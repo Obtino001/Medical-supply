@@ -399,10 +399,18 @@ export default function ImportWizard() {
           <div className="space-y-2">
             {vRows.slice(vPage * 20, vPage * 20 + 20).map((r) => (
               <Card key={r.rowNumber} className="!p-3">
-                <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-slate-500">Row {r.rowNumber}</span><b>{r.title || '(no title)'}</b>
+                <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-[#5F6368]">Row {r.rowNumber}</span><b className="font-medium text-[#202124]">{r.title || '(no title)'}</b>
                   <Badge tone={r.kind === 'valid' ? 'green' : r.kind === 'invalid' ? 'red' : 'amber'}>{r.kind}</Badge></div>
-                <div className="text-sm text-slate-600">Rate {rs(r.price)} {r.schemeText ? `· ${r.schemeText}` : ''} → effective {r.cost.effective != null && r.cost.status !== 'invalid' ? rs(r.cost.effective) : '—'}</div>
-                {[...r.errors, ...r.warnings].map((m, i) => <div key={i} className={`text-sm ${r.errors.includes(m) ? 'text-red-700' : 'text-amber-800'}`}>• {m}</div>)}
+                <div className="text-sm text-[#5F6368]">
+                  {r.price != null ? (
+                    <>Rate {rs(r.price)} {r.schemeText ? `· ${r.schemeText}` : ''} → effective {r.cost.effective != null && r.cost.status !== 'invalid' ? rs(r.cost.effective) : '—'}</>
+                  ) : r.schemeText ? (
+                    <>Offer: <b className="font-medium text-[#202124]">{r.schemeText}</b></>
+                  ) : (
+                    <>Rate —</>
+                  )}
+                </div>
+                {[...r.errors, ...r.warnings].map((m, i) => <div key={i} className={`text-sm ${r.errors.includes(m) ? 'text-[#D93025]' : 'text-[#B06000]'}`}>• {m}</div>)}
               </Card>
             ))}
             {vRows.length === 0 && <Card>No rows in this view.</Card>}
@@ -433,7 +441,7 @@ export default function ImportWizard() {
                     <span className="text-xs text-[#5F6368]">Row {r.rowNumber}</span><b className="font-medium text-[#202124]">{r.title}</b><Badge tone={m.match.confidence === 'exact' || m.match.confidence === 'high' ? 'blue' : m.match.confidence === 'conflicting' ? 'red' : m.match.confidence === 'needs_review' ? 'amber' : 'slate'}>
                       {{ exact: 'Exact match', high: 'High confidence', needs_review: 'Needs review', conflicting: 'Conflicting attributes', unmatched: 'Unmatched → new product' }[m.match.confidence]}</Badge>
                   </div>
-                  <div className="text-sm text-slate-600">{m.match.reason} · Rate {rs(r.price)}</div>
+                  <div className="text-sm text-[#5F6368]">{m.match.reason} · {r.price != null ? `Rate ${rs(r.price)}${r.schemeText ? ` (${r.schemeText})` : ''}` : `Offer: ${r.schemeText || '—'}`}</div>
                   <div className="my-2"><AttrTable imported={incomingView(r)} existing={existing ? productView(existing) : null} /></div>
                   {m.match.candidates.length > 1 && (
                     <Field label="Other possible products"><Select value={sel ?? ''} onChange={(e) => e.target.value && setChoice(r, { action: 'use', productId: e.target.value })}>
