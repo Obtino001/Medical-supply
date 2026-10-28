@@ -121,9 +121,9 @@ export default function Wishlist() {
           <button
             key={t.label}
             onClick={() => { setTile(t.key); setPage(0) }}
-            className={`rounded-xl text-left transition-all ${tile === t.key ? 'ring-2 ring-teal-600 shadow-xs' : 'hover:opacity-95'}`}
+            className={`rounded-lg text-left transition-all ${tile === t.key ? 'ring-2 ring-[#1A73E8]' : 'hover:opacity-95'}`}
           >
-            <Stat label={t.label} value={t.n} tone={tile === t.key ? 'teal' : undefined} />
+            <Stat label={t.label} value={t.n} tone={tile === t.key ? 'blue' : undefined} />
           </button>
         ))}
       </div>
@@ -151,21 +151,21 @@ export default function Wishlist() {
               <Card key={e.item.id}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <Link to={`/products/${e.product.id}`} className="text-lg font-bold hover:underline">{e.product.name}</Link>
+                    <Link to={`/products/${e.product.id}`} className="text-lg font-medium text-[#202124] hover:text-[#1A73E8] hover:underline">{e.product.name}</Link>
                     <div className="flex flex-wrap items-center gap-1.5">{variantLabel(e.product) && <Badge tone="blue">{variantLabel(e.product)}</Badge>}
                       {e.item.priority === 'high' ? <Badge tone="red">{PRI_LABEL.high}</Badge> : <Badge>{PRI_LABEL[e.item.priority]}</Badge>}
                       {e.item.status === 'needs_fresh_price' && <Badge tone="amber">Needs fresh price</Badge>}
-                      {e.item.status === 'checked' && <Badge tone="green">Checked {fmtDate(e.item.last_checked_at)}</Badge>}
+                      {e.item.status === 'checked' && <Badge tone="blue">Checked {fmtDate(e.item.last_checked_at)}</Badge>}
                       {e.reviewCount > 0 && <Badge tone="amber">Match review pending</Badge>}
                       {e.newLow && <Badge tone="green">New lower price</Badge>}</div>
-                    <div className="text-xs text-slate-500">Added by {memberName(e.item.created_by)} on {fmtDate(e.item.created_at)} · last survey {fmtDate(e.lastSurvey)} · last price update {fmtDate(e.lastUpdate)}</div>
+                    <div className="text-xs text-[#5F6368]">Added by {memberName(e.item.created_by)} on {fmtDate(e.item.created_at)} · last survey {fmtDate(e.lastSurvey)} · last price update {fmtDate(e.lastUpdate)}</div>
                   </div>
                   <div className="text-right">
                     {best ? (<>
-                      <div className={`rounded-lg px-2 py-1 text-xl font-extrabold ${best.isBest ? 'bg-emerald-600 text-white' : ''}`}>{rs(best.cents! / 100)}</div>
+                      <div className={`rounded px-2 py-1 text-xl font-bold tabular-nums ${best.isBest ? 'bg-[#188038] text-white' : 'text-[#202124]'}`}>{rs(best.cents! / 100)}</div>
                       <div className="text-sm">{best.isBest && <Badge tone="solid">{best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>} <b>{shopMap.get(best.rec.shop_id)?.name}</b></div>
-                      <div className="text-xs text-slate-600">{fmtDate(best.rec.observed_on)}{!best.fresh && ' · possibly outdated'}</div>
-                      {e.cmp.nextBest && <div className="text-xs text-slate-600">Next best {rs(e.cmp.nextBest.cents / 100)} · difference {rs(e.cmp.nextBest.saving)}</div>}
+                      <div className="text-xs text-[#5F6368]">{fmtDate(best.rec.observed_on)}{!best.fresh && ' · possibly outdated'}</div>
+                      {e.cmp.nextBest && <div className="text-xs text-[#5F6368]">Next best {rs(e.cmp.nextBest.cents / 100)} · difference {rs(e.cmp.nextBest.saving)}</div>}
                     </>) : <Badge tone="amber">No valid price</Badge>}
                   </div>
                 </div>

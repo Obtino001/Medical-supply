@@ -124,12 +124,12 @@ export default function ProductDetail() {
                         const prev = recs[i + 1]
                         const ch = prev?.effective_cost && r.effective_cost ? ((r.effective_cost - prev.effective_cost) / prev.effective_cost) * 100 : null
                         return (
-                          <tr key={r.id} className={`border-t border-slate-100 ${r.archived ? 'text-slate-400 line-through' : ''}`}>
-                            <td className="py-1 pr-2 whitespace-nowrap">{fmtDate(r.observed_on)} {latestIds.has(r.id) ? <Badge tone="green">Latest</Badge> : <Badge>Older</Badge>}</td>
-                            <td className="pr-2 whitespace-nowrap">{rs(r.base_price)}</td>
+                          <tr key={r.id} className={`border-t border-[#DADCE0] ${r.archived ? 'text-[#5F6368] line-through' : ''}`}>
+                            <td className="py-1.5 pr-2 whitespace-nowrap">{fmtDate(r.observed_on)} {latestIds.has(r.id) ? <Badge tone="blue">Latest</Badge> : <Badge>Older</Badge>}</td>
+                            <td className="pr-2 whitespace-nowrap tabular-nums">{rs(r.base_price)}</td>
                             <td className="pr-2">{r.scheme_text || '—'}</td>
-                            <td className="pr-2 font-semibold whitespace-nowrap">{r.scheme_status === 'ok' ? rs(r.effective_cost) : <Badge tone="amber">{r.scheme_status}</Badge>}</td>
-                            <td className={`pr-2 whitespace-nowrap ${ch == null ? '' : ch < 0 ? 'font-semibold text-emerald-700' : ch > 0 ? 'text-red-700' : ''}`}>{ch == null ? '—' : `${ch > 0 ? '+' : ''}${ch.toFixed(1)}%`}</td>
+                            <td className="pr-2 font-medium whitespace-nowrap tabular-nums">{r.scheme_status === 'ok' ? rs(r.effective_cost) : <Badge tone="amber">{r.scheme_status}</Badge>}</td>
+                            <td className={`pr-2 whitespace-nowrap tabular-nums ${ch == null ? '' : ch < 0 ? 'font-semibold text-[#188038]' : ch > 0 ? 'text-[#D93025]' : ''}`}>{ch == null ? '—' : `${ch > 0 ? '+' : ''}${ch.toFixed(1)}%`}</td>
                             <td>{memberName(r.created_by)}</td>
                           </tr>
                         )

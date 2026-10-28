@@ -176,12 +176,12 @@ export default function ImportWizard() {
     return (
       <Card className="mx-auto max-w-lg space-y-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E6F4EA] text-[#188038]">
             <IconCheck className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Import complete</h1>
-            <p className="text-sm text-slate-600">Saved to the shared database. Your partner sees it after refreshing.</p>
+            <h1 className="text-lg font-medium text-[#202124]">Import complete</h1>
+            <p className="text-sm text-[#5F6368]">Saved to the shared database. Your partner sees it after refreshing.</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -212,19 +212,19 @@ export default function ImportWizard() {
         title="Import price list"
         subtitle="Upload a supplier CSV or Excel (.xlsx / .xls) price list, verify columns, and match items into the shared catalog."
       />
-      <ol className="flex gap-1.5 overflow-x-auto pb-1 text-xs font-semibold">
+      <ol className="flex gap-1.5 overflow-x-auto pb-1 text-xs font-medium">
         {STEPS.map((s, i) => (
           <li
             key={s}
             className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 transition-colors ${
               i === step
-                ? 'bg-teal-700 text-white shadow-xs'
+                ? 'bg-[#1A73E8] text-white'
                 : i < step
-                  ? 'bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200'
-                  : 'bg-slate-100 text-slate-500'
+                  ? 'bg-[#E8F0FE] text-[#1A73E8] ring-1 ring-inset ring-[#1A73E8]/30'
+                  : 'bg-[#F8F9FA] text-[#5F6368] ring-1 ring-inset ring-[#DADCE0]'
             }`}
           >
-            {i < step ? <IconCheck className="h-3.5 w-3.5 text-teal-700" /> : <span>{i + 1}.</span>}
+            {i < step ? <IconCheck className="h-3.5 w-3.5 text-[#1A73E8]" /> : <span>{i + 1}.</span>}
             <span>{s}</span>
           </li>
         ))}
@@ -254,22 +254,22 @@ export default function ImportWizard() {
 
       {step === 1 && (
         <Card className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-sm text-[#5F6368]">
             <span>Selected supplier:</span>
-            <Badge tone="teal">{shop?.name}</Badge>
+            <Badge tone="blue">{shop?.name}</Badge>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Survey date"><Input type="date" value={surveyDate} max={today()} onChange={(e) => setSurveyDate(e.target.value)} /></Field>
             <Field label="Survey notes (optional)"><Input placeholder="e.g. Monthly wholesale rate sheet" value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
           </div>
           <Field label="Price list file (CSV or Excel .xlsx / .xls)" hint="PDF and photo price lists are not supported yet: ask the shop for Excel/CSV or export to .xlsx first.">
-            <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={(e) => void onFile(e.target.files?.[0])} className="block w-full min-h-11 rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-teal-700 file:px-3.5 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-teal-800" />
+            <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={(e) => void onFile(e.target.files?.[0])} className="block w-full min-h-11 rounded-md border border-[#DADCE0] bg-white p-2 text-sm text-[#202124] file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-[#1A73E8] file:px-3.5 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-[#1557B0]" />
           </Field>
-          {reading && <div className="text-sm text-slate-600">Reading file…</div>}
+          {reading && <div className="text-sm text-[#5F6368]">Reading file…</div>}
           {fileErr && <ErrorBox>{fileErr}</ErrorBox>}
           {file && (
-            <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-sm text-emerald-900">
-              <IconFileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-700" />
+            <div className="flex items-center gap-2.5 rounded-md border border-[#CEEAD6] bg-[#E6F4EA] px-3.5 py-2.5 text-sm text-[#188038]">
+              <IconFileSpreadsheet className="h-4 w-4 shrink-0 text-[#188038]" />
               <span>Loaded <b>{file.filename}</b>{file.sheetName ? ` (sheet "${file.sheetName}")` : ''} · {file.grid.length} rows · {(file.size / 1024).toFixed(0)} KB</span>
             </div>
           )}
@@ -292,9 +292,9 @@ export default function ImportWizard() {
               </Select>
             </Field>
             {sideBySide.status === 'detected' && (
-              <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3.5 text-sm text-emerald-950">
-                <div className="font-semibold">Side-by-side price list detected</div>
-                <p className="mt-0.5 text-xs text-emerald-900">{sideBySide.reason}</p>
+              <div className="mt-3 rounded-md border border-[#1A73E8]/30 bg-[#E8F0FE] p-3.5 text-sm text-[#202124]">
+                <div className="font-medium text-[#1A73E8]">Side-by-side price list detected</div>
+                <p className="mt-0.5 text-xs text-[#5F6368]">{sideBySide.reason}</p>
                 <label className="mt-2 flex items-center gap-2 text-xs font-medium">
                   <input
                     type="checkbox"
@@ -347,8 +347,8 @@ export default function ImportWizard() {
                 <span>
                   Additional columns <span className="font-normal text-slate-500">(optional: Discount, Scheme / Bonus, Notes, etc.)</span>
                 </span>
-                <span className="flex items-center gap-2 text-xs text-slate-600">
-                  {mappedOptionalCount > 0 && <Badge tone="green">{mappedOptionalCount} mapped</Badge>}
+                <span className="flex items-center gap-2 text-xs text-[#5F6368]">
+                  {mappedOptionalCount > 0 && <Badge tone="blue">{mappedOptionalCount} mapped</Badge>}
                   {showAdditionalCols ? <IconChevronDown className="h-4 w-4" /> : <IconChevronRight className="h-4 w-4" />}
                 </span>
               </button>
@@ -430,7 +430,7 @@ export default function ImportWizard() {
               return (
                 <Card key={r.rowNumber} className={m.match.confidence === 'conflicting' ? 'border-red-300' : ''}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-slate-500">Row {r.rowNumber}</span><b>{r.title}</b><Badge tone={m.match.confidence === 'exact' || m.match.confidence === 'high' ? 'green' : m.match.confidence === 'conflicting' ? 'red' : m.match.confidence === 'needs_review' ? 'amber' : 'slate'}>
+                    <span className="text-xs text-[#5F6368]">Row {r.rowNumber}</span><b className="font-medium text-[#202124]">{r.title}</b><Badge tone={m.match.confidence === 'exact' || m.match.confidence === 'high' ? 'blue' : m.match.confidence === 'conflicting' ? 'red' : m.match.confidence === 'needs_review' ? 'amber' : 'slate'}>
                       {{ exact: 'Exact match', high: 'High confidence', needs_review: 'Needs review', conflicting: 'Conflicting attributes', unmatched: 'Unmatched → new product' }[m.match.confidence]}</Badge>
                   </div>
                   <div className="text-sm text-slate-600">{m.match.reason} · Rate {rs(r.price)}</div>

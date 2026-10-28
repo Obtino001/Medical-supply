@@ -54,40 +54,40 @@ export default function Opportunities() {
           {list.slice(page * per, page * per + per).map((o) => {
             const st = opportunityStatus.get(o.product.id)
             return (
-              <Card key={o.product.id} className="border-emerald-200/90 transition-colors hover:border-emerald-300">
+              <Card key={o.product.id} className="border-[#DADCE0] transition-colors hover:border-[#1A73E8]">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link to={`/products/${o.product.id}`} className="text-[15px] font-semibold text-slate-900 hover:text-teal-700 hover:underline">{o.product.name}</Link>
-                      <span className="text-xs text-slate-400 tabular-nums">#{o.product.product_no}</span>
+                      <Link to={`/products/${o.product.id}`} className="text-[15px] font-medium text-[#202124] hover:text-[#1A73E8] hover:underline">{o.product.name}</Link>
+                      <span className="text-xs text-[#5F6368] tabular-nums">#{o.product.product_no}</span>
                       {variantLabel(o.product) && <Badge tone="blue">{variantLabel(o.product)}</Badge>}
                     </div>
                   </div>
                   <div className="text-right tabular-nums">
-                    <div className="text-lg font-bold text-emerald-700">Save {rs(o.saving)} <span className="text-sm font-semibold">({o.savingPct.toFixed(1)}%)</span></div>
-                    <div className="text-[11px] text-slate-500">vs next-best supplier</div>
+                    <div className="text-lg font-semibold text-[#188038]">Save {rs(o.saving)} <span className="text-sm font-medium">({o.savingPct.toFixed(1)}%)</span></div>
+                    <div className="text-[11px] text-[#5F6368]">vs next-best supplier</div>
                   </div>
                 </div>
                 <div className="mt-2.5 grid gap-2 text-sm sm:grid-cols-2">
-                  <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-[#CEEAD6] bg-[#E6F4EA] px-3 py-2 text-xs">
                     <Badge tone="solid">{o.tied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>
-                    <b className="text-slate-900">{shopMap.get(o.best.rec.shop_id)?.name}</b>:
-                    <b className="text-emerald-800 tabular-nums">{rs(o.best.cents! / 100)}</b>
-                    {o.best.rec.scheme_text ? <span className="text-slate-600">({o.best.rec.scheme_text})</span> : ''}
+                    <b className="font-medium text-[#202124]">{shopMap.get(o.best.rec.shop_id)?.name}</b>:
+                    <b className="font-semibold text-[#188038] tabular-nums">{rs(o.best.cents! / 100)}</b>
+                    {o.best.rec.scheme_text ? <span className="text-[#5F6368]">({o.best.rec.scheme_text})</span> : ''}
                   </div>
                   {o.next && (
-                    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-[#DADCE0] bg-[#F8F9FA] px-3 py-2 text-xs text-[#5F6368]">
                       <span>Next best:</span>
-                      <b className="text-slate-900">{shopMap.get(o.next.rec.shop_id)?.name}</b>:
-                      <span className="font-semibold tabular-nums">{rs(o.next.cents! / 100)}</span>
+                      <b className="font-medium text-[#202124]">{shopMap.get(o.next.rec.shop_id)?.name}</b>:
+                      <span className="font-medium tabular-nums">{rs(o.next.cents! / 100)}</span>
                     </div>
                   )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {o.reasons.map((r) => <Badge key={r} tone={r === 'multiple' ? 'slate' : 'green'}>{LABEL[r]}{r === 'price_drop' && o.dropPct ? ` ${o.dropPct.toFixed(0)}%` : ''}{r === 'new_low' && o.priorLow ? ` (was ${rs(o.priorLow)})` : ''}</Badge>)}
                   <FreshBadge ageDays={o.best.ageDays} fresh={o.best.fresh} />
-                  <Badge tone={o.verified ? 'green' : 'amber'}>Match: {o.confidence}</Badge>
-                  <span className="text-xs text-slate-500">Survey {fmtDate(o.best.rec.observed_on)}</span>
+                  <Badge tone={o.verified ? 'blue' : 'amber'}>Match: {o.confidence}</Badge>
+                  <span className="text-xs text-[#5F6368]">Survey {fmtDate(o.best.rec.observed_on)}</span>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Select className="!w-auto !min-h-9 text-sm" value={st?.status ?? ''} onChange={(e) => void setStatus(o.product.id, e.target.value)} aria-label="Opportunity status">

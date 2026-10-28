@@ -37,14 +37,14 @@ export default function Shops() {
         <div className="grid gap-3 sm:grid-cols-2">
           {list.map((s) => (
             <Link key={s.id} to={`/shops/${s.id}`}>
-              <Card className="transition-colors hover:border-teal-600">
+              <Card className="transition-colors hover:border-[#1A73E8] hover:bg-[#F8F9FA]">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[15px] font-semibold text-slate-900">{s.name}</span>
-                  {s.status === 'archived' ? <Badge tone="amber">Archived</Badge> : <Badge tone="teal">{s.city || 'Supplier'}</Badge>}
+                  <span className="text-[15px] font-medium text-[#202124]">{s.name}</span>
+                  {s.status === 'archived' ? <Badge tone="amber">Archived</Badge> : <Badge tone="blue">{s.city || 'Supplier'}</Badge>}
                 </div>
-                <div className="mt-1 text-xs text-slate-600">{[s.city, s.address].filter(Boolean).join(' · ') || 'No location recorded'}</div>
-                {([s.owner_name, s.phone].some(Boolean)) && <div className="mt-0.5 text-xs text-slate-600">{[s.owner_name, s.phone].filter(Boolean).join(' · ')}</div>}
-                <div className="mt-2 text-xs text-slate-500">Last survey: <span className="font-medium text-slate-700">{fmtDate(lastSurvey.get(s.id))}</span></div>
+                <div className="mt-1 text-xs text-[#5F6368]">{[s.city, s.address].filter(Boolean).join(' · ') || 'No location recorded'}</div>
+                {([s.owner_name, s.phone].some(Boolean)) && <div className="mt-0.5 text-xs text-[#5F6368]">{[s.owner_name, s.phone].filter(Boolean).join(' · ')}</div>}
+                <div className="mt-2 text-xs text-[#5F6368]">Last survey: <span className="font-medium text-[#202124]">{fmtDate(lastSurvey.get(s.id))}</span></div>
               </Card>
             </Link>
           ))}

@@ -132,7 +132,7 @@ export default function ExportCenter() {
           ))}
         </div>
         <details>
-          <summary className="cursor-pointer text-sm font-semibold text-emerald-800">Add columns</summary>
+          <summary className="cursor-pointer text-sm font-medium text-[#1A73E8] hover:text-[#1557B0]">Add columns</summary>
           <div className="mt-2 grid gap-1 sm:grid-cols-2">{EXPORT_COLUMNS.filter((c) => !cols.some((x) => x.key === c.key)).map((c) => <label key={c.key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={false} onChange={() => toggle(c.key)} />{c.label}</label>)}</div>
         </details>
         <div className="flex flex-wrap items-end gap-2">

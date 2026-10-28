@@ -33,11 +33,11 @@ export default function Settings() {
         <p className="mb-2 text-sm text-slate-600">Both accounts see the same shops, products, prices, wishlist and match decisions. You are signed in as <b>{email}</b> ({role}).</p>
         <div className="space-y-2">
           {members.map((m) => (
-            <div key={m.user_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-2">
-              <div><b>{m.email}</b> {m.user_id === userId && <Badge tone="blue">you</Badge>}</div>
+            <div key={m.user_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#DADCE0] p-2.5">
+              <div><b className="font-medium text-[#202124]">{m.email}</b> {m.user_id === userId && <Badge tone="blue">you</Badge>}</div>
               {isAdmin && m.user_id !== userId ? (
                 <Select className="!w-auto" value={m.role} onChange={(e) => void setRole(m.user_id, e.target.value)}><option value="admin">Admin</option><option value="partner">Partner</option></Select>
-              ) : <Badge tone={m.role === 'admin' ? 'green' : 'slate'}>{m.role}</Badge>}
+              ) : <Badge tone={m.role === 'admin' ? 'blue' : 'slate'}>{m.role}</Badge>}
             </div>
           ))}
         </div>
