@@ -33,8 +33,8 @@ export default function Review() {
         subtitle="Verify uncertain product matches or inspect saved supplier-to-catalog mappings."
       />
       <div className="flex gap-2">
-        <Button variant={tab === 'review' ? 'primary' : 'secondary'} onClick={() => setTab('review')}>To review</Button>
-        <Button variant={tab === 'saved' ? 'primary' : 'secondary'} onClick={() => setTab('saved')}>Saved mappings</Button>
+        <Button small variant={tab === 'review' ? 'primary' : 'secondary'} onClick={() => setTab('review')}>To review</Button>
+        <Button small variant={tab === 'saved' ? 'primary' : 'secondary'} onClick={() => setTab('saved')}>Saved mappings</Button>
       </div>
       {tab === 'review' ? <ToReview /> : <Saved />}
     </div>
@@ -57,7 +57,7 @@ function ToReview() {
   const per = 10
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">These price records are saved but not linked to a product, so they are never ranked. Different grams / strengths / pack sizes are never merged automatically. Conflicts are highlighted in red.</p>
+      <p className="text-sm text-[var(--text-secondary)]">These price records are saved but not linked to a product, so they are never ranked. Different grams / strengths / pack sizes are never merged automatically. Conflicts are highlighted in red.</p>
       {review.slice(page * per, page * per + per).map((r) => {
         const cands = (r.match_candidates ?? []).filter((c) => productMap.has(c.productId))
         const chosen = sel[r.id] ?? cands[0]?.productId ?? null
@@ -65,9 +65,9 @@ function ToReview() {
         const reason = cands.find((c) => c.productId === chosen)
         return (
           <Card key={r.id}>
-            <div className="flex flex-wrap items-center gap-2"><b>{r.original_title}</b><MatchBadge status={r.match_status} /></div>
-            <div className="text-sm text-slate-600">{shopMap.get(r.shop_id)?.name} · {fmtDate(r.observed_on)} · Rate {rs(r.base_price)}{r.scheme_text ? ` · ${r.scheme_text}` : ''}</div>
-            {reason && <div className="mt-1 text-sm text-amber-800">Why: {reason.reason}</div>}
+            <div className="flex flex-wrap items-center gap-2"><b className="font-medium text-[var(--text-primary)]">{r.original_title}</b><MatchBadge status={r.match_status} /></div>
+            <div className="text-sm text-[var(--text-secondary)]">{shopMap.get(r.shop_id)?.name} · {fmtDate(r.observed_on)} · Rate {rs(r.base_price)}{r.scheme_text ? ` · ${r.scheme_text}` : ''}</div>
+            {reason && <div className="mt-1 text-sm text-[var(--color-warning-text)]">Why: {reason.reason}</div>}
             <div className="my-2"><AttrTable imported={sourceView(r)} existing={existing ? productView(existing) : null} /></div>
             {cands.length > 1 && (
               <Field label="Suggested products"><Select value={chosen ?? ''} onChange={(e) => setSel({ ...sel, [r.id]: e.target.value })}>
@@ -121,21 +121,21 @@ function Saved() {
   return (
     <div className="space-y-4">
       <section>
-        <h2 className="mb-2 font-bold">Confirmed mappings ({dec.length})</h2>
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Confirmed mappings ({dec.length})</h2>
         {dec.length === 0 ? <Empty title="No saved mappings yet" /> : dec.slice(page * per, page * per + per).map((d) => (
           <Card key={d.id} className="mb-2 !p-3">
-            <div className="text-sm"><Badge>{shopMap.get(d.shop_id)?.name}</Badge> “{label(d.source_key)}” → <b>{productMap.get(d.product_id)?.name}</b></div>
-            <div className="text-xs text-slate-500">Confirmed by {memberName(d.created_by)} on {fmtDate(d.created_at)}</div>
+            <div className="text-sm"><Badge>{shopMap.get(d.shop_id)?.name}</Badge> “{label(d.source_key)}” → <b className="font-medium text-[var(--text-primary)]">{productMap.get(d.product_id)?.name}</b></div>
+            <div className="text-xs text-[var(--text-secondary)]">Confirmed by {memberName(d.created_by)} on {fmtDate(d.created_at)}</div>
             <Button small variant="ghost" onClick={() => undo(d)}>Undo mapping</Button>
           </Card>
         ))}
         <Pagination page={page} pages={Math.ceil(dec.length / per)} onPage={setPage} />
       </section>
       <section>
-        <h2 className="mb-2 font-bold">Rejected pairings ({rej.length})</h2>
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Rejected pairings ({rej.length})</h2>
         {rej.length === 0 ? <Empty title="None" /> : rej.slice(0, 50).map((r) => (
           <Card key={r.id} className="mb-2 !p-3">
-            <div className="text-sm"><Badge>{shopMap.get(r.shop_id)?.name}</Badge> “{label(r.source_key)}” is <b>not</b> {productMap.get(r.product_id)?.name}</div>
+            <div className="text-sm"><Badge>{shopMap.get(r.shop_id)?.name}</Badge> “{label(r.source_key)}” is <b className="font-medium text-[var(--text-primary)]">not</b> {productMap.get(r.product_id)?.name}</div>
             <Button small variant="ghost" onClick={() => unreject(r)}>Allow this pairing again</Button>
           </Card>
         ))}

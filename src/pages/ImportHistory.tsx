@@ -25,8 +25,8 @@ export default function ImportHistory() {
         <div className="space-y-2">
           {jobs.slice(page * per, page * per + per).map((j) => (
             <Card key={j.id} className="!p-3.5">
-              <div className="font-semibold text-slate-900 break-all">{j.filename}</div>
-              <div className="mt-0.5 text-xs text-slate-600">{shopMap.get(j.shop_id)?.name} · {fmtDate(j.created_at)} · by {memberName(j.created_by)}</div>
+              <div className="font-medium text-[var(--text-primary)] break-all">{j.filename}</div>
+              <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{shopMap.get(j.shop_id)?.name} · {fmtDate(j.created_at)} · by {memberName(j.created_by)}</div>
               <div className="mt-2 flex flex-wrap gap-1.5"><Badge>{j.row_total} rows</Badge><Badge tone="green">{j.row_imported} imported</Badge>{j.row_skipped > 0 && <Badge tone="amber">{j.row_skipped} skipped</Badge>}{j.row_errors > 0 && <Badge tone="red">{j.row_errors} errors</Badge>}</div>
             </Card>
           ))}

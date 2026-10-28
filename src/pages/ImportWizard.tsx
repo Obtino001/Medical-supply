@@ -218,12 +218,12 @@ export default function ImportWizard() {
     return (
       <Card className="mx-auto max-w-lg space-y-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E6F4EA] text-[#188038]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-best-bg)] text-[var(--color-best)]">
             <IconCheck className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-medium text-[#202124]">Import complete</h1>
-            <p className="text-sm text-[#5F6368]">Saved to the shared database. Your partner sees it after refreshing.</p>
+            <h1 className="text-lg font-medium text-[var(--text-primary)]">Import complete</h1>
+            <p className="text-sm text-[var(--text-secondary)]">Saved to the shared database. Your partner sees it after refreshing.</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -278,20 +278,20 @@ export default function ImportWizard() {
               className={cx(
                 'flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
                 isCurrent
-                  ? 'border-[#1A73E8] bg-[#1A73E8] text-white'
+                  ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-text)]'
                   : isDone
-                    ? 'border-[#1A73E8]/30 bg-[#E8F0FE] text-[#1A73E8]'
-                    : 'border-[#E1E5EA] bg-white text-[#5F6368]',
+                    ? 'border-[var(--color-primary-border)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
+                    : 'border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)]',
               )}
             >
               <span
                 className={cx(
                   'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums',
                   isCurrent
-                    ? 'bg-white/20 text-white'
+                    ? 'bg-black/15 text-[var(--color-primary-text)]'
                     : isDone
-                      ? 'bg-[#1A73E8] text-white'
-                      : 'bg-[#F8FAFC] text-[#5F6368] border border-[#E1E5EA]',
+                      ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)]'
+                      : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] border border-[var(--border-default)]',
                 )}
               >
                 {isDone ? <IconCheck size={12} /> : i + 1}
@@ -306,18 +306,18 @@ export default function ImportWizard() {
       {step === 0 && (
         <Card className="space-y-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E8F0FE] text-[#1A73E8]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary-light)] text-[var(--color-primary)]">
               <IconStore size={20} />
             </div>
             <div>
-              <h2 className="text-base font-medium text-[#202124]">Which shop is this price list from?</h2>
-              <p className="text-xs text-[#5F6368]">Select an existing wholesale supplier or add a new shop.</p>
+              <h2 className="text-base font-medium text-[var(--text-primary)]">Which shop is this price list from?</h2>
+              <p className="text-xs text-[var(--text-secondary)]">Select an existing wholesale supplier or add a new shop.</p>
             </div>
           </div>
 
           {activeShops.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[#E1E5EA] bg-[#F8FAFC] p-4 text-sm text-[#5F6368]">
-              <div className="font-medium text-[#202124]">No shops added yet</div>
+            <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] p-4 text-sm text-[var(--text-secondary)]">
+              <div className="font-medium text-[var(--text-primary)]">No shops added yet</div>
               <p className="mt-0.5 text-xs">Add your first wholesale supplier to import its price list.</p>
             </div>
           ) : (
@@ -339,16 +339,16 @@ export default function ImportWizard() {
             </Field>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E1E5EA] pt-3">
-            <span className="text-xs text-[#5F6368]">Supplier not in the list?</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-default)] pt-3">
+            <span className="text-xs text-[var(--text-secondary)]">Supplier not in the list?</span>
             <Button variant="secondary" onClick={() => setAddingShop(true)}>
-              <IconPlus size={16} className="text-[#1A73E8]" />
+              <IconPlus size={16} className="text-[var(--color-primary)]" />
               <span>Add a new shop</span>
             </Button>
           </div>
 
           {shop && (
-            <div className="rounded-xl border border-[#E1E5EA] bg-[#F8FAFC] px-3.5 py-2.5 text-xs text-[#5F6368]">
+            <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-subtle)] px-3.5 py-2.5 text-xs text-[var(--text-secondary)]">
               {preset
                 ? 'Saved column mapping found for this shop — it will be applied automatically.'
                 : 'No saved mapping for this shop yet — columns will be detected automatically.'}
@@ -360,15 +360,15 @@ export default function ImportWizard() {
       {/* STEP 2: SURVEY & FILE UPLOAD */}
       {step === 1 && (
         <Card className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E1E5EA] pb-3">
-            <div className="flex items-center gap-2 text-sm text-[#5F6368]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-default)] pb-3">
+            <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
               <span>Selected supplier:</span>
               <Badge tone="blue">{shop?.name}</Badge>
             </div>
             <button
               type="button"
               onClick={() => setStep(0)}
-              className="text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline"
+              className="text-xs font-medium text-[var(--color-primary)] hover:underline"
             >
               Change shop
             </button>
@@ -384,8 +384,8 @@ export default function ImportWizard() {
           </div>
 
           <div>
-            <span className="mb-1.5 block text-xs font-medium text-[#202124] sm:text-sm">
-              Price list file <span className="font-semibold text-[#D93025]">*</span>
+            <span className="mb-1.5 block text-xs font-medium text-[var(--text-primary)] sm:text-[13px]">
+              Price list file <span className="font-semibold text-[var(--color-error-text)]">*</span>
             </span>
 
             <input
@@ -400,26 +400,26 @@ export default function ImportWizard() {
             {!file ? (
               <label
                 htmlFor="price-list-file-input"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#E1E5EA] bg-[#F8FAFC] px-4 py-7 text-center transition-colors hover:border-[#1A73E8] hover:bg-[#E8F0FE]/30"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] px-4 py-7 text-center transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"
               >
-                <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[#E8F0FE] text-[#1A73E8]">
+                <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)]">
                   <IconUpload size={22} />
                 </div>
-                <span className="text-sm font-medium text-[#1A73E8]">Choose price list</span>
-                <span className="mt-1 text-xs font-medium text-[#202124]">Supported formats: CSV, XLSX and XLS</span>
-                <span className="mt-1 max-w-md text-xs text-[#5F6368]">
+                <span className="text-sm font-medium text-[var(--color-primary)]">Choose price list</span>
+                <span className="mt-1 text-xs font-medium text-[var(--text-primary)]">Supported formats: CSV, XLSX and XLS</span>
+                <span className="mt-1 max-w-md text-xs text-[var(--text-secondary)]">
                   PDF and photo price lists are not supported yet — ask the supplier for Excel/CSV or export to .xlsx first.
                 </span>
               </label>
             ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#CEEAD6] bg-[#E6F4EA]/60 p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-best-border)] bg-[var(--color-best-bg)] p-3.5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#188038] text-white">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-best-solid)] text-[var(--color-best-solid-text)]">
                     <IconFileSpreadsheet size={20} />
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-[#202124]">{file.filename}</div>
-                    <div className="text-xs text-[#5F6368] tabular-nums">
+                    <div className="truncate text-sm font-medium text-[var(--text-primary)]">{file.filename}</div>
+                    <div className="text-xs text-[var(--text-secondary)] tabular-nums">
                       {file.sheetName ? `Sheet "${file.sheetName}" · ` : ''}
                       {file.grid.length} rows · {Math.max(1, Math.round(file.size / 1024))} KB
                     </div>
@@ -428,7 +428,7 @@ export default function ImportWizard() {
                 <div className="flex items-center gap-2">
                   <label
                     htmlFor="price-list-file-input"
-                    className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-[#E1E5EA] bg-white px-3 py-1.5 text-xs font-medium text-[#202124] hover:bg-[#F8FAFC]"
+                    className="inline-flex min-h-8.5 cursor-pointer items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                   >
                     Replace file
                   </label>
@@ -436,7 +436,7 @@ export default function ImportWizard() {
                     type="button"
                     onClick={clearFile}
                     aria-label="Remove file"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E1E5EA] bg-white text-[#5F6368] hover:bg-[#FCE8E6] hover:text-[#D93025]"
+                    className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--color-error-bg)] hover:text-[var(--color-error-text)]"
                   >
                     <IconClose size={16} />
                   </button>
@@ -449,12 +449,12 @@ export default function ImportWizard() {
           {fileErr && <ErrorBox>{fileErr}</ErrorBox>}
 
           {dupJob && (
-            <div className="rounded-xl border border-[#FDD663] bg-[#FEF7E0] p-3.5 text-sm text-[#202124]">
-              <div className="font-medium text-[#B06000]">This exact file was already imported for this shop</div>
-              <p className="mt-0.5 text-xs text-[#5F6368]">
+            <div className="rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3.5 text-sm text-[var(--text-primary)]">
+              <div className="font-medium text-[var(--color-warning-text)]">This exact file was already imported for this shop</div>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                 {dupJob.filename} · imported on {fmtDate(dupJob.created_at)}. Importing again creates a second set of price records.
               </p>
-              <label className="mt-2.5 flex items-center gap-2 text-xs font-medium text-[#202124] sm:text-sm">
+              <label className="mt-2.5 flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] sm:text-sm">
                 <input type="checkbox" checked={allowDup} onChange={(e) => setAllowDup(e.target.checked)} />
                 Import this file again anyway
               </label>
@@ -469,8 +469,8 @@ export default function ImportWizard() {
           <Card className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h2 className="text-base font-medium text-[#202124]">Map columns</h2>
-                <p className="mt-0.5 text-xs text-[#5F6368]">
+                <h2 className="text-base font-medium text-[var(--text-primary)]">Map columns</h2>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                   Only <b>Product Name / Item Name</b> and <b>Offer Rate / Price</b> are required.
                 </p>
               </div>
@@ -513,16 +513,16 @@ export default function ImportWizard() {
               })}
             </div>
 
-            <div className="border-t border-[#E1E5EA] pt-3">
+            <div className="border-t border-[var(--border-default)] pt-3">
               <button
                 type="button"
                 onClick={() => setShowAdditionalCols(!showAdditionalCols)}
-                className="flex w-full items-center justify-between rounded-xl border border-[#E1E5EA] bg-[#F8FAFC] px-3.5 py-2.5 text-left text-sm font-medium text-[#202124] transition-colors hover:bg-[#E8F0FE]/40"
+                className="flex w-full items-center justify-between rounded-xl border border-[var(--border-default)] bg-[var(--bg-subtle)] px-3.5 py-2.5 text-left text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-hover)]"
               >
                 <span>
-                  Additional columns <span className="font-normal text-[#5F6368]">(optional: Discount, Scheme / Bonus, Notes)</span>
+                  Additional columns <span className="font-normal text-[var(--text-secondary)]">(optional: Discount, Scheme / Bonus, Notes)</span>
                 </span>
-                <span className="flex items-center gap-2 text-xs text-[#5F6368]">
+                <span className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                   {mappedOptionalCount > 0 && <Badge tone="blue">{mappedOptionalCount} mapped</Badge>}
                   {showAdditionalCols ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
                 </span>
@@ -557,8 +557,8 @@ export default function ImportWizard() {
                       )
                     })}
                   </div>
-                  <div className="space-y-3 rounded-xl border border-[#E1E5EA] bg-[#F8FAFC] p-3.5">
-                    <h3 className="text-sm font-medium text-[#202124]">Discount &amp; scheme calculation options</h3>
+                  <div className="space-y-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-subtle)] p-3.5">
+                    <h3 className="text-sm font-medium text-[var(--text-primary)]">Discount &amp; scheme calculation options</h3>
                     <Field
                       label="A plain number in the Discount column means"
                       hint="e.g. “2” = 2% or Rs 2. Text such as “2%” or “Rs. 20” is always read as written."
@@ -571,7 +571,7 @@ export default function ImportWizard() {
                         <option value="flat">Flat Rs per unit</option>
                       </Select>
                     </Field>
-                    <label className="flex items-start gap-2 text-sm text-[#202124]">
+                    <label className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
                       <input
                         type="checkbox"
                         className="mt-1"
@@ -582,7 +582,7 @@ export default function ImportWizard() {
                         The Rate column is <b>already net</b> of the discount (do not apply the discount again)
                       </span>
                     </label>
-                    <label className="flex items-start gap-2 text-sm text-[#202124]">
+                    <label className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
                       <input
                         type="checkbox"
                         className="mt-1"
@@ -608,14 +608,14 @@ export default function ImportWizard() {
               )}
             </div>
 
-            <label className="flex items-center gap-2 pt-1 text-sm text-[#202124]">
+            <label className="flex items-center gap-2 pt-1 text-sm text-[var(--text-primary)]">
               <input type="checkbox" checked={savePreset} onChange={(e) => setSavePreset(e.target.checked)} />
               Remember this column mapping for {shop?.name}
             </label>
           </Card>
 
           <Card className="space-y-3">
-            <h2 className="text-base font-medium text-[#202124]">File preview</h2>
+            <h2 className="text-base font-medium text-[var(--text-primary)]">File preview</h2>
             <Field label="Header row (the row containing column names)">
               <Select
                 value={options.headerRow}
@@ -634,9 +634,9 @@ export default function ImportWizard() {
               </Select>
             </Field>
             {sideBySide.status === 'detected' && (
-              <div className="rounded-xl border border-[#1A73E8]/30 bg-[#E8F0FE] p-3.5 text-sm text-[#202124]">
-                <div className="font-medium text-[#1A73E8]">Side-by-side price list detected</div>
-                <p className="mt-0.5 text-xs text-[#5F6368]">{sideBySide.reason}</p>
+              <div className="rounded-xl border border-[var(--color-primary-border)] bg-[var(--color-primary-light)] p-3.5 text-sm text-[var(--text-primary)]">
+                <div className="font-medium text-[var(--color-primary)]">Side-by-side price list detected</div>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{sideBySide.reason}</p>
                 <label className="mt-2 flex items-center gap-2 text-xs font-medium">
                   <input
                     type="checkbox"
@@ -648,14 +648,14 @@ export default function ImportWizard() {
               </div>
             )}
             {sideBySide.status === 'ambiguous' && (
-              <div className="rounded-xl border border-[#FDD663] bg-[#FEF7E0] p-3.5 text-sm text-[#202124]">
-                <div className="font-medium text-[#B06000]">Please verify column mapping</div>
-                <p className="mt-0.5 text-xs text-[#5F6368]">{sideBySide.reason}</p>
+              <div className="rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3.5 text-sm text-[var(--text-primary)]">
+                <div className="font-medium text-[var(--color-warning-text)]">Please verify column mapping</div>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{sideBySide.reason}</p>
               </div>
             )}
-            <div className="overflow-x-auto rounded-xl border border-[#E1E5EA]">
+            <div className="overflow-x-auto rounded-xl border border-[var(--border-default)]">
               <table className="min-w-full text-xs">
-                <thead className="bg-[#F8FAFC] text-[#5F6368]">
+                <thead className="bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
                   <tr>
                     {headers.map((h) => (
                       <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium">
@@ -664,11 +664,11 @@ export default function ImportWizard() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E1E5EA]">
+                <tbody className="divide-y divide-[var(--border-default)]">
                   {file.grid.slice(options.headerRow, options.headerRow + 6).map((r, i) => (
-                    <tr key={i} className="hover:bg-[#F8FAFC]">
+                    <tr key={i} className="hover:bg-[var(--bg-hover)]">
                       {headers.map((_, c) => (
-                        <td key={c} className="whitespace-nowrap px-3 py-1.5 text-[#202124]">
+                        <td key={c} className="whitespace-nowrap px-3 py-1.5 text-[var(--text-primary)]">
                           {r[c]}
                         </td>
                       ))}
@@ -677,7 +677,7 @@ export default function ImportWizard() {
                 </tbody>
               </table>
             </div>
-            <div className="flex flex-wrap gap-1.5 text-xs text-[#5F6368]">
+            <div className="flex flex-wrap gap-1.5 text-xs text-[var(--text-secondary)]">
               {detectColumns(headers, file.grid.slice(options.headerRow, options.headerRow + 50)).map(
                 (c) => c.numericShare > 0.8 && <Badge key={c.header} tone="blue">{c.header}: numeric</Badge>,
               )}
@@ -690,14 +690,14 @@ export default function ImportWizard() {
       {step === 3 && built && (
         <div className="space-y-4">
           {/* Ready to Import Summary Card */}
-          <Card className="space-y-3.5 border-[#1A73E8]/30 bg-white">
+          <Card className="space-y-3.5 border-[var(--color-primary-border)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-medium text-[#202124]">Ready to import</h2>
-                <p className="text-xs text-[#5F6368]">
-                  Shop <b className="font-medium text-[#202124]">{shop?.name}</b> · survey date{' '}
-                  <b className="font-medium text-[#202124]">{fmtDate(surveyDate)}</b> · file{' '}
-                  <b className="font-medium text-[#202124]">{file?.filename}</b>
+                <h2 className="text-base font-medium text-[var(--text-primary)]">Ready to import</h2>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Shop <b className="font-medium text-[var(--text-primary)]">{shop?.name}</b> · survey date{' '}
+                  <b className="font-medium text-[var(--text-primary)]">{fmtDate(surveyDate)}</b> · file{' '}
+                  <b className="font-medium text-[var(--text-primary)]">{file?.filename}</b>
                 </p>
               </div>
               <Button onClick={() => void commit()} disabled={busy || !index || importable.length === 0}>
@@ -726,13 +726,13 @@ export default function ImportWizard() {
 
           {/* Segmented Toggle: Product Matching vs Row Validation */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex rounded-xl border border-[#E1E5EA] bg-white p-1">
+            <div className="inline-flex rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-1">
               <button
                 type="button"
                 onClick={() => setReviewTab('matching')}
                 className={cx(
                   'rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors sm:text-sm',
-                  reviewTab === 'matching' ? 'bg-[#1A73E8] text-white' : 'text-[#5F6368] hover:text-[#202124]',
+                  reviewTab === 'matching' ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
                 )}
               >
                 Product matching ({counts.needs_review + counts.conflicting} need review)
@@ -742,7 +742,7 @@ export default function ImportWizard() {
                 onClick={() => setReviewTab('validation')}
                 className={cx(
                   'rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors sm:text-sm',
-                  reviewTab === 'validation' ? 'bg-[#1A73E8] text-white' : 'text-[#5F6368] hover:text-[#202124]',
+                  reviewTab === 'validation' ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
                 )}
               >
                 Row validation ({built.stats.invalid} invalid · {built.stats.valid} valid)
@@ -767,13 +767,13 @@ export default function ImportWizard() {
                     <option value="attention">Needs my attention ({counts.needs_review + counts.conflicting})</option>
                     <option value="all">All importable rows ({importable.length})</option>
                   </Select>
-                  <span className="text-xs text-[#5F6368]">
+                  <span className="text-xs text-[var(--text-secondary)]">
                     {counts.exact} exact · {counts.high} high confidence · {counts.unmatched} new products
                   </span>
                 </div>
 
                 {mRows.length === 0 ? (
-                  <Card className="text-sm text-[#5F6368]">
+                  <Card className="text-sm text-[var(--text-secondary)]">
                     Nothing needs your attention. All {importable.length} valid rows are matched or ready to be created as new products.
                   </Card>
                 ) : (
@@ -784,10 +784,10 @@ export default function ImportWizard() {
                     const sel = m.choice.action === 'use' ? m.choice.productId : sugg
                     const existing: Product | undefined = sel ? productMap.get(sel) : undefined
                     return (
-                      <Card key={r.rowNumber} className={m.match.confidence === 'conflicting' ? 'border-[#FAD2CF]' : ''}>
+                      <Card key={r.rowNumber} className={m.match.confidence === 'conflicting' ? 'border-[var(--color-error-border)]' : ''}>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-[#5F6368] tabular-nums">Row {r.rowNumber}</span>
-                          <b className="font-medium text-[#202124]">{r.title}</b>
+                          <span className="text-xs text-[var(--text-secondary)] tabular-nums">Row {r.rowNumber}</span>
+                          <b className="font-medium text-[var(--text-primary)]">{r.title}</b>
                           <Badge
                             tone={
                               m.match.confidence === 'exact' || m.match.confidence === 'high'
@@ -808,7 +808,7 @@ export default function ImportWizard() {
                             }[m.match.confidence]}
                           </Badge>
                         </div>
-                        <div className="mt-0.5 text-sm text-[#5F6368]">
+                        <div className="mt-0.5 text-sm text-[var(--text-secondary)]">
                           {m.match.reason} ·{' '}
                           {r.price != null ? `Rate ${rs(r.price)}${r.schemeText ? ` (${r.schemeText})` : ''}` : `Offer: ${r.schemeText || '—'}`}
                         </div>
@@ -853,9 +853,9 @@ export default function ImportWizard() {
                           )}
                           {existing && <WishlistToggle productId={existing.id} />}
                         </div>
-                        <div className="mt-1.5 text-xs text-[#5F6368]">
+                        <div className="mt-1.5 text-xs text-[var(--text-secondary)]">
                           Current choice:{' '}
-                          <b className="font-medium text-[#202124]">
+                          <b className="font-medium text-[var(--text-primary)]">
                             {{
                               use: 'use existing product',
                               new: 'create new product',
@@ -919,11 +919,11 @@ export default function ImportWizard() {
                 {vRows.slice(vPage * 20, vPage * 20 + 20).map((r) => (
                   <Card key={r.rowNumber} className="!p-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-[#5F6368] tabular-nums">Row {r.rowNumber}</span>
-                      <b className="font-medium text-[#202124]">{r.title || '(no title)'}</b>
+                      <span className="text-xs text-[var(--text-secondary)] tabular-nums">Row {r.rowNumber}</span>
+                      <b className="font-medium text-[var(--text-primary)]">{r.title || '(no title)'}</b>
                       <Badge tone={r.kind === 'valid' ? 'green' : r.kind === 'invalid' ? 'red' : 'amber'}>{r.kind}</Badge>
                     </div>
-                    <div className="mt-0.5 text-sm text-[#5F6368]">
+                    <div className="mt-0.5 text-sm text-[var(--text-secondary)]">
                       {r.price != null ? (
                         <>
                           Rate {rs(r.price)} {r.schemeText ? `· ${r.schemeText}` : ''} → effective{' '}
@@ -931,20 +931,20 @@ export default function ImportWizard() {
                         </>
                       ) : r.schemeText ? (
                         <>
-                          Offer: <b className="font-medium text-[#202124]">{r.schemeText}</b>
+                          Offer: <b className="font-medium text-[var(--text-primary)]">{r.schemeText}</b>
                         </>
                       ) : (
                         <>Rate —</>
                       )}
                     </div>
                     {[...r.errors, ...r.warnings].map((m, i) => (
-                      <div key={i} className={`text-sm ${r.errors.includes(m) ? 'text-[#D93025]' : 'text-[#B06000]'}`}>
+                      <div key={i} className={`text-sm ${r.errors.includes(m) ? 'text-[var(--color-error-text)]' : 'text-[var(--color-warning-text)]'}`}>
                         • {m}
                       </div>
                     ))}
                   </Card>
                 ))}
-                {vRows.length === 0 && <Card className="text-sm text-[#5F6368]">No rows in this view.</Card>}
+                {vRows.length === 0 && <Card className="text-sm text-[var(--text-secondary)]">No rows in this view.</Card>}
               </div>
               <Pagination page={vPage} pages={Math.ceil(vRows.length / 20)} onPage={setVPage} />
             </div>
@@ -953,7 +953,7 @@ export default function ImportWizard() {
       )}
 
       {/* Sticky Footer Navigation */}
-      <div className="safe-bottom fixed inset-x-0 bottom-14 z-30 flex items-center justify-between gap-3 border-t border-[#E1E5EA] bg-white px-4 py-2.5 md:static md:mt-4 md:border-0 md:bg-transparent md:px-0 md:py-0">
+      <div className="safe-bottom fixed inset-x-0 bottom-14 z-30 flex items-center justify-between gap-3 border-t border-[var(--border-default)] bg-[var(--bg-nav)] px-4 py-2.5 md:static md:mt-4 md:border-0 md:bg-transparent md:px-0 md:py-0">
         <Button
           variant="secondary"
           disabled={step === 0 || busy}
@@ -968,7 +968,7 @@ export default function ImportWizard() {
 
         <div className="flex min-w-0 items-center gap-2.5">
           {nextReason && step < STEPS.length - 1 && (
-            <span className="hidden truncate text-xs text-[#5F6368] sm:inline">{nextReason}</span>
+            <span className="hidden truncate text-xs text-[var(--text-secondary)] sm:inline">{nextReason}</span>
           )}
           {step < STEPS.length - 1 ? (
             <Button onClick={next} disabled={!!nextReason || busy}>

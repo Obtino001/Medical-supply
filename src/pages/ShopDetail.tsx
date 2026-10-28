@@ -47,11 +47,11 @@ export default function ShopDetail() {
         <Button variant="secondary" onClick={toggleArchive}>{shop.status === 'active' ? 'Archive' : 'Restore'}</Button>
       </PageHeader>
       <Card>
-        <div className="text-sm text-slate-700">
+        <div className="text-sm text-[var(--text-secondary)]">
           {shop.status === 'archived' && <Badge tone="amber">Archived</Badge>} Shop #{shop.shop_no} · added {fmtDate(shop.created_at)}
-          <div>{[shop.owner_name, shop.phone].filter(Boolean).join(' · ') || 'No contact recorded'}</div>
+          <div className="mt-0.5 text-[var(--text-primary)]">{[shop.owner_name, shop.phone].filter(Boolean).join(' · ') || 'No contact recorded'}</div>
           <div>{[shop.address, shop.city].filter(Boolean).join(', ')}</div>
-          {shop.notes && <div className="mt-1 whitespace-pre-wrap text-slate-600">{shop.notes}</div>}
+          {shop.notes && <div className="mt-1 whitespace-pre-wrap text-[var(--text-secondary)]">{shop.notes}</div>}
         </div>
       </Card>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -60,34 +60,34 @@ export default function ShopDetail() {
         <Stat label="All historical records" value={histCount} />
         <Stat label="Best price on" value={`${bestCount.best} / ${bestCount.compared}`} />
       </div>
-      <p className="text-xs text-slate-500">“Best price on” counts products with 2+ comparable offers where this shop is the cheapest (ties included).</p>
+      <p className="text-xs text-[var(--text-secondary)]">“Best price on” counts products with 2+ comparable offers where this shop is the cheapest (ties included).</p>
       <section>
-        <h2 className="mb-2 text-lg font-bold">Surveys</h2>
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Surveys</h2>
         {shopSurveys.length === 0 ? <Empty title="No surveys yet" /> : (
-          <div className="space-y-1">{shopSurveys.map((s) => <Card key={s.id} className="!p-3 text-sm">Survey #{s.survey_no} · {fmtDate(s.survey_date)}{s.notes ? ` · ${s.notes}` : ''}</Card>)}</div>
+          <div className="space-y-1.5">{shopSurveys.map((s) => <Card key={s.id} className="!p-3 text-sm">Survey #{s.survey_no} · {fmtDate(s.survey_date)}{s.notes ? ` · ${s.notes}` : ''}</Card>)}</div>
         )}
       </section>
       <section>
-        <h2 className="mb-2 text-base font-semibold text-slate-900">Latest prices offered</h2>
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Latest prices offered</h2>
         {mine.length === 0 ? <Empty title="No matched prices yet" /> : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
+          <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)]">
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <tr><th className="px-3.5 py-2.5">Product</th><th className="px-3 py-2.5">Offer Rate</th><th className="px-3 py-2.5">Scheme / Discount</th><th className="px-3 py-2.5">Effective Price</th><th className="px-3.5 py-2.5">Date</th></tr>
+              <thead className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)] text-left text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                <tr><th className="px-3.5 py-2">Product</th><th className="px-3 py-2">Offer Rate</th><th className="px-3 py-2">Scheme / Discount</th><th className="px-3 py-2">Effective Price</th><th className="px-3.5 py-2">Date</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--border-default)]">
                 {mine.slice(0, 200).sort((a, b) => (productMap.get(a.product_id!)?.name ?? '').localeCompare(productMap.get(b.product_id!)?.name ?? '')).map((r) => (
-                  <tr key={r.id} className="hover:bg-[#F8F9FA]">
-                    <td className="px-3.5 py-2"><Link className="font-medium text-[#202124] hover:text-[#1A73E8] hover:underline" to={`/products/${r.product_id}`}>{productMap.get(r.product_id!)?.name}</Link></td>
-                    <td className="whitespace-nowrap px-3 py-2 text-[#5F6368] tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</td>
-                    <td className="px-3 py-2 text-[#5F6368]">{r.scheme_text || '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2 font-medium text-[#202124] tabular-nums">{r.scheme_status === 'ok' ? (r.effective_cost != null ? rs(r.effective_cost) : r.scheme_text || '—') : '—'}</td>
-                    <td className="whitespace-nowrap px-3.5 py-2 text-xs text-[#5F6368]">{fmtDate(r.observed_on)}</td>
+                  <tr key={r.id} className="hover:bg-[var(--bg-hover)]">
+                    <td className="px-3.5 py-2"><Link className="font-medium text-[var(--text-primary)] hover:text-[var(--color-primary)] hover:underline" to={`/products/${r.product_id}`}>{productMap.get(r.product_id!)?.name}</Link></td>
+                    <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)] tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-secondary)]">{r.scheme_text || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-medium text-[var(--text-primary)] tabular-nums">{r.scheme_status === 'ok' ? (r.effective_cost != null ? rs(r.effective_cost) : r.scheme_text || '—') : '—'}</td>
+                    <td className="whitespace-nowrap px-3.5 py-2 text-xs text-[var(--text-secondary)]">{fmtDate(r.observed_on)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {mine.length > 200 && <div className="border-t border-slate-100 px-3.5 py-2 text-xs text-slate-500">Showing first 200 of {mine.length}. Use Export for the full list.</div>}
+            {mine.length > 200 && <div className="border-t border-[var(--border-default)] px-3.5 py-2 text-xs text-[var(--text-secondary)]">Showing first 200 of {mine.length}. Use Export for the full list.</div>}
           </div>
         )}
       </section>

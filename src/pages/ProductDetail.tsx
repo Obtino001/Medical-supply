@@ -86,22 +86,22 @@ export default function ProductDetail() {
         <div className="flex flex-wrap items-center gap-2">
           {variantLabel(product) && <Badge tone="blue">{variantLabel(product)}</Badge>}
           {product.archived && <Badge tone="amber">Archived</Badge>}
-          <span className="text-sm text-slate-500">Product #{product.product_no} · updated {fmtDate(product.updated_at)}</span>
+          <span className="text-sm text-[var(--text-secondary)]">Product #{product.product_no} · updated {fmtDate(product.updated_at)}</span>
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
           {([['Brand', product.brand], ['Manufacturer', product.manufacturer], ['Ingredient', product.active_ingredient], ['Dosage form', product.dosage_form], ['Barcode', product.barcode], ['Manufacturer code', product.mfr_code], ['Normalized name', product.normalized_name]] as const).map(([k, v]) => (
-            <div key={k}><dt className="text-slate-500">{k}</dt><dd className="font-medium">{v || '—'}</dd></div>
+            <div key={k}><dt className="text-xs text-[var(--text-secondary)]">{k}</dt><dd className="font-medium text-[var(--text-primary)]">{v || '—'}</dd></div>
           ))}
         </dl>
         {family.length > 0 && (
-          <div className="mt-3 text-sm"><span className="text-slate-500">Other variants of this title (compared separately): </span>
+          <div className="mt-3 text-sm"><span className="text-[var(--text-secondary)]">Other variants of this title (compared separately): </span>
             {family.map((p) => <Link key={p.id} to={`/products/${p.id}`} className="mr-2 inline-block"><Badge>{variantLabel(p) || p.name}</Badge></Link>)}
           </div>
         )}
       </Card>
 
       <section>
-        <h2 className="mb-2 text-lg font-bold">Current offers (latest per shop)</h2>
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Current offers (latest per shop)</h2>
         {cmp.offers.length === 0 ? <Empty title="No price records yet" /> : (
           <div className="space-y-2">
             {cmp.offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} extra={<Button variant="ghost" small onClick={() => setMoving(o.rec)}>Wrong product? Move…</Button>} />)}
@@ -110,26 +110,26 @@ export default function ProductDetail() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-bold">Price history</h2>
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Price history</h2>
         {history.length === 0 ? <Empty title="No history" /> : (
           <div className="space-y-3">
             {[...byShop.entries()].map(([shopId, recs]) => (
               <Card key={shopId}>
-                <div className="mb-2 font-bold">{shopMap.get(shopId)?.name ?? 'Shop'}</div>
+                <div className="mb-2 font-medium text-[var(--text-primary)]">{shopMap.get(shopId)?.name ?? 'Shop'}</div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="pr-2">Survey date</th><th className="pr-2">Price</th><th className="pr-2">Scheme</th><th className="pr-2">Effective</th><th className="pr-2">Change</th><th>By</th></tr></thead>
+                    <thead><tr className="text-left text-xs uppercase text-[var(--text-secondary)]"><th className="pr-2">Survey date</th><th className="pr-2">Price</th><th className="pr-2">Scheme</th><th className="pr-2">Effective</th><th className="pr-2">Change</th><th>By</th></tr></thead>
                     <tbody>
                       {recs.map((r, i) => {
                         const prev = recs[i + 1]
                         const ch = prev?.effective_cost && r.effective_cost ? ((r.effective_cost - prev.effective_cost) / prev.effective_cost) * 100 : null
                         return (
-                          <tr key={r.id} className={`border-t border-[#DADCE0] ${r.archived ? 'text-[#5F6368] line-through' : ''}`}>
+                          <tr key={r.id} className={`border-t border-[var(--border-default)] ${r.archived ? 'text-[var(--text-secondary)] line-through' : ''}`}>
                             <td className="py-1.5 pr-2 whitespace-nowrap">{fmtDate(r.observed_on)} {latestIds.has(r.id) ? <Badge tone="blue">Latest</Badge> : <Badge>Older</Badge>}</td>
                             <td className="pr-2 whitespace-nowrap tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</td>
                             <td className="pr-2">{r.scheme_text || '—'}</td>
                             <td className="pr-2 font-medium whitespace-nowrap tabular-nums">{r.scheme_status === 'ok' ? (r.effective_cost != null ? rs(r.effective_cost) : r.scheme_text || '—') : <Badge tone="amber">{r.scheme_status}</Badge>}</td>
-                            <td className={`pr-2 whitespace-nowrap tabular-nums ${ch == null ? '' : ch < 0 ? 'font-semibold text-[#188038]' : ch > 0 ? 'text-[#D93025]' : ''}`}>{ch == null ? '—' : `${ch > 0 ? '+' : ''}${ch.toFixed(1)}%`}</td>
+                            <td className={`pr-2 whitespace-nowrap tabular-nums ${ch == null ? '' : ch < 0 ? 'font-semibold text-[var(--color-best)]' : ch > 0 ? 'text-[var(--color-error-text)]' : ''}`}>{ch == null ? '—' : `${ch > 0 ? '+' : ''}${ch.toFixed(1)}%`}</td>
                             <td>{memberName(r.created_by)}</td>
                           </tr>
                         )
@@ -144,17 +144,17 @@ export default function ProductDetail() {
       </section>
 
       <Card>
-        <h2 className="mb-2 font-bold">Names and codes seen in shop lists</h2>
-        {aliases.length === 0 && idents.length === 0 ? <div className="text-sm text-slate-500">None yet.</div> : (
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Names and codes seen in shop lists</h2>
+        {aliases.length === 0 && idents.length === 0 ? <div className="text-sm text-[var(--text-secondary)]">None yet.</div> : (
           <ul className="space-y-1 text-sm">
-            {aliases.map((a) => <li key={a.id}>“{a.title}” <span className="text-slate-500">— {a.shop_id ? shopMap.get(a.shop_id)?.name : 'any shop'}</span></li>)}
-            {idents.map((a) => <li key={a.id}><Badge>{a.kind}</Badge> {a.value} <span className="text-slate-500">— {a.shop_id ? shopMap.get(a.shop_id)?.name : 'any shop'}</span></li>)}
+            {aliases.map((a) => <li key={a.id}>“{a.title}” <span className="text-[var(--text-secondary)]">— {a.shop_id ? shopMap.get(a.shop_id)?.name : 'any shop'}</span></li>)}
+            {idents.map((a) => <li key={a.id}><Badge>{a.kind}</Badge> {a.value} <span className="text-[var(--text-secondary)]">— {a.shop_id ? shopMap.get(a.shop_id)?.name : 'any shop'}</span></li>)}
           </ul>
         )}
       </Card>
 
       <Card>
-        <h2 className="mb-2 font-bold">Notes (shared)</h2>
+        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Notes (shared)</h2>
         <Textarea value={notes ?? product.notes ?? ''} onChange={(e) => setNotes(e.target.value)} />
         <div className="mt-2"><Button small disabled={notes === null} onClick={saveNotes}>Save note</Button></div>
       </Card>

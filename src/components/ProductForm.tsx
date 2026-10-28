@@ -71,16 +71,16 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
   return (
     <Modal open={open} onClose={onClose} title={product ? 'Edit product' : 'New product'} wide>
       <div className="space-y-3">
-        <Field label="Product name *" hint="e.g. 2SUM 500MG INJ, ACABEL-4MG-TABS, ACENAC GEL. Any strength or form in the name is detected automatically."><Input value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
+        <Field label="Product name" required hint="e.g. 2SUM 500MG INJ, ACABEL-4MG-TABS, ACENAC GEL. Any strength or form in the name is detected automatically."><Input value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
         <Field label="Notes (optional)"><Textarea value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
         <div>
           <button
             type="button"
             onClick={() => setShowMore(!showMore)}
-            className="flex w-full items-center justify-between rounded-lg border border-[#DADCE0] bg-[#F8F9FA] px-3 py-2 text-left text-sm font-medium text-[#202124] hover:bg-[#E8F0FE]/50"
+            className="flex w-full items-center justify-between rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] px-3 py-2 text-left text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
           >
             <span>Additional attributes (optional: brand, manufacturer, strength, pack, barcode…)</span>
-            <span className="inline-flex items-center gap-1 text-xs text-[#5F6368]">
+            <span className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)]">
               {showMore ? <><span>Hide</span><IconChevronUp size={15} /></> : <><span>Show</span><IconChevronDown size={15} /></>}
             </span>
           </button>

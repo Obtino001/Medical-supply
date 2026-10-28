@@ -25,7 +25,7 @@ export default function Surveys() {
         subtitle="A survey represents a market visit or price list collection from a single shop."
       >
         <Link to="/import">
-          <Button>
+          <Button small>
             <IconPlus size={15} />
             <span>Create survey (import a price list)</span>
           </Button>
@@ -36,11 +36,11 @@ export default function Surveys() {
           {surveys.slice(page * per, page * per + per).map((s) => (
             <Card key={s.id} className="!p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm"><b className="text-slate-900">Survey #{s.survey_no}</b> · <span className="font-medium text-slate-700">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span> · <span className="text-slate-600">{fmtDate(s.survey_date)}</span></div>
+                <div className="text-sm"><b className="font-medium text-[var(--text-primary)]">Survey #{s.survey_no}</b> · <span className="font-medium text-[var(--text-primary)]">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span> · <span className="text-[var(--text-secondary)]">{fmtDate(s.survey_date)}</span></div>
                 <Button variant="ghost" small onClick={() => { setEdit(s); setNote(s.notes ?? '') }}>Edit note</Button>
               </div>
-              <div className="mt-0.5 text-xs text-slate-500">Created by {memberName(s.created_by)} on {fmtDate(s.created_at)}</div>
-              {s.notes && <div className="mt-1.5 text-sm text-slate-700">{s.notes}</div>}
+              <div className="mt-0.5 text-xs text-[var(--text-secondary)]">Created by {memberName(s.created_by)} on {fmtDate(s.created_at)}</div>
+              {s.notes && <div className="mt-1.5 text-sm text-[var(--text-primary)]">{s.notes}</div>}
             </Card>
           ))}
         </div>

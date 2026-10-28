@@ -25,12 +25,12 @@ export default function Shops() {
         title="Shops"
         subtitle="Manage wholesale suppliers and market shops across Karachi, Nawabshah, and regional hubs."
       >
-        <Button onClick={() => setAdding(true)}>
+        <Button small onClick={() => setAdding(true)}>
           <IconPlus size={15} />
           <span>Add shop</span>
         </Button>
       </PageHeader>
-      <Card className="!p-3.5">
+      <Card className="!p-3">
         <div className="grid gap-2.5 sm:grid-cols-3">
           <Input type="search" placeholder="Search shops…" value={q} onChange={(e) => setQ(e.target.value)} />
           <Select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((c) => <option key={c}>{c}</option>)}</Select>
@@ -41,14 +41,14 @@ export default function Shops() {
         <div className="grid gap-3 sm:grid-cols-2">
           {list.map((s) => (
             <Link key={s.id} to={`/shops/${s.id}`}>
-              <Card className="transition-colors hover:border-[#1A73E8] hover:bg-[#F8F9FA]">
+              <Card className="transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--bg-hover)]">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[15px] font-medium text-[#202124]">{s.name}</span>
+                  <span className="text-[15px] font-medium text-[var(--text-primary)]">{s.name}</span>
                   {s.status === 'archived' ? <Badge tone="amber">Archived</Badge> : <Badge tone="blue">{s.city || 'Supplier'}</Badge>}
                 </div>
-                <div className="mt-1 text-xs text-[#5F6368]">{[s.city, s.address].filter(Boolean).join(' · ') || 'No location recorded'}</div>
-                {([s.owner_name, s.phone].some(Boolean)) && <div className="mt-0.5 text-xs text-[#5F6368]">{[s.owner_name, s.phone].filter(Boolean).join(' · ')}</div>}
-                <div className="mt-2 text-xs text-[#5F6368]">Last survey: <span className="font-medium text-[#202124]">{fmtDate(lastSurvey.get(s.id))}</span></div>
+                <div className="mt-1 text-xs text-[var(--text-secondary)]">{[s.city, s.address].filter(Boolean).join(' · ') || 'No location recorded'}</div>
+                {([s.owner_name, s.phone].some(Boolean)) && <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{[s.owner_name, s.phone].filter(Boolean).join(' · ')}</div>}
+                <div className="mt-2 text-xs text-[var(--text-secondary)]">Last survey: <span className="font-medium text-[var(--text-primary)]">{fmtDate(lastSurvey.get(s.id))}</span></div>
               </Card>
             </Link>
           ))}

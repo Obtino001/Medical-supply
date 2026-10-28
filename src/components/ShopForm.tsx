@@ -41,15 +41,15 @@ export function ShopForm({ open, onClose, shop, onSaved }: { open: boolean; onCl
   return (
     <Modal open={open} onClose={onClose} title={shop ? 'Edit shop' : 'Add shop'}>
       <div className="space-y-3">
-        <Field label="Shop name *"><Input value={f.name} onChange={(e) => set('name', e.target.value)} autoFocus /></Field>
+        <Field label="Shop name" required><Input value={f.name} onChange={(e) => set('name', e.target.value)} autoFocus /></Field>
         <Field label="Owner / contact person"><Input value={f.owner_name} onChange={(e) => set('owner_name', e.target.value)} /></Field>
         <Field label="Phone"><Input type="tel" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
         <Field label="Address / market location"><Input value={f.address} onChange={(e) => set('address', e.target.value)} /></Field>
         <Field label="City"><Input value={f.city} onChange={(e) => set('city', e.target.value)} /></Field>
         <Field label="Notes"><Textarea value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
         {similar.length > 0 && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
-            <b>Possible duplicate:</b> {similar.map((s) => `${s.name}${s.phone ? ` (${s.phone})` : ''}`).join('; ')}
+          <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3 text-sm text-[var(--text-primary)]">
+            <b className="font-medium text-[var(--color-warning-text)]">Possible duplicate:</b> {similar.map((s) => `${s.name}${s.phone ? ` (${s.phone})` : ''}`).join('; ')}
             <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />This is a different shop</label>
           </div>
         )}

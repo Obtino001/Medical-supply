@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { IconBrandMark, IconUsers } from '../components/icons'
-import { Button, Card, ErrorBox, Field, Input, Spinner } from '../components/ui'
+import { Button, Card, ErrorBox, Field, Input, Spinner, ThemeSelector } from '../components/ui'
 import { useAuth } from '../lib/auth'
 
 export default function Login() {
@@ -21,10 +21,13 @@ export default function Login() {
   }
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center px-4 py-10">
+      <div className="mb-4 flex justify-end">
+        <ThemeSelector compact />
+      </div>
       <div className="mb-6 flex flex-col items-center text-center">
         <IconBrandMark size={40} />
-        <h1 className="mt-3 text-2xl font-medium tracking-tight text-[#202124]">Wholesale Price Intelligence</h1>
-        <p className="mt-1 text-sm text-[#5F6368]">Medical wholesale market price comparison &amp; supplier survey system</p>
+        <h1 className="mt-3 text-2xl font-medium tracking-tight text-[var(--text-primary)]">Wholesale Price Intelligence</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Medical wholesale market price comparison &amp; supplier survey system</p>
       </div>
 
       <Card className="p-6">
@@ -55,8 +58,8 @@ export default function Login() {
           </Button>
         </form>
 
-        <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-[#DADCE0] bg-[#F8F9FA] p-3 text-xs text-[#5F6368]">
-          <IconUsers size={16} className="mt-0.5 shrink-0 text-[#1A73E8]" />
+        <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] p-3 text-xs text-[var(--text-secondary)]">
+          <IconUsers size={16} className="mt-0.5 shrink-0 text-[var(--color-primary)]" />
           <span>Sign in with your personal partner account. Both partners share the same shops, products, price lists, and wishlist in real time.</span>
         </div>
       </Card>
