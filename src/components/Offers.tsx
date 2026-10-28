@@ -364,7 +364,7 @@ export function OfferLeadBox({ ranking, shopName }: { ranking: OfferRanking; sho
   return (
     <div
       className={cx(
-        'flex min-w-0 items-stretch gap-2.5 rounded-lg border py-1.5 pr-2.5 pl-2',
+        'flex min-w-0 items-stretch gap-2.5 overflow-hidden rounded-lg border py-1.5 pr-2.5 pl-2',
         verified
           ? 'border-[var(--color-best-border)]/60 bg-[var(--color-best-bg)]/60'
           : uncertain

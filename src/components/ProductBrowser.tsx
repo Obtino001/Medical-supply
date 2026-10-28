@@ -62,7 +62,7 @@ const distinct = (vals: (string | null)[]) =>
   [...new Set(vals.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
 
 const DESKTOP_GRID =
-  'md:grid-cols-[20px_minmax(190px,1.45fr)_minmax(270px,2.25fr)_168px] md:items-center md:gap-x-3.5'
+  'md:grid-cols-[20px_minmax(190px,1.45fr)_minmax(270px,2.25fr)_212px] md:items-center md:gap-x-3.5'
 
 export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   const { products, current, shopMap, shops, settings, wishlistMap, selected, setSelected } = useData()
