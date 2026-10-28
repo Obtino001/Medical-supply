@@ -345,7 +345,7 @@ const LEAD_TONE: Record<RankBadge, 'solid' | 'amber' | 'slate'> = {
 
 /**
  * Compact lead box for products ranked by offer rate (no purchase prices). Shows the discount as imported, never a Rs value.
- * Green only for a verified winner; amber when the ranking is uncertain.
+ * Green only for a verified winner; amber when the ranking is uncertain. Two short lines so many products fit on screen.
  */
 export function OfferLeadBox({ ranking, shopName }: { ranking: OfferRanking; shopName: (shopId: string) => string }) {
   const lead = ranking.lead
@@ -355,40 +355,43 @@ export function OfferLeadBox({ ranking, shopName }: { ranking: OfferRanking; sho
   const names = verified ? ranking.winners.map((w) => shopName(w.view.rec.shop_id)) : [shopName(lead.view.rec.shop_id)]
   const second = ranking.ordered.find((o) => o.rank != null && !o.winner && o.view.offerEligible)
   const r = lead.view.rec
-  const extra: string[] = []
-  if (lead.terms.kind === 'percent' && lead.terms.cartonPct != null) extra.push(`Full carton ${lead.terms.cartonPct}%`)
-  if (lead.terms.kind === 'percent' && lead.terms.minQty != null) extra.push(`Min qty ${lead.terms.minQty}`)
+  const detail: string[] = []
+  if (lead.terms.kind === 'percent' && lead.terms.cartonPct != null) detail.push(`Full carton ${lead.terms.cartonPct}%`)
+  if (lead.terms.kind === 'percent' && lead.terms.minQty != null) detail.push(`Min qty ${lead.terms.minQty}`)
+  if (lead.terms.kind !== 'percent') detail.push(lead.terms.note ?? 'Scheme offer')
+  if (verified && second) detail.push(`Next: ${shopName(second.view.rec.shop_id)} ${second.terms.label}`)
+  const tone = verified ? 'var(--color-best-solid)' : uncertain ? 'var(--color-warning-text)' : 'var(--border-strong)'
   return (
     <div
       className={cx(
-        'rounded-lg border px-2.5 py-1.5',
+        'flex min-w-0 items-stretch gap-2.5 rounded-lg border py-1.5 pr-2.5 pl-2',
         verified
-          ? 'border-[var(--color-best-border)] border-l-3 border-l-[var(--color-best-solid)] bg-[var(--color-best-bg)]'
+          ? 'border-[var(--color-best-border)]/60 bg-[var(--color-best-bg)]/60'
           : uncertain
             ? 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]'
             : 'border-[var(--border-default)] bg-[var(--bg-subtle)]',
       )}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Badge tone={LEAD_TONE[ranking.badge]}>{ranking.badge}</Badge>
-          <span className="truncate text-xs font-semibold text-[var(--text-primary)] sm:text-[13px]" title={names.join(', ')}>
-            {names.join(', ')}
+      <span className="w-1 shrink-0 rounded-full" style={{ background: tone }} aria-hidden />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]" title={names.join(', ')}>
+            {names.join(' · ')}
           </span>
+          <span className="shrink-0"><Badge tone={LEAD_TONE[ranking.badge]}>{ranking.badge}</Badge></span>
         </div>
-        <span className={cx('shrink-0 text-sm font-bold tabular-nums sm:text-[15px]', verified ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]')}>
-          {lead.terms.kind === 'percent' ? `${lead.terms.pct}%` : lead.terms.label}
-        </span>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <span className="truncate" title={detail.join(' · ')}>{detail.length ? detail.join(' · ') : 'Discount offer'}</span>
+          <span className="ml-auto shrink-0 tabular-nums">{fmtDate(r.observed_on)}</span>
+        </div>
+        {ranking.warning && <div className="mt-0.5 text-[11px] font-medium text-[var(--color-warning-text)]">{ranking.warning}</div>}
       </div>
-      <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 text-[11px] text-[var(--text-secondary)] tabular-nums">
-        <span className="min-w-0">
-          {extra.length > 0 ? extra.join(' · ') + ' · ' : ''}
-          {lead.terms.kind === 'percent' ? 'discount' : (lead.terms.note ?? 'offer')} · Purchase price not provided
-          {verified && second ? ` · next: ${shopName(second.view.rec.shop_id)} ${second.terms.label}` : ''}
+      <div className="flex shrink-0 flex-col items-end justify-center leading-none">
+        <span className={cx('text-lg font-bold tabular-nums sm:text-xl', verified ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]')}>
+          {lead.terms.kind === 'percent' ? `${lead.terms.pct}%` : lead.terms.kind === 'tp' ? 'TP' : '—'}
         </span>
-        <span>{fmtDate(r.observed_on)}</span>
+        {lead.terms.kind === 'percent' && <span className="mt-0.5 text-[10px] tracking-wide text-[var(--text-secondary)] uppercase">discount</span>}
       </div>
-      {ranking.warning && <div className="mt-0.5 text-[11px] font-medium text-[var(--color-warning-text)]">{ranking.warning}</div>}
     </div>
   )
 }

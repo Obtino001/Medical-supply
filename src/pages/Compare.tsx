@@ -6,7 +6,7 @@ export default function Compare() {
     <div className="space-y-4">
       <PageHeader
         title="Compare prices"
-        subtitle="Find the best supplier price for each medicine."
+        subtitle="Find the best supplier offer or price for each medicine."
       />
       <ProductBrowser mode="compare" />
     </div>

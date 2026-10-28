@@ -331,16 +331,20 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
         {/* Secondary Compact Filter Pills & View Actions */}
         <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 border-t border-[var(--border-default)]/70 pt-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <FilterPill
-              active={v.available}
-              onClick={() => set({ available: !v.available, incompleteOnly: false })}
-              label={`Valid Rs price (${stats.withBestPrice})`}
-            />
-            <FilterPill
-              active={v.bestOnly}
-              onClick={() => set({ bestOnly: !v.bestOnly })}
-              label={`2+ comparable (${stats.multiShopComparable})`}
-            />
+            {stats.withBestPrice > 0 && (
+              <FilterPill
+                active={v.available}
+                onClick={() => set({ available: !v.available, incompleteOnly: false })}
+                label={`Valid Rs price (${stats.withBestPrice})`}
+              />
+            )}
+            {stats.multiShopComparable > 0 && (
+              <FilterPill
+                active={v.bestOnly}
+                onClick={() => set({ bestOnly: !v.bestOnly })}
+                label={`2+ comparable (${stats.multiShopComparable})`}
+              />
+            )}
             <FilterPill
               active={v.multiple}
               onClick={() => set({ multiple: !v.multiple })}
@@ -597,7 +601,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
               />
             </div>
             <div>Product &amp; form</div>
-            <div>Best supplier &amp; effective price</div>
+            <div>{stats.withBestPrice > 0 ? 'Best supplier & effective price' : 'Best offer & supplier'}</div>
             <div className="text-right">Actions</div>
           </div>
 
@@ -827,7 +831,7 @@ const Row = memo(function Row({
               aria-expanded={open}
               title={open ? 'Collapse supplier offers' : `Compare all ${r.records.length} supplier offers`}
               className={cx(
-                'inline-flex h-8 sm:h-7.5 items-center gap-1 rounded-md border px-2 sm:px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]',
+                'inline-flex h-8 sm:h-7.5 items-center gap-1 whitespace-nowrap rounded-md border px-2 sm:px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]',
                 open
                   ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
                   : 'border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]',

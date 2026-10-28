@@ -124,7 +124,7 @@ export type SortKey =
   | 'shop'
 
 export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'price_low', label: 'Best effective price — lowest first' },
+  { key: 'price_low', label: 'Best offer / price — best first' },
   { key: 'price_high', label: 'Best effective price — highest first' },
   { key: 'name_asc', label: 'Product name A → Z' },
   { key: 'name_desc', label: 'Product name Z → A' },
