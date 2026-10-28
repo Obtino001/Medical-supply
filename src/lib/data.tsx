@@ -50,31 +50,51 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try { sessionStorage.setItem('selectedProducts', JSON.stringify([...s])) } catch { /* ignore */ }
   }
   const lastLoad = useRef(0)
+  const inflight = useRef<Promise<void> | null>(null)
 
   const reload = useCallback(async () => {
     if (!workspaceId) return
+    if (inflight.current) return inflight.current
     lastLoad.current = Date.now()
-    try {
-      const [shops, surveys, products, current, history, review, wishlist, opp, members, ws] = await Promise.all([
-        fetchAll<Shop>((a, b) => supabase.from('shops').select('*').order('name').range(a, b)),
-        fetchAll<Survey>((a, b) => supabase.from('surveys').select('*').order('survey_date', { ascending: false }).range(a, b)),
-        fetchAll<Product>((a, b) => supabase.from('products').select('*').order('product_no').range(a, b)),
-        fetchAll<PriceRecord>((a, b) => supabase.from('current_offers').select('*').order('id').range(a, b)),
-        fetchAll<RecordLite>((a, b) => supabase.from('price_records').select('id,product_id,shop_id,observed_on,effective_cost,scheme_status,created_at').eq('archived', false).not('product_id', 'is', null).order('id').range(a, b)),
-        fetchAll<PriceRecord>((a, b) => supabase.from('price_records').select('*').eq('archived', false).is('product_id', null).order('created_at', { ascending: false }).range(a, b)),
-        fetchAll<WishlistItem>((a, b) => supabase.from('wishlist_items').select('*').order('created_at').range(a, b)),
-        fetchAll<OpportunityStatus>((a, b) => supabase.from('opportunity_status').select('product_id,status,note').range(a, b)),
-        supabase.from('workspace_members').select('user_id,role,email,display_name').then((r) => (r.data ?? []) as Member[]),
-        supabase.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle().then((r) => (r.data?.settings ?? {}) as Partial<WorkspaceSettings>),
-      ])
-      setState({
-        loading: false, error: null, shops, surveys, products, current, history, review, wishlist,
-        opportunityStatus: new Map(opp.map((o) => [o.product_id, o])), members,
-        settings: { freshness_days: 15, ...ws },
-      })
-    } catch (e) {
-      setState((s) => ({ ...s, loading: false, error: (e as Error).message }))
-    }
+    const task = (async () => {
+      try {
+        const [shops, surveys, products, current, history, review, wishlist, opp, members, ws] = await Promise.all([
+          fetchAll<Shop>((a, b) => supabase.from('shops').select('*').order('name').range(a, b)),
+          fetchAll<Survey>((a, b) => supabase.from('surveys').select('*').order('survey_date', { ascending: false }).range(a, b)),
+          fetchAll<Product>((a, b) => supabase.from('products').select('*').order('product_no').range(a, b)),
+          fetchAll<PriceRecord>((a, b) => supabase.from('current_offers').select('*').order('id').range(a, b)),
+          fetchAll<RecordLite>(
+            (a, b) =>
+              supabase
+                .from('price_records')
+                .select('id,product_id,shop_id,observed_on,effective_cost,scheme_status,created_at')
+                .eq('archived', false)
+                .eq('scheme_status', 'ok')
+                .not('product_id', 'is', null)
+                .not('effective_cost', 'is', null)
+                .order('observed_on', { ascending: false })
+                .range(a, b),
+            10000,
+          ),
+          fetchAll<PriceRecord>((a, b) => supabase.from('price_records').select('*').eq('archived', false).is('product_id', null).order('created_at', { ascending: false }).range(a, b), 5000),
+          fetchAll<WishlistItem>((a, b) => supabase.from('wishlist_items').select('*').order('created_at').range(a, b)),
+          fetchAll<OpportunityStatus>((a, b) => supabase.from('opportunity_status').select('product_id,status,note').range(a, b)),
+          supabase.from('workspace_members').select('user_id,role,email,display_name').then((r) => (r.data ?? []) as Member[]),
+          supabase.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle().then((r) => (r.data?.settings ?? {}) as Partial<WorkspaceSettings>),
+        ])
+        setState({
+          loading: false, error: null, shops, surveys, products, current, history, review, wishlist,
+          opportunityStatus: new Map(opp.map((o) => [o.product_id, o])), members,
+          settings: { freshness_days: 15, ...ws },
+        })
+      } catch (e) {
+        setState((s) => ({ ...s, loading: false, error: (e as Error).message }))
+      } finally {
+        inflight.current = null
+      }
+    })()
+    inflight.current = task
+    return task
   }, [workspaceId])
 
   useEffect(() => { void reload() }, [reload])

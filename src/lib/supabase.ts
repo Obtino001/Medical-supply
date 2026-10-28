@@ -26,10 +26,13 @@ export class ConflictError extends Error {
   }
 }
 
-/** Page through a query 1000 rows at a time (PostgREST default cap). */
-export async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+/** Page through a query 1000 rows at a time (PostgREST default cap), optionally bounded by maxRows. */
+export async function fetchAll<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  maxRows = 50000,
+): Promise<T[]> {
   const out: T[] = []
-  for (let from = 0; ; from += 1000) {
+  for (let from = 0; from < maxRows; from += 1000) {
     const { data, error } = await build(from, from + 999)
     if (error) throw new Error(error.message)
     out.push(...(data ?? []))

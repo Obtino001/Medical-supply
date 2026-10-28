@@ -95,7 +95,7 @@ function Shell() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-[var(--bg-app)] text-[var(--text-primary)] md:flex-row">
+    <div className="flex min-h-full w-full max-w-full flex-col overflow-x-hidden bg-[var(--bg-app)] text-[var(--text-primary)] md:flex-row">
       {/* Desktop Sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--border-default)] bg-[var(--bg-nav)] md:sticky md:top-0 md:flex md:h-screen">
         <div className="flex items-center gap-2.5 border-b border-[var(--border-default)] px-4 py-3.5">
@@ -166,30 +166,30 @@ function Shell() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-13.5 items-center justify-between gap-3 border-b border-[var(--border-default)] bg-[var(--bg-nav)] px-3.5 sm:px-6">
-          <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex min-w-0 max-w-full flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-13.5 items-center justify-between gap-2 border-b border-[var(--border-default)] bg-[var(--bg-nav)] px-3 sm:gap-3 sm:px-6">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
             <button
               type="button"
               onClick={() => setMore(true)}
               aria-label="Open navigation menu"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] md:hidden"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] md:hidden"
             >
               <IconMenu size={18} />
             </button>
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex shrink-0 items-center gap-2 md:hidden">
               <IconBrandMark size={24} />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-[var(--text-primary)] sm:text-[15px]">{activeNav.label}</div>
             </div>
-            <span className="hidden items-center gap-1.5 rounded-full bg-[var(--color-primary-light)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-primary)] lg:inline-flex">
+            <span className="hidden shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-primary-light)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-primary)] lg:inline-flex">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" />
               Shared Workspace
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <div className="hidden items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-secondary)] md:flex">
               <span className="max-w-40 truncate font-medium text-[var(--text-primary)]">{email}</span>
               <Badge tone={role === 'admin' ? 'blue' : 'slate'}>{role}</Badge>
@@ -206,7 +206,7 @@ function Shell() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-3.5 pb-28 pt-3.5 sm:px-6 md:pb-10 md:pt-5" key={loc.pathname.split('/')[1]}>
+        <main className="mx-auto w-full max-w-6xl min-w-0 flex-1 overflow-x-hidden px-3 pb-28 pt-3.5 sm:px-6 md:pb-10 md:pt-5" key={loc.pathname.split('/')[1]}>
           {error && (
             <div role="alert" className="mb-4 flex items-start gap-2.5 rounded-lg border border-[var(--color-error-border)] bg-[var(--color-error-bg)] p-3.5 text-sm text-[var(--color-error-text)]">
               <IconAlert size={18} className="mt-0.5 shrink-0 text-[var(--color-error-text)]" />

@@ -203,36 +203,52 @@ export default function Dashboard() {
 
         {top.length === 0 ? (
           <Card className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-              <div className="text-sm font-medium text-[var(--text-primary)]">No multi-shop opportunities yet</div>
-              <p className="text-xs text-[var(--text-secondary)]">Opportunities appear automatically once at least two shops offer the same medicine.</p>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-[var(--text-primary)]">
+                {multi > 0 ? `${multi} medicines listed by 2+ suppliers` : 'No multi-shop opportunities yet'}
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {multi > 0
+                  ? 'Current supplier lists contain discount % offers without base Rs rates. Open Compare Prices to inspect supplier offers, or import Rs rates to calculate monetary savings.'
+                  : 'Opportunities appear automatically once at least two shops offer the same medicine at valid purchase prices.'}
+              </p>
             </div>
-            <Link to="/import">
-              <Button variant="secondary" small>
-                <IconUpload size={14} className="text-[var(--color-primary)]" />
-                <span>Import price list</span>
-              </Button>
-            </Link>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {multi > 0 && (
+                <Link to="/compare">
+                  <Button small>
+                    <IconScale size={14} />
+                    <span>Compare prices</span>
+                  </Button>
+                </Link>
+              )}
+              <Link to="/import">
+                <Button variant="secondary" small>
+                  <IconUpload size={14} className="text-[var(--color-primary)]" />
+                  <span>Import price list</span>
+                </Button>
+              </Link>
+            </div>
           </Card>
         ) : (
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {top.map((o) => {
               const vl = variantLabel(o.product)
               return (
-                <Link key={o.product.id} to={`/products/${o.product.id}`} className="block">
+                <Link key={o.product.id} to={`/products/${o.product.id}`} className="block min-w-0">
                   <Card className="h-full !p-3.5 transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--bg-hover)]">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-[var(--text-primary)]">{o.product.name}</div>
                         {vl && <div className="mt-0.5"><Badge tone="blue">{vl}</Badge></div>}
                       </div>
                       <Badge tone="solid">Save {o.savingPct.toFixed(1)}%</Badge>
                     </div>
-                    <div className="mt-2.5 flex items-baseline justify-between border-t border-[var(--border-default)] pt-2 text-xs text-[var(--text-secondary)]">
-                      <span className="truncate">
+                    <div className="mt-2.5 flex items-baseline justify-between gap-2 border-t border-[var(--border-default)] pt-2 text-xs text-[var(--text-secondary)]">
+                      <span className="min-w-0 truncate">
                         Best: <b className="font-medium text-[var(--text-primary)]">{shopMap.get(o.best.rec.shop_id)?.name}</b>
                       </span>
-                      <span className="font-semibold text-[var(--color-best)] tabular-nums">
+                      <span className="shrink-0 font-semibold text-[var(--color-best)] tabular-nums">
                         {rs(o.best.cents! / 100)} <span className="font-normal text-[var(--text-secondary)]">(-{rs(o.saving)})</span>
                       </span>
                     </div>
@@ -245,9 +261,9 @@ export default function Dashboard() {
       </section>
 
       {/* Bottom 2-Column Grid: Imports/Surveys & Activity */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="space-y-5">
-          <section>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="min-w-0 space-y-5">
+          <section className="min-w-0">
             <div className="mb-2.5 flex items-center justify-between">
               <h2 className="text-base font-medium text-[var(--text-primary)]">Recent imports</h2>
               <Link to="/imports" className="text-xs font-medium text-[var(--color-primary)] hover:underline">History</Link>
@@ -258,14 +274,16 @@ export default function Dashboard() {
               ) : (
                 <ul className="divide-y divide-[var(--border-default)]">
                   {jobs.map((j) => (
-                    <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                      <div className="min-w-0">
-                        <div className="truncate font-medium text-[var(--text-primary)]">{j.filename}</div>
-                        <div className="text-xs text-[var(--text-secondary)]">
+                    <li key={j.id} className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 text-sm sm:px-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-[var(--text-primary)]" title={j.filename}>{j.filename}</div>
+                        <div className="truncate text-xs text-[var(--text-secondary)]">
                           {shopMap.get(j.shop_id)?.name ?? 'Shop'} · {fmtDate(j.created_at)} · by {memberName(j.created_by)}
                         </div>
                       </div>
-                      <Badge tone="blue">{j.row_imported} items</Badge>
+                      <div className="shrink-0">
+                        <Badge tone="blue">{j.row_imported} items</Badge>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -273,7 +291,7 @@ export default function Dashboard() {
             </Card>
           </section>
 
-          <section>
+          <section className="min-w-0">
             <div className="mb-2.5 flex items-center justify-between">
               <h2 className="text-base font-medium text-[var(--text-primary)]">Recent surveys</h2>
               <Link to="/surveys" className="text-xs font-medium text-[var(--color-primary)] hover:underline">All surveys</Link>
@@ -284,12 +302,12 @@ export default function Dashboard() {
               ) : (
                 <ul className="divide-y divide-[var(--border-default)]">
                   {surveys.slice(0, 5).map((s) => (
-                    <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                      <div className="min-w-0">
+                    <li key={s.id} className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 text-sm sm:px-4">
+                      <div className="min-w-0 flex-1 truncate">
                         <span className="font-medium text-[var(--text-primary)]">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span>
                         <span className="ml-2 text-xs text-[var(--text-secondary)]">Survey #{s.survey_no}</span>
                       </div>
-                      <span className="text-xs font-medium text-[var(--text-secondary)] tabular-nums">{fmtDate(s.survey_date)}</span>
+                      <span className="shrink-0 text-xs font-medium text-[var(--text-secondary)] tabular-nums">{fmtDate(s.survey_date)}</span>
                     </li>
                   ))}
                 </ul>
@@ -298,7 +316,7 @@ export default function Dashboard() {
           </section>
         </div>
 
-        <section>
+        <section className="min-w-0">
           <div className="mb-2.5 flex items-center justify-between">
             <h2 className="text-base font-medium text-[var(--text-primary)]">Recent workspace activity</h2>
             <span className="text-xs text-[var(--text-secondary)]">Both partners</span>
@@ -309,8 +327,8 @@ export default function Dashboard() {
             ) : (
               <ul className="divide-y divide-[var(--border-default)]">
                 {audit.map((a) => (
-                  <li key={a.id} className="flex items-start justify-between gap-3 px-4 py-2.5 text-xs sm:text-sm">
-                    <div className="min-w-0 flex-1 text-[var(--text-secondary)]">
+                  <li key={a.id} className="flex items-start justify-between gap-2.5 px-3.5 py-2.5 text-xs sm:px-4 sm:text-sm">
+                    <div className="min-w-0 flex-1 truncate text-[var(--text-secondary)]" title={a.detail?.label ? String(a.detail.label) : undefined}>
                       <span className="font-medium text-[var(--text-primary)]">{memberName(a.user_id)}</span>{' '}
                       {a.action === 'insert'
                         ? 'added'
@@ -321,7 +339,7 @@ export default function Dashboard() {
                             : a.action.replace('_', ' ')}{' '}
                       <span className="text-[var(--text-secondary)]">{TABLE[a.table_name] ?? a.table_name}</span>
                       {a.detail?.label && (
-                        <span className="font-medium text-[var(--text-primary)]"> “{String(a.detail.label).slice(0, 42)}”</span>
+                        <span className="font-medium text-[var(--text-primary)]"> “{String(a.detail.label)}”</span>
                       )}
                     </div>
                     <span className="shrink-0 text-xs text-[var(--text-secondary)] tabular-nums">{fmtDate(a.created_at)}</span>
