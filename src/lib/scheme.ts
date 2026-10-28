@@ -135,7 +135,7 @@ export function parseSchemeText(text: string | null | undefined): SchemeComponen
 
   // If only a carton discount percentage was given (e.g. "COTON 8%") and no other percentage,
   // use cartonDiscountPct as the primary discountPct unless TP was explicitly specified alongside it.
-  if (out.discountPct === null && out.cartonDiscountPct !== null) {
+  if (out.discountPct === null && out.cartonDiscountPct != null) {
     out.discountPct = out.isTradePrice ? 0 : out.cartonDiscountPct
   } else if (out.discountPct === null && out.isTradePrice) {
     out.discountPct = 0

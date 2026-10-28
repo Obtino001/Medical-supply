@@ -342,6 +342,35 @@ describe('import pipeline', () => {
     const sbs = detectSideBySide(g, 1)
     expect(sbs.status).toBe('ambiguous')
   })
+  it('accepts TP (Trade Price = 0% discount), percentage discounts, and COTON/CARTON (full box) discounts in Offer Rate column', () => {
+    const csv = [
+      'ITEM NAME,OFFER RATE',
+      'ACABEL 125 SYP NEW,15% COTON 8%',
+      'ADRANCE 12/1000 NEW,↑ 12%',
+      'ALPHAGAN DROP,1TP',
+      'AMARYL MSR 2/500 NEW,TP',
+      'AMOXIL-FORT-SYP,COTON 8%',
+      '2SUM 500MG INJ,145',
+    ].join('\n')
+    const g = parseCsvText(csv)
+    const map = suggestMapping(g[0])
+    const { rows, stats } = buildRows(g, map, DEFAULT_OPTIONS)
+    expect(stats.invalid).toBe(0)
+    expect(stats.badNumbers).toBe(0)
+    expect(stats.review).toBe(0)
+    expect(stats.valid).toBe(6)
+    expect(rows[0].discountPct).toBe(15)
+    expect(rows[0].schemeText).toBe('15% discount · Full box (carton) 8%')
+    expect(rows[1].discountPct).toBe(12)
+    expect(rows[1].schemeText).toBe('12% discount')
+    expect(rows[2].discountPct).toBe(0)
+    expect(rows[2].schemeText).toBe('TP (0% discount)')
+    expect(rows[3].discountPct).toBe(0)
+    expect(rows[3].schemeText).toBe('TP (0% discount)')
+    expect(rows[4].discountPct).toBe(8)
+    expect(rows[4].schemeText).toBe('Full box (carton) 8% discount')
+    expect(rows[5].cost.effective).toBe(145)
+  })
 })
 
 // ---------- comparison

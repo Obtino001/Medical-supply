@@ -149,6 +149,7 @@ export default function Wishlist() {
         <div className="space-y-3">
           {shown.slice(page * per, page * per + per).map((e) => {
             const best = e.cmp.offers.find((o) => o.eligible)
+            const schemeOnlyOffer = !best ? e.records.find((r) => r.scheme_status === 'ok' && r.scheme_text) : undefined
             const alt = products.filter((p) => p.id !== e.product.id && p.normalized_name === e.product.normalized_name && !p.archived)
             const isOpen = open.has(e.item.id)
             return (
@@ -170,6 +171,10 @@ export default function Wishlist() {
                       <div className="text-sm">{best.isBest && <Badge tone="solid">{best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>} <b>{shopMap.get(best.rec.shop_id)?.name}</b></div>
                       <div className="text-xs text-[#5F6368]">{fmtDate(best.rec.observed_on)}{!best.fresh && ' · possibly outdated'}</div>
                       {e.cmp.nextBest && <div className="text-xs text-[#5F6368]">Next best {rs(e.cmp.nextBest.cents / 100)} · difference {rs(e.cmp.nextBest.saving)}</div>}
+                    </>) : schemeOnlyOffer ? (<>
+                      <div><Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge></div>
+                      <div className="mt-0.5 text-sm"><b>{shopMap.get(schemeOnlyOffer.shop_id)?.name}</b></div>
+                      <div className="text-xs text-[#5F6368]">{fmtDate(schemeOnlyOffer.observed_on)}</div>
                     </>) : <Badge tone="amber">No valid price</Badge>}
                   </div>
                 </div>

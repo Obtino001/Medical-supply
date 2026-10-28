@@ -126,9 +126,9 @@ export default function ProductDetail() {
                         return (
                           <tr key={r.id} className={`border-t border-[#DADCE0] ${r.archived ? 'text-[#5F6368] line-through' : ''}`}>
                             <td className="py-1.5 pr-2 whitespace-nowrap">{fmtDate(r.observed_on)} {latestIds.has(r.id) ? <Badge tone="blue">Latest</Badge> : <Badge>Older</Badge>}</td>
-                            <td className="pr-2 whitespace-nowrap tabular-nums">{rs(r.base_price)}</td>
+                            <td className="pr-2 whitespace-nowrap tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</td>
                             <td className="pr-2">{r.scheme_text || '—'}</td>
-                            <td className="pr-2 font-medium whitespace-nowrap tabular-nums">{r.scheme_status === 'ok' ? rs(r.effective_cost) : <Badge tone="amber">{r.scheme_status}</Badge>}</td>
+                            <td className="pr-2 font-medium whitespace-nowrap tabular-nums">{r.scheme_status === 'ok' ? (r.effective_cost != null ? rs(r.effective_cost) : r.scheme_text || '—') : <Badge tone="amber">{r.scheme_status}</Badge>}</td>
                             <td className={`pr-2 whitespace-nowrap tabular-nums ${ch == null ? '' : ch < 0 ? 'font-semibold text-[#188038]' : ch > 0 ? 'text-[#D93025]' : ''}`}>{ch == null ? '—' : `${ch > 0 ? '+' : ''}${ch.toFixed(1)}%`}</td>
                             <td>{memberName(r.created_by)}</td>
                           </tr>

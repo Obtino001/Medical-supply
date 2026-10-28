@@ -79,9 +79,9 @@ export default function ShopDetail() {
                 {mine.slice(0, 200).sort((a, b) => (productMap.get(a.product_id!)?.name ?? '').localeCompare(productMap.get(b.product_id!)?.name ?? '')).map((r) => (
                   <tr key={r.id} className="hover:bg-[#F8F9FA]">
                     <td className="px-3.5 py-2"><Link className="font-medium text-[#202124] hover:text-[#1A73E8] hover:underline" to={`/products/${r.product_id}`}>{productMap.get(r.product_id!)?.name}</Link></td>
-                    <td className="whitespace-nowrap px-3 py-2 text-[#5F6368] tabular-nums">{rs(r.base_price)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-[#5F6368] tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</td>
                     <td className="px-3 py-2 text-[#5F6368]">{r.scheme_text || '—'}</td>
-                    <td className="whitespace-nowrap px-3 py-2 font-medium text-[#202124] tabular-nums">{r.scheme_status === 'ok' ? rs(r.effective_cost) : '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-medium text-[#202124] tabular-nums">{r.scheme_status === 'ok' ? (r.effective_cost != null ? rs(r.effective_cost) : r.scheme_text || '—') : '—'}</td>
                     <td className="whitespace-nowrap px-3.5 py-2 text-xs text-[#5F6368]">{fmtDate(r.observed_on)}</td>
                   </tr>
                 ))}
