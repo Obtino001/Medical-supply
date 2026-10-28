@@ -225,3 +225,4 @@ export const IconBrandMark = ({ size = 28 }: { size?: number }) => (
     <path d="M9 11.5H15M9 21.5H11" stroke="#FFFFFF" strokeWidth="2.25" strokeLinecap="round" />
   </svg>
 )
+

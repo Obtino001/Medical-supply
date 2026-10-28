@@ -68,22 +68,26 @@ export default function ShopDetail() {
         )}
       </section>
       <section>
-        <h2 className="mb-2 text-lg font-bold">Latest prices offered</h2>
+        <h2 className="mb-2 text-base font-semibold text-slate-900">Latest prices offered</h2>
         {mine.length === 0 ? <Empty title="No matched prices yet" /> : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Product</th><th>Price</th><th>Scheme</th><th>Effective</th><th>Date</th></tr></thead>
-              <tbody>
+              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr><th className="px-3.5 py-2.5">Product</th><th className="px-3 py-2.5">Offer Rate</th><th className="px-3 py-2.5">Scheme / Discount</th><th className="px-3 py-2.5">Effective Price</th><th className="px-3.5 py-2.5">Date</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
                 {mine.slice(0, 200).sort((a, b) => (productMap.get(a.product_id!)?.name ?? '').localeCompare(productMap.get(b.product_id!)?.name ?? '')).map((r) => (
-                  <tr key={r.id} className="border-t border-slate-100">
-                    <td className="p-2"><Link className="font-medium hover:underline" to={`/products/${r.product_id}`}>{productMap.get(r.product_id!)?.name}</Link></td>
-                    <td className="whitespace-nowrap">{rs(r.base_price)}</td><td>{r.scheme_text || '—'}</td>
-                    <td className="whitespace-nowrap font-semibold">{r.scheme_status === 'ok' ? rs(r.effective_cost) : '—'}</td><td className="whitespace-nowrap">{fmtDate(r.observed_on)}</td>
+                  <tr key={r.id} className="hover:bg-slate-50/70">
+                    <td className="px-3.5 py-2"><Link className="font-medium text-slate-900 hover:text-teal-700 hover:underline" to={`/products/${r.product_id}`}>{productMap.get(r.product_id!)?.name}</Link></td>
+                    <td className="whitespace-nowrap px-3 py-2 text-slate-700 tabular-nums">{rs(r.base_price)}</td>
+                    <td className="px-3 py-2 text-slate-600">{r.scheme_text || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900 tabular-nums">{r.scheme_status === 'ok' ? rs(r.effective_cost) : '—'}</td>
+                    <td className="whitespace-nowrap px-3.5 py-2 text-xs text-slate-500">{fmtDate(r.observed_on)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {mine.length > 200 && <div className="p-2 text-xs text-slate-500">Showing first 200 of {mine.length}. Use Export for the full list.</div>}
+            {mine.length > 200 && <div className="border-t border-slate-100 px-3.5 py-2 text-xs text-slate-500">Showing first 200 of {mine.length}. Use Export for the full list.</div>}
           </div>
         )}
       </section>

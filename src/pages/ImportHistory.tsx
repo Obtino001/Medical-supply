@@ -16,15 +16,18 @@ export default function ImportHistory() {
   if (!jobs) return <Spinner />
   const per = 25
   return (
-    <div>
-      <PageHeader title="Import history" />
+    <div className="space-y-4">
+      <PageHeader
+        title="Import history"
+        subtitle="Audit log of all CSV and Excel price lists imported into the shared workspace."
+      />
       {jobs.length === 0 ? <Empty title="No imports yet"><Link className="underline" to="/import">Import a price list</Link></Empty> : (
         <div className="space-y-2">
           {jobs.slice(page * per, page * per + per).map((j) => (
-            <Card key={j.id} className="!p-3">
-              <div className="font-semibold break-all">{j.filename}</div>
-              <div className="text-sm text-slate-600">{shopMap.get(j.shop_id)?.name} · {fmtDate(j.created_at)} · by {memberName(j.created_by)}</div>
-              <div className="mt-1 flex flex-wrap gap-1.5"><Badge>{j.row_total} rows</Badge><Badge tone="green">{j.row_imported} imported</Badge>{j.row_skipped > 0 && <Badge tone="amber">{j.row_skipped} skipped</Badge>}{j.row_errors > 0 && <Badge tone="red">{j.row_errors} errors</Badge>}</div>
+            <Card key={j.id} className="!p-3.5">
+              <div className="font-semibold text-slate-900 break-all">{j.filename}</div>
+              <div className="mt-0.5 text-xs text-slate-600">{shopMap.get(j.shop_id)?.name} · {fmtDate(j.created_at)} · by {memberName(j.created_by)}</div>
+              <div className="mt-2 flex flex-wrap gap-1.5"><Badge>{j.row_total} rows</Badge><Badge tone="green">{j.row_imported} imported</Badge>{j.row_skipped > 0 && <Badge tone="amber">{j.row_skipped} skipped</Badge>}{j.row_errors > 0 && <Badge tone="red">{j.row_errors} errors</Badge>}</div>
             </Card>
           ))}
         </div>

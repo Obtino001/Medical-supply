@@ -18,19 +18,23 @@ export default function Surveys() {
     catch (e) { toast('err', (e as Error).message); await reload() }
   }
   return (
-    <div>
-      <PageHeader title="Surveys"><Link to="/import"><Button>+ Create survey (import a price list)</Button></Link></PageHeader>
-      <p className="mb-3 text-sm text-slate-600">A survey is one visit to one shop. It is created when you import that shop's price list, so surveys always have data behind them.</p>
+    <div className="space-y-4">
+      <PageHeader
+        title="Surveys"
+        subtitle="A survey represents a market visit or price list collection from a single shop."
+      >
+        <Link to="/import"><Button>+ Create survey (import a price list)</Button></Link>
+      </PageHeader>
       {surveys.length === 0 ? <Empty title="No surveys yet" /> : (
         <div className="space-y-2">
           {surveys.slice(page * per, page * per + per).map((s) => (
-            <Card key={s.id} className="!p-3">
+            <Card key={s.id} className="!p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div><b>Survey #{s.survey_no}</b> · {shopMap.get(s.shop_id)?.name ?? 'Shop'} · {fmtDate(s.survey_date)}</div>
+                <div className="text-sm"><b className="text-slate-900">Survey #{s.survey_no}</b> · <span className="font-medium text-slate-700">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span> · <span className="text-slate-600">{fmtDate(s.survey_date)}</span></div>
                 <Button variant="ghost" small onClick={() => { setEdit(s); setNote(s.notes ?? '') }}>Edit note</Button>
               </div>
-              <div className="text-xs text-slate-500">Created by {memberName(s.created_by)} on {fmtDate(s.created_at)}</div>
-              {s.notes && <div className="mt-1 text-sm text-slate-700">{s.notes}</div>}
+              <div className="mt-0.5 text-xs text-slate-500">Created by {memberName(s.created_by)} on {fmtDate(s.created_at)}</div>
+              {s.notes && <div className="mt-1.5 text-sm text-slate-700">{s.notes}</div>}
             </Card>
           ))}
         </div>

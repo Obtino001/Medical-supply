@@ -24,7 +24,10 @@ export default function Settings() {
   }
   return (
     <div className="space-y-4">
-      <PageHeader title="Settings" />
+      <PageHeader
+        title="Settings"
+        subtitle="Configure shared workspace members, price freshness thresholds, and product matching rules."
+      />
       <Card>
         <h2 className="mb-2 font-bold">Workspace members</h2>
         <p className="mb-2 text-sm text-slate-600">Both accounts see the same shops, products, prices, wishlist and match decisions. You are signed in as <b>{email}</b> ({role}).</p>

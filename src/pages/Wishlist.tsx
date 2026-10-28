@@ -109,12 +109,22 @@ export default function Wishlist() {
   }
   const per = 15
   return (
-    <div>
-      <PageHeader title="My Wishlist"><Button onClick={() => setAdding(true)}>+ Add product</Button></PageHeader>
-      <p className="mb-3 text-sm text-slate-600">Shared priority products: both partners see and edit the same list. Only the exact variant is compared; other sizes are shown separately as alternatives.</p>
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+    <div className="space-y-4">
+      <PageHeader
+        title="My Wishlist"
+        subtitle="Shared priority products: both partners see and edit the same list. Only the exact variant is compared; other sizes are shown separately as alternatives."
+      >
+        <Button onClick={() => setAdding(true)}>+ Add product</Button>
+      </PageHeader>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
         {tiles.map((t) => (
-          <button key={t.label} onClick={() => { setTile(t.key); setPage(0) }} className={`rounded-xl text-left ${tile === t.key ? 'ring-2 ring-emerald-600' : ''}`}><Stat label={t.label} value={t.n} /></button>
+          <button
+            key={t.label}
+            onClick={() => { setTile(t.key); setPage(0) }}
+            className={`rounded-xl text-left transition-all ${tile === t.key ? 'ring-2 ring-teal-600 shadow-xs' : 'hover:opacity-95'}`}
+          >
+            <Stat label={t.label} value={t.n} tone={tile === t.key ? 'teal' : undefined} />
+          </button>
         ))}
       </div>
       <div className="mb-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">

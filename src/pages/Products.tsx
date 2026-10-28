@@ -11,8 +11,11 @@ export default function Products() {
   const nav = useNavigate()
   const toast = useToast()
   return (
-    <div>
-      <PageHeader title="Product master">
+    <div className="space-y-4">
+      <PageHeader
+        title="Product master"
+        subtitle="Normalized catalog of medical products, strengths, and dosage forms across all shops."
+      >
         <Button onClick={() => setCreating(true)}>+ New product</Button>
       </PageHeader>
       <ProductBrowser mode="master" />

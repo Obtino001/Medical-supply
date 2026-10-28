@@ -27,9 +27,12 @@ function sourceView(r: PriceRecord): IncomingView {
 export default function Review() {
   const [tab, setTab] = useState<'review' | 'saved'>('review')
   return (
-    <div>
-      <PageHeader title="Match review" />
-      <div className="mb-3 flex gap-2">
+    <div className="space-y-4">
+      <PageHeader
+        title="Match review"
+        subtitle="Verify uncertain product matches or inspect saved supplier-to-catalog mappings."
+      />
+      <div className="flex gap-2">
         <Button variant={tab === 'review' ? 'primary' : 'secondary'} onClick={() => setTab('review')}>To review</Button>
         <Button variant={tab === 'saved' ? 'primary' : 'secondary'} onClick={() => setTab('saved')}>Saved mappings</Button>
       </div>

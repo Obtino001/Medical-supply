@@ -19,22 +19,32 @@ export default function Shops() {
   const list = shops.filter((s) => (!status || s.status === status) && (!city || s.city === city) &&
     (!q || [s.name, s.owner_name, s.phone, s.address, s.city].filter(Boolean).join(' ').toLowerCase().includes(q.toLowerCase())))
   return (
-    <div>
-      <PageHeader title="Shops"><Button onClick={() => setAdding(true)}>+ Add shop</Button></PageHeader>
-      <div className="mb-3 grid gap-2 sm:grid-cols-3">
-        <Input type="search" placeholder="Search shops…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <Select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((c) => <option key={c}>{c}</option>)}</Select>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}><option value="active">Active</option><option value="archived">Archived</option><option value="">All</option></Select>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Shops"
+        subtitle="Manage wholesale suppliers and market shops across Karachi, Nawabshah, and regional hubs."
+      >
+        <Button onClick={() => setAdding(true)}>+ Add shop</Button>
+      </PageHeader>
+      <Card className="!p-3.5">
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          <Input type="search" placeholder="Search shops…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((c) => <option key={c}>{c}</option>)}</Select>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}><option value="active">Active</option><option value="archived">Archived</option><option value="">All</option></Select>
+        </div>
+      </Card>
       {list.length === 0 ? <Empty title="No shops yet">Add your first shop, then import its price list.</Empty> : (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {list.map((s) => (
             <Link key={s.id} to={`/shops/${s.id}`}>
-              <Card className="hover:border-emerald-600">
-                <div className="flex items-center justify-between gap-2"><span className="font-bold">{s.name}</span>{s.status === 'archived' && <Badge tone="amber">Archived</Badge>}</div>
-                <div className="text-sm text-slate-600">{[s.city, s.address].filter(Boolean).join(' · ') || 'No location'}</div>
-                <div className="text-sm text-slate-600">{[s.owner_name, s.phone].filter(Boolean).join(' · ')}</div>
-                <div className="mt-1 text-xs text-slate-500">Last survey: {fmtDate(lastSurvey.get(s.id))}</div>
+              <Card className="transition-colors hover:border-teal-600">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[15px] font-semibold text-slate-900">{s.name}</span>
+                  {s.status === 'archived' ? <Badge tone="amber">Archived</Badge> : <Badge tone="teal">{s.city || 'Supplier'}</Badge>}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">{[s.city, s.address].filter(Boolean).join(' · ') || 'No location recorded'}</div>
+                {([s.owner_name, s.phone].some(Boolean)) && <div className="mt-0.5 text-xs text-slate-600">{[s.owner_name, s.phone].filter(Boolean).join(' · ')}</div>}
+                <div className="mt-2 text-xs text-slate-500">Last survey: <span className="font-medium text-slate-700">{fmtDate(lastSurvey.get(s.id))}</span></div>
               </Card>
             </Link>
           ))}

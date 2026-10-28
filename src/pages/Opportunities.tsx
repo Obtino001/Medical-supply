@@ -36,31 +36,52 @@ export default function Opportunities() {
   }
   const per = 20
   return (
-    <div>
-      <PageHeader title="Best opportunities" />
-      <p className="mb-3 text-sm text-slate-600">Saving is measured against the next-best comparable offer for the <b>same variant</b>, not the supplier's own discount. Opportunity status is a research note only: it does not create purchases anywhere.</p>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Select className="!w-auto" value={sort} onChange={(e) => setSort(e.target.value as 'pct' | 'abs')}><option value="pct">Greatest % saving</option><option value="abs">Greatest Rs saving</option></Select>
-        <Select className="!w-auto" value={reason} onChange={(e) => setReason(e.target.value as '')}><option value="">All reasons</option>{Object.entries(LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
-        <label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />Verified matches only</label>
-        <label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={hideStatus} onChange={(e) => setHideStatus(e.target.checked)} />Hide purchased / not interested</label>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Best opportunities"
+        subtitle="Savings are measured against the next-best comparable offer for the exact same variant across suppliers."
+      />
+      <Card className="!p-3.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select className="!w-auto" value={sort} onChange={(e) => setSort(e.target.value as 'pct' | 'abs')}><option value="pct">Greatest % saving</option><option value="abs">Greatest Rs saving</option></Select>
+          <Select className="!w-auto" value={reason} onChange={(e) => setReason(e.target.value as '')}><option value="">All reasons</option>{Object.entries(LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
+          <label className="flex min-h-9 items-center gap-2 text-xs font-medium text-slate-700"><input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />Verified matches only</label>
+          <label className="flex min-h-9 items-center gap-2 text-xs font-medium text-slate-700"><input type="checkbox" checked={hideStatus} onChange={(e) => setHideStatus(e.target.checked)} />Hide purchased / not interested</label>
+        </div>
+      </Card>
       {list.length === 0 ? <Empty title="No opportunities yet">Opportunities appear when at least two shops offer the same variant at valid prices.</Empty> : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {list.slice(page * per, page * per + per).map((o) => {
             const st = opportunityStatus.get(o.product.id)
             return (
-              <Card key={o.product.id} className="border-emerald-300">
+              <Card key={o.product.id} className="border-emerald-200/90 transition-colors hover:border-emerald-300">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <Link to={`/products/${o.product.id}`} className="font-bold hover:underline">{o.product.name}</Link> <span className="text-xs text-slate-500">#{o.product.product_no}</span>
-                    {variantLabel(o.product) && <div><Badge tone="blue">{variantLabel(o.product)}</Badge></div>}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link to={`/products/${o.product.id}`} className="text-[15px] font-semibold text-slate-900 hover:text-teal-700 hover:underline">{o.product.name}</Link>
+                      <span className="text-xs text-slate-400 tabular-nums">#{o.product.product_no}</span>
+                      {variantLabel(o.product) && <Badge tone="blue">{variantLabel(o.product)}</Badge>}
+                    </div>
                   </div>
-                  <div className="text-right"><div className="text-xl font-extrabold text-emerald-800">{rs(o.saving)} <span className="text-base">({o.savingPct.toFixed(1)}%)</span></div><div className="text-xs text-slate-600">saved vs next-best</div></div>
+                  <div className="text-right tabular-nums">
+                    <div className="text-lg font-bold text-emerald-700">Save {rs(o.saving)} <span className="text-sm font-semibold">({o.savingPct.toFixed(1)}%)</span></div>
+                    <div className="text-[11px] text-slate-500">vs next-best supplier</div>
+                  </div>
                 </div>
-                <div className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
-                  <div className="rounded-lg bg-emerald-50 p-2"><Badge tone="solid">{o.tied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge> <b>{shopMap.get(o.best.rec.shop_id)?.name}</b>: <b>{rs(o.best.cents! / 100)}</b>{o.best.rec.scheme_text ? ` (${o.best.rec.scheme_text})` : ''}</div>
-                  {o.next && <div className="rounded-lg bg-slate-50 p-2">Next best: <b>{shopMap.get(o.next.rec.shop_id)?.name}</b>: {rs(o.next.cents! / 100)}</div>}
+                <div className="mt-2.5 grid gap-2 text-sm sm:grid-cols-2">
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 text-xs">
+                    <Badge tone="solid">{o.tied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>
+                    <b className="text-slate-900">{shopMap.get(o.best.rec.shop_id)?.name}</b>:
+                    <b className="text-emerald-800 tabular-nums">{rs(o.best.cents! / 100)}</b>
+                    {o.best.rec.scheme_text ? <span className="text-slate-600">({o.best.rec.scheme_text})</span> : ''}
+                  </div>
+                  {o.next && (
+                    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                      <span>Next best:</span>
+                      <b className="text-slate-900">{shopMap.get(o.next.rec.shop_id)?.name}</b>:
+                      <span className="font-semibold tabular-nums">{rs(o.next.cents! / 100)}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {o.reasons.map((r) => <Badge key={r} tone={r === 'multiple' ? 'slate' : 'green'}>{LABEL[r]}{r === 'price_drop' && o.dropPct ? ` ${o.dropPct.toFixed(0)}%` : ''}{r === 'new_low' && o.priorLow ? ` (was ${rs(o.priorLow)})` : ''}</Badge>)}

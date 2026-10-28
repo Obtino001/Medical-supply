@@ -7,7 +7,6 @@ import {
   IconDownload,
   IconFileSpreadsheet,
   IconGitCompare,
-  IconHistory,
   IconPackage,
   IconPlus,
   IconScale,

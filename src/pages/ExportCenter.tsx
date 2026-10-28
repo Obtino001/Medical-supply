@@ -92,7 +92,10 @@ export default function ExportCenter() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Export center" />
+      <PageHeader
+        title="Export center"
+        subtitle="Export compared prices, supplier catalogs, or a full workspace backup in CSV or Excel (.xlsx) format."
+      />
       <Card className="space-y-3">
         <Field label="What to export"><Select value={ds} onChange={(e) => setDs(e.target.value as Dataset)}>{DATASETS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}</Select></Field>
         {ds === 'shop' && <Field label="Shop"><Select value={shopId} onChange={(e) => setShopId(e.target.value)}><option value="">Select a shop…</option>{shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>}

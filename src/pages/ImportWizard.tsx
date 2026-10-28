@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { IconCheck, IconChevronDown, IconChevronRight, IconFileSpreadsheet, IconPlus } from '../components/icons'
 import { AttrTable, ProductPicker, productView, type IncomingView } from '../components/Match'
 import { ShopForm } from '../components/ShopForm'
 import { WishlistToggle } from '../components/WishlistToggle'
-import { Badge, Button, Card, ErrorBox, Field, Input, Pagination, Select, Stat, Textarea, fmtDate, rs, useToast } from '../components/ui'
+import { Badge, Button, Card, ErrorBox, Field, Input, PageHeader, Pagination, Select, Stat, fmtDate, rs, useToast } from '../components/ui'
 import { ADDITIONAL_FIELDS, DEFAULT_OPTIONS, REQUIRED_FIELDS, suggestMapping, type ImportOptions, type Mapping } from '../lib/columns'
 import { useData } from '../lib/data'
 import { download, toCsv, toMatrix } from '../lib/exporter'
@@ -173,11 +174,27 @@ export default function ImportWizard() {
   // ---------------------------------------------------------------- render
   if (result) {
     return (
-      <Card className="mx-auto max-w-lg">
-        <h1 className="text-xl font-bold text-emerald-800">Import complete</h1>
-        <p className="mt-1 text-sm text-slate-600">Saved to the shared database. Your partner sees it after refreshing.</p>
-        <div className="my-3 grid grid-cols-2 gap-2"><Stat label="Price records imported" value={result.imported} /><Stat label="New products created" value={result.new_products} /><Stat label="Rows skipped" value={result.skipped} /><Stat label="Rows with errors" value={result.errors} /></div>
-        <div className="flex flex-wrap gap-2"><Link to="/review"><Button variant="secondary">Review matches</Button></Link><Link to="/compare"><Button>Compare prices</Button></Link><Button variant="secondary" onClick={() => location.assign('/import')}>Import another</Button></div>
+      <Card className="mx-auto max-w-lg space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+            <IconCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">Import complete</h1>
+            <p className="text-sm text-slate-600">Saved to the shared database. Your partner sees it after refreshing.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Stat label="Price records imported" value={result.imported} tone="green" />
+          <Stat label="New products created" value={result.new_products} />
+          <Stat label="Rows skipped" value={result.skipped} />
+          <Stat label="Rows with errors" value={result.errors} tone={result.errors ? 'amber' : undefined} />
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Link to="/compare"><Button>Compare prices</Button></Link>
+          <Link to="/review"><Button variant="secondary">Review matches</Button></Link>
+          <Button variant="secondary" onClick={() => location.assign('/import')}>Import another</Button>
+        </div>
       </Card>
     )
   }
@@ -190,59 +207,95 @@ export default function ImportWizard() {
   const mappedOptionalCount = ADDITIONAL_FIELDS.filter((f) => !!mapping[f.key]).length
 
   return (
-    <div>
-      <h1 className="mb-2 text-xl font-bold sm:text-2xl">Import price list</h1>
-      <ol className="mb-4 flex gap-1 overflow-x-auto pb-1 text-xs font-semibold">
-        {STEPS.map((s, i) => <li key={s} className={`shrink-0 rounded-full px-3 py-1 ${i === step ? 'bg-emerald-700 text-white' : i < step ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200 text-slate-600'}`}>{i + 1}. {s}</li>)}
+    <div className="space-y-4">
+      <PageHeader
+        title="Import price list"
+        subtitle="Upload a supplier CSV or Excel (.xlsx / .xls) price list, verify columns, and match items into the shared catalog."
+      />
+      <ol className="flex gap-1.5 overflow-x-auto pb-1 text-xs font-semibold">
+        {STEPS.map((s, i) => (
+          <li
+            key={s}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 transition-colors ${
+              i === step
+                ? 'bg-teal-700 text-white shadow-xs'
+                : i < step
+                  ? 'bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200'
+                  : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {i < step ? <IconCheck className="h-3.5 w-3.5 text-teal-700" /> : <span>{i + 1}.</span>}
+            <span>{s}</span>
+          </li>
+        ))}
       </ol>
 
       {step === 0 && (
-        <Card className="space-y-3">
+        <Card className="space-y-4">
           <Field label="Which shop is this price list from?">
             <Select value={shopId} onChange={(e) => { setShopId(e.target.value); setFile(null) }}>
               <option value="">Select a shop…</option>
               {shops.filter((s) => s.status === 'active').map((s) => <option key={s.id} value={s.id}>{s.name}{s.city ? ` — ${s.city}` : ''}</option>)}
             </Select>
           </Field>
-          <Button variant="secondary" onClick={() => setAddingShop(true)}>+ Add a new shop</Button>
-          {shop && <div className="text-sm text-slate-600">{preset ? 'A saved column mapping exists for this shop and will be applied.' : 'No saved column mapping for this shop yet.'}</div>}
+          <div>
+            <Button variant="secondary" onClick={() => setAddingShop(true)}>
+              <IconPlus className="h-4 w-4 text-slate-600" />
+              Add a new shop
+            </Button>
+          </div>
+          {shop && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs text-slate-600">
+              {preset ? 'A saved column mapping exists for this shop and will be applied automatically.' : 'No saved column mapping for this shop yet — columns will be detected automatically.'}
+            </div>
+          )}
         </Card>
       )}
 
       {step === 1 && (
-        <Card className="space-y-3">
-          <div className="text-sm text-slate-600">Shop: <b>{shop?.name}</b></div>
-          <Field label="Survey date"><Input type="date" value={surveyDate} max={today()} onChange={(e) => setSurveyDate(e.target.value)} /></Field>
-          <Field label="Survey notes (optional)"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+        <Card className="space-y-4">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <span>Selected supplier:</span>
+            <Badge tone="teal">{shop?.name}</Badge>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Survey date"><Input type="date" value={surveyDate} max={today()} onChange={(e) => setSurveyDate(e.target.value)} /></Field>
+            <Field label="Survey notes (optional)"><Input placeholder="e.g. Monthly wholesale rate sheet" value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+          </div>
           <Field label="Price list file (CSV or Excel .xlsx / .xls)" hint="PDF and photo price lists are not supported yet: ask the shop for Excel/CSV or export to .xlsx first.">
-            <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={(e) => void onFile(e.target.files?.[0])} className="block w-full min-h-11 rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:font-semibold file:text-white" />
+            <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={(e) => void onFile(e.target.files?.[0])} className="block w-full min-h-11 rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-teal-700 file:px-3.5 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-teal-800" />
           </Field>
           {reading && <div className="text-sm text-slate-600">Reading file…</div>}
           {fileErr && <ErrorBox>{fileErr}</ErrorBox>}
-          {file && <div className="text-sm text-emerald-800">Loaded <b>{file.filename}</b>{file.sheetName ? ` (sheet "${file.sheetName}")` : ''} · {file.grid.length} rows · {(file.size / 1024).toFixed(0)} KB</div>}
+          {file && (
+            <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-sm text-emerald-900">
+              <IconFileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-700" />
+              <span>Loaded <b>{file.filename}</b>{file.sheetName ? ` (sheet "${file.sheetName}")` : ''} · {file.grid.length} rows · {(file.size / 1024).toFixed(0)} KB</span>
+            </div>
+          )}
           {dupJob && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-950">
               <b>This exact file was already imported</b> for this shop ({dupJob.filename}, {fmtDate(dupJob.created_at)}). Importing again creates a second set of price records.
-              <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={allowDup} onChange={(e) => setAllowDup(e.target.checked)} />Import it again anyway</label>
+              <label className="mt-2 flex items-center gap-2 font-medium"><input type="checkbox" checked={allowDup} onChange={(e) => setAllowDup(e.target.checked)} />Import it again anyway</label>
             </div>
           )}
         </Card>
       )}
 
       {step === 2 && file && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <Card>
-            <h2 className="mb-2 font-bold">File preview</h2>
+            <h2 className="mb-2 text-base font-semibold text-slate-900">File preview</h2>
             <Field label="Header row (the row containing column names)">
               <Select value={options.headerRow} onChange={(e) => { const o = { ...options, headerRow: Number(e.target.value) }; setOptions(o); applyMapping(file, o, preset) }}>
                 {file.grid.slice(0, 15).map((r, i) => <option key={i} value={i + 1}>Row {i + 1}: {r.filter(Boolean).slice(0, 4).join(' | ').slice(0, 60)}</option>)}
               </Select>
             </Field>
             {sideBySide.status === 'detected' && (
-              <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">
-                <div className="font-bold">Side-by-side price list detected</div>
-                <p className="mt-0.5">{sideBySide.reason}</p>
-                <label className="mt-2 flex items-center gap-2 font-medium">
+              <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3.5 text-sm text-emerald-950">
+                <div className="font-semibold">Side-by-side price list detected</div>
+                <p className="mt-0.5 text-xs text-emerald-900">{sideBySide.reason}</p>
+                <label className="mt-2 flex items-center gap-2 text-xs font-medium">
                   <input
                     type="checkbox"
                     checked={options.combineSideBySide !== false}
@@ -253,26 +306,26 @@ export default function ImportWizard() {
               </div>
             )}
             {sideBySide.status === 'ambiguous' && (
-              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                <div className="font-bold">Please verify column mapping</div>
-                <p className="mt-0.5">{sideBySide.reason}</p>
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-950">
+                <div className="font-semibold">Please verify column mapping</div>
+                <p className="mt-0.5 text-xs">{sideBySide.reason}</p>
               </div>
             )}
             <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
               <table className="min-w-full text-xs">
-                <thead className="bg-slate-100"><tr>{headers.map((h) => <th key={h} className="whitespace-nowrap px-2 py-1.5 text-left">{h}</th>)}</tr></thead>
-                <tbody>{file.grid.slice(options.headerRow, options.headerRow + 8).map((r, i) => <tr key={i} className="border-t border-slate-100">{headers.map((_, c) => <td key={c} className="whitespace-nowrap px-2 py-1">{r[c]}</td>)}</tr>)}</tbody>
+                <thead className="bg-slate-50 text-slate-600"><tr>{headers.map((h) => <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-semibold">{h}</th>)}</tr></thead>
+                <tbody className="divide-y divide-slate-100">{file.grid.slice(options.headerRow, options.headerRow + 8).map((r, i) => <tr key={i} className="hover:bg-slate-50/60">{headers.map((_, c) => <td key={c} className="whitespace-nowrap px-3 py-1.5 text-slate-700">{r[c]}</td>)}</tr>)}</tbody>
               </table>
             </div>
-            <div className="mt-2 flex flex-wrap gap-1 text-xs text-slate-600">
+            <div className="mt-2.5 flex flex-wrap gap-1.5 text-xs text-slate-600">
               {detectColumns(headers, file.grid.slice(options.headerRow, options.headerRow + 50)).map((c) => c.numericShare > 0.8 && <Badge key={c.header} tone="blue">{c.header}: numeric</Badge>)}
             </div>
           </Card>
 
-          <Card className="space-y-3">
+          <Card className="space-y-4">
             <div>
-              <h2 className="font-bold">Map columns</h2>
-              <p className="text-sm text-slate-600">Only <b>Product Name / Item Name</b> and <b>Offer Rate / Price</b> are required. Common headers like <code>ITEM NAME</code> and <code>OFFER RATE</code> are detected automatically.</p>
+              <h2 className="text-base font-semibold text-slate-900">Map columns</h2>
+              <p className="mt-0.5 text-xs text-slate-600">Only <b>Product Name / Item Name</b> and <b>Offer Rate / Price</b> are required. Common headers like <code>ITEM NAME</code> and <code>OFFER RATE</code> are detected automatically.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {REQUIRED_FIELDS.map((f) => (
@@ -285,18 +338,18 @@ export default function ImportWizard() {
               ))}
             </div>
 
-            <div className="border-t border-slate-200 pt-2">
+            <div className="border-t border-slate-200 pt-3">
               <button
                 type="button"
                 onClick={() => setShowAdditionalCols(!showAdditionalCols)}
-                className="flex w-full items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-800 hover:bg-slate-100"
+                className="flex w-full items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50 px-3.5 py-2.5 text-left text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-100"
               >
                 <span>
-                  Additional columns <span className="font-normal text-slate-600">(optional: Discount, Scheme / Bonus, Notes, etc.)</span>
+                  Additional columns <span className="font-normal text-slate-500">(optional: Discount, Scheme / Bonus, Notes, etc.)</span>
                 </span>
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-2 text-xs text-slate-600">
                   {mappedOptionalCount > 0 && <Badge tone="green">{mappedOptionalCount} mapped</Badge>}
-                  <span>{showAdditionalCols ? '▲ Hide' : '▼ Show'}</span>
+                  {showAdditionalCols ? <IconChevronDown className="h-4 w-4" /> : <IconChevronRight className="h-4 w-4" />}
                 </span>
               </button>
 
