@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
-import { IconAlert, IconCheck, IconClose } from './icons'
+import { IconAlert, IconArrowLeft, IconArrowRight, IconCheck, IconClose } from './icons'
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
@@ -229,9 +229,15 @@ export function Pagination({ page, pages, onPage }: { page: number; pages: numbe
   if (pages <= 1) return null
   return (
     <div className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-[#DADCE0] bg-white px-3 py-2">
-      <Button variant="secondary" small disabled={page <= 0} onClick={() => onPage(page - 1)}>← Previous</Button>
+      <Button variant="secondary" small disabled={page <= 0} onClick={() => onPage(page - 1)}>
+        <IconArrowLeft size={15} />
+        <span>Previous</span>
+      </Button>
       <span className="text-xs font-medium text-[#5F6368] sm:text-sm tabular-nums">Page {page + 1} of {pages}</span>
-      <Button variant="secondary" small disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>Next →</Button>
+      <Button variant="secondary" small disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>
+        <span>Next</span>
+        <IconArrowRight size={15} />
+      </Button>
     </div>
   )
 }

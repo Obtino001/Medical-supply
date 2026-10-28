@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
-import { IconChevronDown, IconFilter, IconSearch } from './icons'
+import { IconArrowRight, IconChevronDown, IconFilter, IconSearch } from './icons'
 import { OfferCard } from './Offers'
 import { WishlistToggle } from './WishlistToggle'
 import { Badge, Button, Card, Empty, Field, Pagination, Select, cx, fmtDate, rs, useDebounced, useLocalState, useToast } from './ui'
@@ -181,7 +181,10 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
         <span className="tabular-nums">Showing {filtered.length} of {rows.length} products{selected.size > 0 && ` · ${selected.size} selected for export`}</span>
         {selected.size > 0 && (
           <span className="flex items-center gap-3">
-            <Link to="/export" className="font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">Export selected →</Link>
+            <Link to="/export" className="inline-flex items-center gap-1 font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">
+              <span>Export selected</span>
+              <IconArrowRight size={14} />
+            </Link>
             <button type="button" className="text-[#5F6368] hover:text-[#202124] hover:underline" onClick={() => setSelected(new Set())}>Clear selection</button>
           </span>
         )}

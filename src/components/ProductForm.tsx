@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { identityKey, parseTitle } from '../lib/productParse'
 import { supabase, updateChecked } from '../lib/supabase'
 import type { Product } from '../lib/types'
+import { IconChevronDown, IconChevronUp } from './icons'
 import { Button, ErrorBox, Field, Input, Modal, Select, Textarea } from './ui'
 
 const num = (s: string): number | null => {
@@ -76,10 +77,12 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
           <button
             type="button"
             onClick={() => setShowMore(!showMore)}
-            className="flex w-full items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            className="flex w-full items-center justify-between rounded-lg border border-[#DADCE0] bg-[#F8F9FA] px-3 py-2 text-left text-sm font-medium text-[#202124] hover:bg-[#E8F0FE]/50"
           >
             <span>Additional attributes (optional: brand, manufacturer, strength, pack, barcode…)</span>
-            <span>{showMore ? '▲ Hide' : '▼ Show'}</span>
+            <span className="inline-flex items-center gap-1 text-xs text-[#5F6368]">
+              {showMore ? <><span>Hide</span><IconChevronUp size={15} /></> : <><span>Show</span><IconChevronDown size={15} /></>}
+            </span>
           </button>
           {showMore && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">

@@ -189,15 +189,55 @@ export const IconUsers = (p: IconProps) => (
   </BaseIcon>
 )
 
+export const IconChevronLeft = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <polyline points="15 18 9 12 15 6" />
+  </BaseIcon>
+)
+
 export const IconChevronRight = (p: IconProps) => (
   <BaseIcon {...p}>
     <polyline points="9 18 15 12 9 6" />
   </BaseIcon>
 )
 
+export const IconChevronUp = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <polyline points="18 15 12 9 6 15" />
+  </BaseIcon>
+)
+
 export const IconChevronDown = (p: IconProps) => (
   <BaseIcon {...p}>
     <polyline points="6 9 12 15 18 9" />
+  </BaseIcon>
+)
+
+export const IconArrowLeft = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <line x1="19" y1="12" x2="5" y2="12" />
+    <polyline points="12 19 5 12 12 5" />
+  </BaseIcon>
+)
+
+export const IconArrowRight = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
+  </BaseIcon>
+)
+
+export const IconArrowUp = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <line x1="12" y1="19" x2="12" y2="5" />
+    <polyline points="5 12 12 5 19 12" />
+  </BaseIcon>
+)
+
+export const IconArrowDown = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <polyline points="19 12 12 19 5 12" />
   </BaseIcon>
 )
 

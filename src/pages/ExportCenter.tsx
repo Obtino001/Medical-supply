@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
+import { IconArrowDown, IconArrowUp, IconClose } from '../components/icons'
 import { ProductPicker } from '../components/Match'
 import { Badge, Button, Card, Field, Input, PageHeader, Select, useToast } from '../components/ui'
 import { useAuth } from '../lib/auth'
@@ -123,11 +124,11 @@ export default function ExportCenter() {
         <div className="space-y-1">
           {cols.map((c, i) => (
             <div key={c.key} className="flex items-center gap-1.5">
-              <Button variant="secondary" small onClick={() => move(i, -1)} aria-label="Move up">↑</Button>
-              <Button variant="secondary" small onClick={() => move(i, 1)} aria-label="Move down">↓</Button>
+              <Button variant="secondary" small onClick={() => move(i, -1)} aria-label="Move up"><IconArrowUp size={14} /></Button>
+              <Button variant="secondary" small onClick={() => move(i, 1)} aria-label="Move down"><IconArrowDown size={14} /></Button>
               <Input className="!min-h-9" value={c.header} onChange={(e) => setProfile({ ...profile, columns: cols.map((x, j) => (j === i ? { ...x, header: e.target.value } : x)) })} aria-label={`Header for ${c.key}`} />
-              <span className="hidden w-40 shrink-0 text-xs text-slate-500 sm:block">{EXPORT_COLUMNS.find((x) => x.key === c.key)?.label}</span>
-              <Button variant="ghost" small onClick={() => toggle(c.key)} aria-label="Remove column">✕</Button>
+              <span className="hidden w-40 shrink-0 text-xs text-[#5F6368] sm:block">{EXPORT_COLUMNS.find((x) => x.key === c.key)?.label}</span>
+              <Button variant="ghost" small onClick={() => toggle(c.key)} aria-label="Remove column"><IconClose size={14} /></Button>
             </div>
           ))}
         </div>

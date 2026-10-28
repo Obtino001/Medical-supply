@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { IconCheck, IconChevronDown, IconChevronRight, IconFileSpreadsheet, IconPlus } from '../components/icons'
+import { IconArrowLeft, IconArrowRight, IconCheck, IconChevronDown, IconChevronRight, IconFileSpreadsheet, IconPlus } from '../components/icons'
 import { AttrTable, ProductPicker, productView, type IncomingView } from '../components/Match'
 import { ShopForm } from '../components/ShopForm'
 import { WishlistToggle } from '../components/WishlistToggle'
@@ -471,9 +471,17 @@ export default function ImportWizard() {
         </Card>
       )}
 
-      <div className="safe-bottom fixed inset-x-0 bottom-14 z-30 flex justify-between gap-2 border-t border-slate-200 bg-white p-2 md:static md:mt-4 md:border-0 md:bg-transparent md:p-0">
-        <Button variant="secondary" disabled={step === 0 || busy} onClick={() => setStep(step - 1)}>← Back</Button>
-        {step < 5 && <Button onClick={next}>Next →</Button>}
+      <div className="safe-bottom fixed inset-x-0 bottom-14 z-30 flex justify-between gap-2 border-t border-[#DADCE0] bg-white p-2 md:static md:mt-4 md:border-0 md:bg-transparent md:p-0">
+        <Button variant="secondary" disabled={step === 0 || busy} onClick={() => setStep(step - 1)}>
+          <IconArrowLeft size={16} />
+          <span>Back</span>
+        </Button>
+        {step < 5 && (
+          <Button onClick={next}>
+            <span>Next</span>
+            <IconArrowRight size={16} />
+          </Button>
+        )}
       </div>
       {addingShop && <ShopForm open onClose={() => setAddingShop(false)} onSaved={async (s) => { await reload(); if (s) setShopId(s.id) }} />}
       {picker && <ProductPicker open onClose={() => setPicker(null)} initialQuery={picker.incoming.normalizedName} onPick={(p) => { setChoice(picker, { action: 'use', productId: p.id }); setPicker(null) }} />}
