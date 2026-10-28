@@ -1,0 +1,85 @@
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { FreshBadge } from '../components/Offers'
+import { WishlistToggle } from '../components/WishlistToggle'
+import { Badge, Card, Empty, PageHeader, Pagination, Select, fmtDate, rs, useLocalState, useToast } from '../components/ui'
+import { findOpportunities, type OpportunityReason } from '../lib/compare'
+import { useData } from '../lib/data'
+import { variantLabel } from '../lib/productParse'
+import { supabase } from '../lib/supabase'
+import type { OpportunityStatus } from '../lib/types'
+
+const LABEL: Record<OpportunityReason, string> = { multiple: 'Several comparable offers', new_low: 'New lowest price', price_drop: 'Price dropped', scheme: 'Useful scheme' }
+const STATUS: Record<OpportunityStatus['status'], string> = { interesting: 'Interesting', verify: 'Need to verify', contact: 'Contact supplier', purchased: 'Purchased (research note only)', not_interested: 'Not interested' }
+
+export default function Opportunities() {
+  const { products, current, history, settings, shopMap, opportunityStatus, reload } = useData()
+  const toast = useToast()
+  const [sort, setSort] = useLocalState<'pct' | 'abs'>('opp:sort', 'pct')
+  const [reason, setReason] = useState<'' | OpportunityReason>('')
+  const [verifiedOnly, setVerifiedOnly] = useState(true)
+  const [hideStatus, setHideStatus] = useState(true)
+  const [page, setPage] = useState(0)
+
+  const all = useMemo(() => findOpportunities(products, current, history, { freshnessDays: settings.freshness_days, excludeStale: false }), [products, current, history, settings])
+  const list = useMemo(() => {
+    const out = all.filter((o) => (!verifiedOnly || o.verified) && (!reason || o.reasons.includes(reason)) && (!hideStatus || !['not_interested', 'purchased'].includes(opportunityStatus.get(o.product.id)?.status ?? '')))
+    return out.sort((a, b) => (sort === 'pct' ? b.savingPct - a.savingPct : b.saving - a.saving))
+  }, [all, verifiedOnly, reason, hideStatus, sort, opportunityStatus])
+
+  const setStatus = async (productId: string, status: string) => {
+    const { error } = status
+      ? await supabase.from('opportunity_status').upsert({ product_id: productId, status }, { onConflict: 'workspace_id,product_id' })
+      : await supabase.from('opportunity_status').delete().eq('product_id', productId)
+    if (error) return toast('err', error.message)
+    await reload()
+  }
+  const per = 20
+  return (
+    <div>
+      <PageHeader title="Best opportunities" />
+      <p className="mb-3 text-sm text-slate-600">Saving is measured against the next-best comparable offer for the <b>same variant</b>, not the supplier's own discount. Opportunity status is a research note only: it does not create purchases anywhere.</p>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Select className="!w-auto" value={sort} onChange={(e) => setSort(e.target.value as 'pct' | 'abs')}><option value="pct">Greatest % saving</option><option value="abs">Greatest Rs saving</option></Select>
+        <Select className="!w-auto" value={reason} onChange={(e) => setReason(e.target.value as '')}><option value="">All reasons</option>{Object.entries(LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
+        <label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />Verified matches only</label>
+        <label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={hideStatus} onChange={(e) => setHideStatus(e.target.checked)} />Hide purchased / not interested</label>
+      </div>
+      {list.length === 0 ? <Empty title="No opportunities yet">Opportunities appear when at least two shops offer the same variant at valid prices.</Empty> : (
+        <div className="space-y-2">
+          {list.slice(page * per, page * per + per).map((o) => {
+            const st = opportunityStatus.get(o.product.id)
+            return (
+              <Card key={o.product.id} className="border-emerald-300">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <Link to={`/products/${o.product.id}`} className="font-bold hover:underline">{o.product.name}</Link> <span className="text-xs text-slate-500">#{o.product.product_no}</span>
+                    <div><Badge tone="blue">{variantLabel(o.product) || 'no size'}</Badge></div>
+                  </div>
+                  <div className="text-right"><div className="text-xl font-extrabold text-emerald-800">{rs(o.saving)} <span className="text-base">({o.savingPct.toFixed(1)}%)</span></div><div className="text-xs text-slate-600">saved vs next-best</div></div>
+                </div>
+                <div className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+                  <div className="rounded-lg bg-emerald-50 p-2"><Badge tone="solid">{o.tied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge> <b>{shopMap.get(o.best.rec.shop_id)?.name}</b>: <b>{rs(o.best.cents! / 100)}</b>{o.best.rec.scheme_text ? ` (${o.best.rec.scheme_text})` : ''}</div>
+                  {o.next && <div className="rounded-lg bg-slate-50 p-2">Next best: <b>{shopMap.get(o.next.rec.shop_id)?.name}</b>: {rs(o.next.cents! / 100)}</div>}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {o.reasons.map((r) => <Badge key={r} tone={r === 'multiple' ? 'slate' : 'green'}>{LABEL[r]}{r === 'price_drop' && o.dropPct ? ` ${o.dropPct.toFixed(0)}%` : ''}{r === 'new_low' && o.priorLow ? ` (was ${rs(o.priorLow)})` : ''}</Badge>)}
+                  <FreshBadge ageDays={o.best.ageDays} fresh={o.best.fresh} />
+                  <Badge tone={o.verified ? 'green' : 'amber'}>Match: {o.confidence}</Badge>
+                  <span className="text-xs text-slate-500">Survey {fmtDate(o.best.rec.observed_on)}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Select className="!w-auto !min-h-9 text-sm" value={st?.status ?? ''} onChange={(e) => void setStatus(o.product.id, e.target.value)} aria-label="Opportunity status">
+                    <option value="">Status: none</option>{Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </Select>
+                  <WishlistToggle productId={o.product.id} />
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+      <Pagination page={page} pages={Math.ceil(list.length / per)} onPage={setPage} />
+    </div>
+  )
+}
