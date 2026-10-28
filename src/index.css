@@ -3,12 +3,13 @@
 :root {
   color-scheme: light;
 
-  /* Google-Inspired Clean SaaS Design Tokens */
-  --font-sans: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Google-Inspired Clean Mobile-First Design Tokens */
+  --font-sans: "Google Sans Flex", "Google Sans", Roboto, Arial, sans-serif;
 
   /* Surfaces & Backgrounds */
-  --bg-main: #FFFFFF;
-  --bg-secondary: #F8F9FA;
+  --bg-main: #F8FAFC;
+  --bg-secondary: #F8FAFC;
+  --bg-surface: #FFFFFF;
   --bg-card: #FFFFFF;
   --bg-blue-light: #E8F0FE;
 
@@ -17,7 +18,7 @@
   --text-secondary: #5F6368;
 
   /* Borders */
-  --border-default: #DADCE0;
+  --border-default: #E1E5EA;
 
   /* Brand & Action Colours */
   --color-primary: #1A73E8;
@@ -50,7 +51,7 @@ html, body, #root {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-main);
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.5;
@@ -83,4 +84,13 @@ input[type="radio"] {
 
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
