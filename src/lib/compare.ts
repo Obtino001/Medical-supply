@@ -13,6 +13,8 @@ export interface OfferView {
   reason: Reason | null
   /** True when the supplier provided a valid discount/scheme text, but no base rate in Rs to calculate effective cost */
   isDiscountOnly: boolean
+  /** Usable for offer-rate ranking: passes every check except having a purchase price (match, scheme, stock, expiry, freshness) */
+  offerEligible: boolean
   cents: number | null // effective cost in paisa, rounded to 2 decimals
   isBest: boolean
   isTied: boolean
@@ -139,6 +141,11 @@ export function compareOffers(records: PriceRecord[], product: Product | undefin
 
     if (isDiscountOnly || reason === 'review') hasIncompleteOffers = true
 
+    let offerEligible = false
+    if (!rec.archived && rec.scheme_status === 'ok' && !UNVERIFIED_MATCH.has(rec.match_status) && !hasAttributeConflict(rec, product)) {
+      offerEligible = !(isUnavailable(rec.availability) || expired || (opt.excludeStale && !fresh))
+    }
+
     return {
       rec,
       ageDays,
@@ -146,6 +153,7 @@ export function compareOffers(records: PriceRecord[], product: Product | undefin
       eligible: reason === null,
       reason,
       isDiscountOnly,
+      offerEligible,
       cents: reason === 'review' || reason === 'invalid' ? null : validCents,
       isBest: false,
       isTied: false,

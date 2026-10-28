@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { OfferView } from '../lib/compare'
+import type { OfferRanking, RankBadge, RankedOffer } from '../lib/offerRank'
 import type { PriceRecord, Shop } from '../lib/types'
 import { Badge, cx, fmtDate, rs } from './ui'
 
@@ -39,17 +40,25 @@ export function OfferRow({
   isWinner,
   shop,
   extra,
+  entry,
+  ranking,
 }: {
   o: OfferView
   rank?: number
   isWinner?: boolean
   shop: Shop | undefined
   extra?: React.ReactNode
+  /** Offer-rate terms and rank; with an 'offer' ranking the row shows the discount instead of a Rs price */
+  entry?: RankedOffer
+  ranking?: OfferRanking
 }) {
   const [showCalc, setShowCalc] = useState(false)
   const r = o.rec
-  const win = Boolean(isWinner ?? o.isBest)
-  const isSchemeOnly = o.isDiscountOnly
+  const offerMode = ranking?.method === 'offer' && entry != null
+  const win = Boolean(offerMode ? entry!.winner : (isWinner ?? o.isBest))
+  const isSchemeOnly = o.isDiscountOnly && !offerMode
+  const shownRank = offerMode ? (entry!.rank ?? undefined) : o.eligible ? rank : undefined
+  const winLabel = offerMode ? ranking!.badge : o.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'
 
   return (
     <div
@@ -65,7 +74,7 @@ export function OfferRow({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            {rank != null && o.eligible && (
+            {shownRank != null && (
               <span
                 className={cx(
                   'inline-flex h-4.5 min-w-4.5 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums',
@@ -74,23 +83,24 @@ export function OfferRow({
                     : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]',
                 )}
               >
-                #{rank}
+                #{shownRank}
               </span>
             )}
             <span className={cx('truncate text-xs sm:text-[13px] font-semibold', win ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]')}>
               {shop?.name ?? 'Unknown supplier'}
             </span>
-            {win && (
-              <Badge tone="solid">
-                {o.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}
-              </Badge>
+            {win && <Badge tone="solid">{winLabel}</Badge>}
+            {offerMode && !win && entry!.terms.kind === 'percent' && entry!.rank != null && ranking!.badge !== 'NEEDS REVIEW' && (
+              <Badge tone="slate">{entry!.rank === 2 ? 'Second' : entry!.rank === 3 ? 'Third' : `#${entry!.rank}`}</Badge>
             )}
+            {offerMode && entry!.terms.kind !== 'percent' && entry!.terms.note && <Badge tone="amber">{entry!.terms.note}</Badge>}
             {!o.fresh && <Badge tone="amber">Stale · {o.ageDays}d</Badge>}
             {o.reason === 'expired' && <Badge tone="red">Expired</Badge>}
             {isSchemeOnly && <Badge tone="amber">Incomplete · base rate missing</Badge>}
-            {!isSchemeOnly && !o.eligible && o.reason && o.reason !== 'expired' && (
+            {!isSchemeOnly && !offerMode && !o.eligible && o.reason && o.reason !== 'expired' && (
               <Badge tone="amber">{REASON[o.reason]}</Badge>
             )}
+            {offerMode && !o.offerEligible && o.reason && o.reason !== 'expired' && <Badge tone="amber">{REASON[o.reason] ?? 'Not ranked'}</Badge>}
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-[var(--text-secondary)]">
@@ -102,6 +112,11 @@ export function OfferRow({
             {r.scheme_text && (
               <span>
                 Scheme: <b className="font-medium text-[var(--text-primary)]">{r.scheme_text}</b>
+              </span>
+            )}
+            {entry?.terms.original && entry.terms.original !== r.scheme_text && (
+              <span>
+                Original offer: <b className="font-medium text-[var(--text-primary)]">{entry.terms.original}</b>
               </span>
             )}
             {o.perUnit && (
@@ -120,7 +135,14 @@ export function OfferRow({
         </div>
 
         <div className="shrink-0 text-right">
-          {o.eligible ? (
+          {offerMode ? (
+            <>
+              <div className={cx('text-sm sm:text-[15px] font-bold tabular-nums', win ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]')}>
+                {entry!.terms.label}
+              </div>
+              <div className="text-[10.5px] text-[var(--text-secondary)]">Purchase price not provided</div>
+            </>
+          ) : o.eligible ? (
             <>
               <div
                 className={cx(
@@ -307,6 +329,66 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
           {r.calc_notes}
         </pre>
       )}
+    </div>
+  )
+}
+
+const LEAD_TONE: Record<RankBadge, 'solid' | 'amber' | 'slate'> = {
+  'BEST PRICE': 'solid',
+  'BEST PRICE (TIED)': 'solid',
+  'BEST OFFER': 'solid',
+  'TIED OFFER': 'solid',
+  'NEEDS REVIEW': 'amber',
+  INCOMPLETE: 'amber',
+  'SINGLE OFFER': 'slate',
+}
+
+/**
+ * Compact lead box for products ranked by offer rate (no purchase prices). Shows the discount as imported, never a Rs value.
+ * Green only for a verified winner; amber when the ranking is uncertain.
+ */
+export function OfferLeadBox({ ranking, shopName }: { ranking: OfferRanking; shopName: (shopId: string) => string }) {
+  const lead = ranking.lead
+  if (!lead) return null
+  const verified = ranking.badge === 'BEST OFFER' || ranking.badge === 'TIED OFFER'
+  const uncertain = ranking.badge === 'NEEDS REVIEW' || ranking.badge === 'INCOMPLETE'
+  const names = verified ? ranking.winners.map((w) => shopName(w.view.rec.shop_id)) : [shopName(lead.view.rec.shop_id)]
+  const second = ranking.ordered.find((o) => o.rank != null && !o.winner && o.view.offerEligible)
+  const r = lead.view.rec
+  const extra: string[] = []
+  if (lead.terms.kind === 'percent' && lead.terms.cartonPct != null) extra.push(`Full carton ${lead.terms.cartonPct}%`)
+  if (lead.terms.kind === 'percent' && lead.terms.minQty != null) extra.push(`Min qty ${lead.terms.minQty}`)
+  return (
+    <div
+      className={cx(
+        'rounded-lg border px-2.5 py-1.5',
+        verified
+          ? 'border-[var(--color-best-border)] border-l-3 border-l-[var(--color-best-solid)] bg-[var(--color-best-bg)]'
+          : uncertain
+            ? 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]'
+            : 'border-[var(--border-default)] bg-[var(--bg-subtle)]',
+      )}
+    >
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Badge tone={LEAD_TONE[ranking.badge]}>{ranking.badge}</Badge>
+          <span className="truncate text-xs font-semibold text-[var(--text-primary)] sm:text-[13px]" title={names.join(', ')}>
+            {names.join(', ')}
+          </span>
+        </div>
+        <span className={cx('shrink-0 text-sm font-bold tabular-nums sm:text-[15px]', verified ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]')}>
+          {lead.terms.kind === 'percent' ? `${lead.terms.pct}%` : lead.terms.label}
+        </span>
+      </div>
+      <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 text-[11px] text-[var(--text-secondary)] tabular-nums">
+        <span className="min-w-0">
+          {extra.length > 0 ? extra.join(' · ') + ' · ' : ''}
+          {lead.terms.kind === 'percent' ? 'discount' : (lead.terms.note ?? 'offer')} · Purchase price not provided
+          {verified && second ? ` · next: ${shopName(second.view.rec.shop_id)} ${second.terms.label}` : ''}
+        </span>
+        <span>{fmtDate(r.observed_on)}</span>
+      </div>
+      {ranking.warning && <div className="mt-0.5 text-[11px] font-medium text-[var(--color-warning-text)]">{ranking.warning}</div>}
     </div>
   )
 }

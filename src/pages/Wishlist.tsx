@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconChevronDown, IconClose, IconFilter, IconPlus, IconSearch } from '../components/icons'
-import { OfferRow } from '../components/Offers'
+import { OfferLeadBox, OfferRow } from '../components/Offers'
 import { ProductPicker } from '../components/Match'
 import { Badge, Button, Card, Empty, Field, Modal, PageHeader, Pagination, Select, Stat, Textarea, cx, fmtDate, rs, useConfirm, useLocalState, useToast } from '../components/ui'
 import { addToWishlist, removeFromWishlist, updateWishlist } from '../lib/actions'
 import { compareOffers, findOpportunities, ageInDays, type CompareResult } from '../lib/compare'
 import { useData } from '../lib/data'
+import { rankOffers } from '../lib/offerRank'
 import { variantLabel } from '../lib/productParse'
 import type { PriceRecord, Product, WishlistItem } from '../lib/types'
 
@@ -321,7 +322,7 @@ export default function Wishlist() {
         <div className="space-y-2.5">
           {shown.slice(page * per, page * per + per).map((e) => {
             const best = e.cmp.offers.find((o) => o.eligible)
-            const schemeOnlyOffer = !best ? e.cmp.offers.find((o) => o.isDiscountOnly)?.rec ?? e.records.find((r) => r.scheme_status === 'ok' && r.scheme_text) : undefined
+            const ranking = rankOffers(e.cmp)
             const bestShopName = best ? shopMap.get(best.rec.shop_id)?.name : null
             const nextBestShopName = e.cmp.nextBest ? shopMap.get(e.cmp.nextBest.shopId)?.name : null
             const alt = products.filter((p) => p.id !== e.product.id && p.normalized_name === e.product.normalized_name && !p.archived)
@@ -411,22 +412,8 @@ export default function Wishlist() {
                           </div>
                         )}
                       </div>
-                    ) : schemeOnlyOffer ? (
-                      <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] px-3 py-2 text-xs">
-                        <div className="flex items-center justify-between gap-2 min-w-0">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge>
-                            <b className="truncate font-medium text-[var(--text-primary)]">
-                              {shopMap.get(schemeOnlyOffer.shop_id)?.name ?? 'Supplier'}
-                            </b>
-                          </div>
-                          <Badge tone="amber">Incomplete · no Rs rate</Badge>
-                        </div>
-                        <div className="mt-1 flex items-center justify-between text-[11px] text-[var(--text-secondary)] tabular-nums">
-                          <span>Discount/scheme only — base rate needed for Rs ranking</span>
-                          <span>{fmtDate(schemeOnlyOffer.observed_on)}</span>
-                        </div>
-                      </div>
+                    ) : ranking.lead ? (
+                      <OfferLeadBox ranking={ranking} shopName={(id) => shopMap.get(id)?.name ?? 'Supplier'} />
                     ) : (
                       <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-3 py-2 text-xs text-[var(--color-warning-text)]">
                         No valid supplier offer recorded yet
@@ -516,13 +503,15 @@ export default function Wishlist() {
                       <div className="text-sm text-[var(--text-secondary)]">No price records for this exact variant yet.</div>
                     ) : (
                       <div className="space-y-1.5">
-                        {e.cmp.offers.map((o, idx) => (
+                        {ranking.ordered.map((x, idx) => (
                           <OfferRow
-                            key={o.rec.id}
-                            o={o}
-                            rank={o.eligible ? idx + 1 : undefined}
-                            isWinner={best ? o.rec.id === best.rec.id || o.isBest : false}
-                            shop={shopMap.get(o.rec.shop_id)}
+                            key={x.view.rec.id}
+                            o={x.view}
+                            entry={x}
+                            ranking={ranking}
+                            rank={x.view.eligible ? idx + 1 : undefined}
+                            isWinner={best ? x.view.rec.id === best.rec.id || x.view.isBest : false}
+                            shop={shopMap.get(x.view.rec.shop_id)}
                           />
                         ))}
                       </div>

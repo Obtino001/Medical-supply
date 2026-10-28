@@ -11,6 +11,8 @@ export interface SchemeComponents {
   cartonDiscountPct?: number | null
   /** Full-box / carton net rate in Rs when specified (e.g. "240 COTON 220") */
   cartonRate?: number | null
+  /** Percentage written outside any carton phrase; unlike discountPct it is never filled in from the carton % */
+  plainDiscountPct?: number | null
   /** True when the offer is explicitly Trade Price (TP / 1TP / T.P = 0% discount) */
   isTradePrice?: boolean
   /** Human-readable normalized summary of the scheme/discount */
@@ -126,6 +128,7 @@ export function parseSchemeText(text: string | null | undefined): SchemeComponen
   const pcts = [...t.matchAll(pctRe)]
   if (pcts.length === 1) {
     out.discountPct = n(pcts[0][1])
+    out.plainDiscountPct = out.discountPct
     t = t.replace(pcts[0][0], ' ')
   } else if (pcts.length > 1) {
     out.ambiguous = true

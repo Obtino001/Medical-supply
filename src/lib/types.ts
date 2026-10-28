@@ -58,6 +58,13 @@ export interface SourceAttrs {
   weight_unit: 'g' | 'ml' | null
   pack_size: number | null
   dosage_form: string | null
+  /** Offer-rate cell exactly as imported (e.g. "15% COTON 8%", "TP"); scheme_text holds a normalized summary */
+  offer_raw?: string | null
+  /** Plain (non-carton) discount % parsed from the offer cell; null for TP / carton-only / unparsed */
+  base_discount_pct?: number | null
+  carton_discount_pct?: number | null
+  carton_rate?: number | null
+  is_trade_price?: boolean
 }
 
 export interface PriceRecord {

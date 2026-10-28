@@ -1,11 +1,14 @@
 // Row model, sorting and grouping for the product / comparison tables. Pure functions.
 import { compareOffers, type CompareOptions, type CompareResult, type OfferView } from './compare'
+import { rankOffers, type OfferRanking } from './offerRank'
 import { naturalCompare, numCompare, variantLabel } from './productParse'
 import type { PriceRecord, Product, Shop } from './types'
 
 export interface ProductRow {
   product: Product
   cmp: CompareResult
+  /** Price ranking when purchase prices exist, otherwise offer-rate ranking */
+  ranking: OfferRanking
   records: PriceRecord[]
   bestOffer: OfferView | null
   bestShop: Shop | null
@@ -40,6 +43,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
     const cmp = compareOffers(records, product, opt)
     const eligible = cmp.offers.filter((o) => o.eligible)
     const bestOffer = eligible[0] ?? null
+    const ranking = rankOffers(cmp)
     const schemeOnlyOffer =
       !bestOffer
         ? cmp.offers.find((o) => o.isDiscountOnly)?.rec ?? records.find((r) => r.scheme_status === 'ok' && Boolean(r.scheme_text)) ?? null
@@ -47,11 +51,9 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
     const variant = variantLabel(product)
     let latestDate: string | null = null
     let oldestDate: string | null = null
-    let maxDiscount: number | null = null
     for (const r of records) {
       if (latestDate == null || r.observed_on > latestDate) latestDate = r.observed_on
       if (oldestDate == null || r.observed_on < oldestDate) oldestDate = r.observed_on
-      if (r.discount_pct != null && (maxDiscount == null || r.discount_pct > maxDiscount)) maxDiscount = r.discount_pct
     }
     const searchParts: (string | null | undefined)[] = [
       product.name,
@@ -78,6 +80,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
     return {
       product,
       cmp,
+      ranking,
       records,
       bestOffer,
       bestShop: bestOffer ? shops.get(bestOffer.rec.shop_id) ?? null : null,
@@ -85,7 +88,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
       schemeOnlyOffer,
       bestCents: cmp.bestCents,
       highestCents: eligible.length ? eligible[eligible.length - 1].cents : null,
-      maxDiscount,
+      maxDiscount: ranking.leadPct,
       latestDate,
       oldestDate,
       savingRs: cmp.nextBest ? cmp.nextBest.saving : null,
@@ -136,7 +139,7 @@ export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'strength', label: 'Strength' },
   { key: 'weight', label: 'Grams / weight' },
   { key: 'pack', label: 'Pack size' },
-  { key: 'discount', label: 'Highest discount %' },
+  { key: 'discount', label: 'Highest offer rate (discount %)' },
 ]
 
 export type GroupKey = 'none' | 'title' | 'product' | 'brand' | 'manufacturer' | 'shop' | 'strength' | 'weight' | 'pack' | 'best'
@@ -181,8 +184,10 @@ export function sortRows(
   const priceLowCmp = (a: ProductRow, b: ProductRow) => {
     const c = cmpNullLast(a.bestCents, b.bestCents, 1)
     if (c !== 0) return c
-    // Among products without an absolute rupee price, put those with recorded scheme/discount offers ahead of empty products
+    // Among products without an absolute rupee price, rank by the best comparable discount (TP / missing never count as 0%)
     if (a.bestCents == null && b.bestCents == null) {
+      const d = cmpNullLast(a.maxDiscount, b.maxDiscount, -1)
+      if (d !== 0) return d
       const aHas = a.records.length > 0 ? 0 : 1
       const bHas = b.records.length > 0 ? 0 : 1
       if (aHas !== bHas) return aHas - bHas

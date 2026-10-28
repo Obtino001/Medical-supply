@@ -12,3 +12,4 @@ create index if not exists price_records_valid_history_idx
 create index if not exists products_active_ws_no_idx
   on public.products (workspace_id, product_no)
   where archived = false;
+

@@ -4,9 +4,9 @@ import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
 import { IconArrowRight, IconChevronDown, IconClose, IconFilter, IconSearch, IconUpload } from './icons'
-import { OfferRow } from './Offers'
+import { OfferLeadBox, OfferRow } from './Offers'
 import { WishlistToggle } from './WishlistToggle'
-import { Badge, Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useDebounced, useLocalState, useToast } from './ui'
+import { Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useDebounced, useLocalState, useToast } from './ui'
 
 interface View {
   q: string
@@ -522,7 +522,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
             </span>
             {stats.incompleteOnlyCount > 0 && stats.withBestPrice === 0 && (
               <span className="text-[11.5px] text-[var(--color-warning-text)]">
-                · Current imports contain discount % only (import Rs rates to rank cheapest suppliers)
+                · Imports contain offer rates only: suppliers are ranked by discount, not by purchase price
               </span>
             )}
           </div>
@@ -689,13 +689,12 @@ const Row = memo(function Row({
   const { shopMap } = useData()
   const p = r.product
   const best = r.bestOffer
-  const schemeOnlyOffer = r.schemeOnlyOffer
+  const ranking = r.ranking
   const bestShopName = r.bestShop?.name ?? (best ? shopMap.get(best.rec.shop_id)?.name : null)
-  const schemeShopName = schemeOnlyOffer ? shopMap.get(schemeOnlyOffer.shop_id)?.name : null
   const fallbackRec = r.records[0]
   const fallbackShopName = fallbackRec ? shopMap.get(fallbackRec.shop_id)?.name : null
 
-  const offers = bestOnly ? r.cmp.offers.filter((o) => o.isBest || o.eligible) : r.cmp.offers
+  const ordered = bestOnly ? ranking.ordered.filter((e) => e.winner || e.view.eligible) : ranking.ordered
   const formBadge = r.variant || p.dosage_form
   const codeAndMeta = [`#${p.product_no}`, p.mfr_code ? `Code ${p.mfr_code}` : null, p.brand, p.manufacturer]
     .filter(Boolean)
@@ -797,30 +796,8 @@ const Row = memo(function Row({
                 </div>
               </div>
             </div>
-          ) : schemeOnlyOffer ? (
-            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2.5 py-1.5">
-              <div className="flex items-center justify-between gap-2 min-w-0">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge>
-                  <span
-                    className="truncate text-xs font-medium text-[var(--text-primary)]"
-                    title={schemeShopName ?? undefined}
-                  >
-                    {schemeShopName ?? 'Supplier'}
-                  </span>
-                </div>
-                <span className="shrink-0 rounded border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-warning-text)]">
-                  Incomplete · no Rs rate
-                </span>
-              </div>
-              <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 text-[11px] text-[var(--text-secondary)] tabular-nums">
-                <span>
-                  Discount/scheme only — absolute Rs comparison unavailable
-                  {r.records.length > 1 ? ` (${r.records.length} suppliers)` : ''}
-                </span>
-                <span>{fmtDate(schemeOnlyOffer.observed_on)}</span>
-              </div>
-            </div>
+          ) : ranking.lead ? (
+            <OfferLeadBox ranking={ranking} shopName={(id) => shopMap.get(id)?.name ?? 'Supplier'} />
           ) : r.records.length > 0 ? (
             <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-2.5 py-1.5 text-xs">
               <div className="flex items-center justify-between gap-2">
@@ -883,20 +860,22 @@ const Row = memo(function Row({
         <div className="border-t border-[var(--border-default)] bg-[var(--bg-subtle)] px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-secondary)]">
             <span>
-              Supplier offers for <b className="font-medium text-[var(--text-primary)]">{p.name}</b> — ranked cheapest to most expensive ({offers.length})
+              Supplier offers for <b className="font-medium text-[var(--text-primary)]">{p.name}</b> — {ranking.method === 'price' ? 'ranked by effective purchase price' : 'ranked by offer rate (no purchase prices)'} ({ordered.length})
             </span>
             <Link to={`/products/${p.id}`} className="font-medium text-[var(--color-primary)] hover:underline">
               Full price history →
             </Link>
           </div>
           <div className="space-y-1.5">
-            {offers.map((o, idx) => (
+            {ordered.map((e, idx) => (
               <OfferRow
-                key={o.rec.id}
-                o={o}
-                rank={o.eligible ? idx + 1 : undefined}
-                isWinner={best ? o.rec.id === best.rec.id || o.isBest : false}
-                shop={shopMap.get(o.rec.shop_id)}
+                key={e.view.rec.id}
+                o={e.view}
+                entry={e}
+                ranking={ranking}
+                rank={e.view.eligible ? idx + 1 : undefined}
+                isWinner={best ? e.view.rec.id === best.rec.id || e.view.isBest : false}
+                shop={shopMap.get(e.view.rec.shop_id)}
               />
             ))}
           </div>

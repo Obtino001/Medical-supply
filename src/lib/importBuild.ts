@@ -23,6 +23,13 @@ export interface BuiltRow {
   bonusBuy: number | null
   bonusFree: number | null
   schemeText: string | null
+  /** Offer cells exactly as imported (rate | discount | scheme), kept alongside the normalized values */
+  offerRaw: string | null
+  /** Plain discount % excluding any carton-only percentage; null for TP / carton-only offers */
+  baseDiscountPct: number | null
+  cartonDiscountPct: number | null
+  cartonRate: number | null
+  isTradePrice: boolean
   minOrderQty: number | null
   availability: string | null
   expiry: string | null
@@ -435,6 +442,14 @@ export function buildRows(
         rowNumber, raw, kind, errors, warnings, incoming, identity, title, code, price, mrp,
         discountPct: comp.discountPct, flatDiscount: comp.flatDiscount, bonusBuy: comp.bonusBuy, bonusFree: comp.bonusFree,
         schemeText,
+        offerRaw: [priceRaw, discRaw, schemeRaw].filter(Boolean).join(' | ') || null,
+        baseDiscountPct:
+          comp.cartonDiscountPct != null && comp.discountPct === comp.cartonDiscountPct && comp.plainDiscountPct == null && !comp.isTradePrice
+            ? null
+            : comp.discountPct,
+        cartonDiscountPct: comp.cartonDiscountPct ?? null,
+        cartonRate: comp.cartonRate ?? null,
+        isTradePrice: Boolean(comp.isTradePrice),
         minOrderQty: qty, availability: get(idx.avail) || null, expiry: get(idx.expiry) || null, notes: get(idx.notes) || null,
         taxIncluded: tax, priceIsNet: options.priceIsNet, combine: options.combine, packSize, cost,
       })
