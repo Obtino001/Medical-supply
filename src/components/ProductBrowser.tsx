@@ -3,10 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
-import { IconArrowRight, IconChevronDown, IconFilter, IconSearch } from './icons'
+import { IconArrowRight, IconChevronDown, IconClose, IconFilter, IconSearch, IconUpload } from './icons'
 import { OfferCard } from './Offers'
 import { WishlistToggle } from './WishlistToggle'
-import { Badge, Button, Card, Empty, Field, Pagination, Select, cx, fmtDate, rs, useDebounced, useLocalState, useToast } from './ui'
+import { Badge, Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useDebounced, useLocalState, useToast } from './ui'
 
 interface View {
   q: string; sort: SortKey; group: GroupKey; brand: string; manufacturer: string; strength: string; weight: string; pack: string
@@ -86,6 +86,23 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   const pages = Math.max(1, Math.ceil(items.length / PAGE))
   const pageItems = items.slice(page * PAGE, page * PAGE + PAGE)
 
+  const sheetFilterCount = [
+    v.brand,
+    v.manufacturer,
+    v.strength,
+    v.weight,
+    v.pack,
+    v.shop,
+    v.excludeStale,
+    v.multiple,
+    v.available,
+    v.review,
+    v.freshness != null && v.freshness !== settings.freshness_days,
+  ].filter(Boolean).length
+
+  const hasAnyFilter =
+    Boolean(v.q || qInput || v.bestOnly || v.wishlistOnly || sheetFilterCount > 0 || v.sort !== 'name_asc' || v.group !== 'none')
+
   const toggleSel = (id: string) => {
     const s = new Set(selected)
     if (s.has(id)) s.delete(id)
@@ -103,52 +120,115 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
 
   return (
     <div className="space-y-3">
-      <Card className="!p-3.5 sm:!p-4">
-        <div className="grid gap-2.5 sm:grid-cols-[1fr_auto_auto]">
-          <div className="relative">
-            <IconSearch size={17} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#5F6368]" />
-            <input
-              type="search"
-              placeholder="Search product name, shop, strength, or code…"
-              value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
-              aria-label="Search products"
-              className="min-h-10 w-full rounded-md border border-[#DADCE0] bg-white py-2 pr-3 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/75 hover:border-[#5F6368] focus:border-[#1A73E8] focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
-            />
-          </div>
+      {/* Compact Search & Filter Bar */}
+      <Card className="!p-3 sm:!p-4">
+        <div className="relative">
+          <IconSearch size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#5F6368]" />
+          <input
+            type="search"
+            placeholder="Search medicine name, shop, strength, or code…"
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            aria-label="Search products"
+            className="min-h-11 sm:min-h-10 w-full rounded-lg border border-[#E1E5EA] bg-[#F8FAFC] py-2 pr-9 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/75 hover:border-[#5F6368]/60 focus:border-[#1A73E8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
+          />
+          {qInput && (
+            <button
+              type="button"
+              onClick={() => { setQInput(''); set({ q: '' }) }}
+              aria-label="Clear search"
+              className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#5F6368] hover:bg-[#E1E5EA]/50 hover:text-[#202124]"
+            >
+              <IconClose size={15} />
+            </button>
+          )}
+        </div>
+
+        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <Select value={v.sort} onChange={(e) => set({ sort: e.target.value as SortKey })} aria-label="Sort">
             {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>Sort: {o.label}</option>)}
           </Select>
           <Select value={v.group} onChange={(e) => set({ group: e.target.value as GroupKey })} aria-label="Group">
             {GROUP_OPTIONS.map((o) => <option key={o.key} value={o.key}>Group: {o.label}</option>)}
           </Select>
+          <Button
+            variant="secondary"
+            onClick={() => setShowFilters(true)}
+            className="col-span-2 sm:col-span-1"
+          >
+            <IconFilter size={15} className="text-[#1A73E8]" />
+            <span>Filters</span>
+            {sheetFilterCount > 0 && (
+              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1A73E8] px-1.5 text-[11px] font-semibold text-white tabular-nums">
+                {sheetFilterCount}
+              </span>
+            )}
+          </Button>
         </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <Button variant="secondary" small onClick={() => setShowFilters(!showFilters)}>
-            <IconFilter size={14} className="text-[#1A73E8]" />
-            <span>{showFilters ? 'Hide filters' : 'Filters'}</span>
-          </Button>
-          <label className={cx('flex min-h-8.5 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors sm:text-sm', v.bestOnly ? 'border-[#1A73E8] bg-[#E8F0FE] text-[#1A73E8]' : 'border-[#DADCE0] bg-white text-[#202124] hover:bg-[#F8F9FA]')}>
-            <input type="checkbox" checked={v.bestOnly} onChange={(e) => set({ bestOnly: e.target.checked })} />
-            Best-price results only
-          </label>
-          <label className={cx('flex min-h-8.5 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors sm:text-sm', v.wishlistOnly ? 'border-[#1A73E8] bg-[#E8F0FE] text-[#1A73E8]' : 'border-[#DADCE0] bg-white text-[#202124] hover:bg-[#F8F9FA]')}>
-            <input type="checkbox" checked={v.wishlistOnly} onChange={(e) => set({ wishlistOnly: e.target.checked })} />
-            Wishlist only
-          </label>
+          <button
+            type="button"
+            onClick={() => set({ bestOnly: !v.bestOnly })}
+            className={cx(
+              'inline-flex min-h-8.5 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              v.bestOnly
+                ? 'border-[#1A73E8] bg-[#E8F0FE] text-[#1A73E8]'
+                : 'border-[#E1E5EA] bg-white text-[#5F6368] hover:bg-[#F8FAFC] hover:text-[#202124]',
+            )}
+          >
+            <span>Best-price results only</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => set({ wishlistOnly: !v.wishlistOnly })}
+            className={cx(
+              'inline-flex min-h-8.5 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              v.wishlistOnly
+                ? 'border-[#1A73E8] bg-[#E8F0FE] text-[#1A73E8]'
+                : 'border-[#E1E5EA] bg-white text-[#5F6368] hover:bg-[#F8FAFC] hover:text-[#202124]',
+            )}
+          >
+            <span>Wishlist only</span>
+          </button>
           {saved.length > 0 && (
-            <Select className="!min-h-8.5 !w-auto text-xs sm:text-sm" value="" onChange={(e) => { const s = saved.find((x) => x.id === e.target.value); if (s) { setView({ ...DEFAULT_VIEW, ...s.config }); setQInput(s.config.q ?? ''); setPage(0) } }} aria-label="Saved views">
+            <Select
+              className="!min-h-8.5 !w-auto rounded-full text-xs"
+              value=""
+              onChange={(e) => {
+                const s = saved.find((x) => x.id === e.target.value)
+                if (s) {
+                  setView({ ...DEFAULT_VIEW, ...s.config })
+                  setQInput(s.config.q ?? '')
+                  setPage(0)
+                }
+              }}
+              aria-label="Saved views"
+            >
               <option value="">Saved views…</option>
               {saved.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           )}
           <Button variant="ghost" small onClick={saveView}>Save view</Button>
-          <Button variant="ghost" small onClick={() => { setView(DEFAULT_VIEW); setQInput('') }}>Reset</Button>
+          {hasAnyFilter && (
+            <Button
+              variant="ghost"
+              small
+              onClick={() => {
+                setView(DEFAULT_VIEW)
+                setQInput('')
+              }}
+            >
+              Reset
+            </Button>
+          )}
         </div>
+      </Card>
 
-        {showFilters && (
-          <div className="mt-3 grid grid-cols-2 gap-2.5 border-t border-[#DADCE0] pt-3 sm:grid-cols-3 lg:grid-cols-4">
+      {/* Filters Bottom Sheet / Dialog */}
+      <Modal open={showFilters} onClose={() => setShowFilters(false)} title="Filter products">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {(['brand', 'manufacturer', 'strength', 'weight', 'pack'] as const).map((k) => (
               <Field key={k} label={{ brand: 'Brand', manufacturer: 'Manufacturer', strength: 'Strength', weight: 'Grams / volume', pack: 'Pack size' }[k]}>
                 <Select value={v[k]} onChange={(e) => set({ [k]: e.target.value })}>
@@ -168,39 +248,101 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 {[7, 15, 30, 60, 90].map((d) => <option key={d} value={d}>{d} days</option>)}
               </Select>
             </Field>
-            <div className="col-span-2 flex flex-col justify-end gap-1.5 text-xs text-[#202124] sm:col-span-3 sm:text-sm lg:col-span-1">
-              {([['excludeStale', 'Exclude outdated quotes'], ['multiple', 'Multiple offers'], ['available', 'Has a valid price'], ['review', 'Needs review']] as const).map(([k, label]) => (
-                <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={v[k]} onChange={(e) => set({ [k]: e.target.checked })} />{label}</label>
-              ))}
-            </div>
           </div>
-        )}
-      </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs font-medium text-[#5F6368] sm:text-sm">
-        <span className="tabular-nums">Showing {filtered.length} of {rows.length} products{selected.size > 0 && ` · ${selected.size} selected for export`}</span>
-        {selected.size > 0 && (
-          <span className="flex items-center gap-3">
-            <Link to="/export" className="inline-flex items-center gap-1 font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">
-              <span>Export selected</span>
-              <IconArrowRight size={14} />
-            </Link>
-            <button type="button" className="text-[#5F6368] hover:text-[#202124] hover:underline" onClick={() => setSelected(new Set())}>Clear selection</button>
+          <div className="space-y-2 rounded-xl border border-[#E1E5EA] bg-[#F8FAFC] p-3.5 text-sm text-[#202124]">
+            {([
+              ['excludeStale', 'Exclude outdated quotes'],
+              ['multiple', 'Multiple supplier offers (2+ shops)'],
+              ['available', 'Has a valid purchase price'],
+              ['review', 'Needs scheme or calculation review'],
+            ] as const).map(([k, label]) => (
+              <label key={k} className="flex items-center gap-2.5">
+                <input type="checkbox" checked={v[k]} onChange={(e) => set({ [k]: e.target.checked })} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t border-[#E1E5EA] pt-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setView(DEFAULT_VIEW)
+                setQInput('')
+              }}
+            >
+              Reset all
+            </Button>
+            <Button onClick={() => setShowFilters(false)}>
+              Show {filtered.length} product{filtered.length === 1 ? '' : 's'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {rows.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs font-medium text-[#5F6368] sm:text-sm">
+          <span className="tabular-nums">
+            Showing {filtered.length} of {rows.length} products
+            {selected.size > 0 && ` · ${selected.size} selected for export`}
           </span>
-        )}
-      </div>
+          {selected.size > 0 && (
+            <span className="flex items-center gap-3">
+              <Link to="/export" className="inline-flex items-center gap-1 font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">
+                <span>Export selected</span>
+                <IconArrowRight size={14} />
+              </Link>
+              <button type="button" className="text-[#5F6368] hover:text-[#202124] hover:underline" onClick={() => setSelected(new Set())}>
+                Clear selection
+              </button>
+            </span>
+          )}
+        </div>
+      )}
 
       {items.length === 0 ? (
-        <Empty title={rows.length === 0 ? 'No products in workspace yet' : 'No products match these filters'}>
-          {rows.length === 0 ? <>Import a supplier price list to populate products and compare rates. <Link to="/import" className="font-medium text-[#1A73E8] underline">Import price list</Link></> : 'Try clearing or resetting your active search and filter criteria.'}
-        </Empty>
+        rows.length === 0 ? (
+          <Empty title="No products yet">
+            <p>Import a supplier price list to start comparing offers.</p>
+            <div className="mt-4">
+              <Link to="/import">
+                <Button>
+                  <IconUpload size={16} />
+                  <span>Import price list</span>
+                </Button>
+              </Link>
+            </div>
+          </Empty>
+        ) : (
+          <Empty title="No products match these filters">
+            <p>Try clearing or resetting your active search and filter criteria.</p>
+            <div className="mt-3">
+              <Button
+                variant="secondary"
+                small
+                onClick={() => {
+                  setView(DEFAULT_VIEW)
+                  setQInput('')
+                }}
+              >
+                Reset filters
+              </Button>
+            </div>
+          </Empty>
+        )
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {pageItems.map((it, i) =>
             it.type === 'group' ? (
-              <div key={'g' + i + it.label} className="sticky top-14 z-10 mt-3 flex items-center justify-between rounded-md border border-[#DADCE0] bg-[#F8F9FA] px-3.5 py-1.5 text-xs font-medium tracking-wide text-[#202124] uppercase">
+              <div
+                key={'g' + i + it.label}
+                className="sticky top-14 z-10 mt-3 flex items-center justify-between rounded-lg border border-[#E1E5EA] bg-[#F8FAFC] px-3.5 py-1.5 text-xs font-medium tracking-wide text-[#202124] uppercase"
+              >
                 <span>{it.label}</span>
-                <span className="rounded-full bg-[#E8F0FE] px-2 py-0.5 text-[11px] font-medium text-[#1A73E8] tabular-nums">{it.count}</span>
+                <span className="rounded-full bg-[#E8F0FE] px-2 py-0.5 text-[11px] font-medium text-[#1A73E8] tabular-nums">
+                  {it.count}
+                </span>
               </div>
             ) : (
               <Row
@@ -227,56 +369,86 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   )
 }
 
-function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: ProductRow; mode: 'compare' | 'master'; selected: boolean; onSelect: () => void; open: boolean; onToggle: () => void; bestOnly: boolean }) {
+function Row({
+  r,
+  mode,
+  selected,
+  onSelect,
+  open,
+  onToggle,
+  bestOnly,
+}: {
+  r: ProductRow
+  mode: 'compare' | 'master'
+  selected: boolean
+  onSelect: () => void
+  open: boolean
+  onToggle: () => void
+  bestOnly: boolean
+}) {
   const { shopMap } = useData()
   const p = r.product
   const best = r.cmp.offers.find((o) => o.eligible)
   const schemeOnlyOffer = !best ? r.records.find((x) => x.scheme_status === 'ok' && x.scheme_text) : undefined
   const offers = bestOnly ? r.cmp.offers.filter((o) => o.isBest) : r.cmp.offers
-  const brandMfr = [p.brand, p.manufacturer].filter(Boolean).join(' · ')
+  const metaParts = [p.brand, p.manufacturer, p.pack_size ? `Pack ${p.pack_size}` : null].filter(Boolean).join(' · ')
+
   return (
-    <div className="rounded-lg border border-[#DADCE0] bg-white p-3.5 transition-colors hover:border-[#1A73E8]/70">
+    <div className="rounded-xl border border-[#E1E5EA] bg-white p-3.5 sm:p-4 transition-colors hover:border-[#1A73E8]/60">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <input
             type="checkbox"
-            className="mt-1 h-4.5 w-4.5 shrink-0 rounded border-[#DADCE0]"
+            className="mt-1 h-4.5 w-4.5 shrink-0 rounded border-[#E1E5EA]"
             checked={selected}
             onChange={onSelect}
             aria-label={`Select ${p.name} for export`}
           />
           <div className="min-w-0 flex-1">
+            {/* 1. Product Name & 2. Strength / Grams / Formulation / Pack Details */}
             <div className="flex flex-wrap items-center gap-2">
-              <Link to={`/products/${p.id}`} className="text-[15px] font-medium text-[#202124] hover:text-[#1A73E8] hover:underline">
+              <Link to={`/products/${p.id}`} className="text-base font-medium text-[#202124] hover:text-[#1A73E8] hover:underline">
                 {p.name}
               </Link>
               <span className="text-xs text-[#5F6368] tabular-nums">#{p.product_no}</span>
               {r.variant && <Badge tone="blue">{r.variant}</Badge>}
             </div>
-            {brandMfr && <div className="mt-0.5 text-xs text-[#5F6368]">{brandMfr}</div>}
+            {metaParts && <div className="mt-0.5 text-xs text-[#5F6368]">{metaParts}</div>}
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs sm:text-sm">
+            {/* 3–10. Best Price Summary Strip */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs sm:text-sm">
               {best ? (
                 <>
+                  {/* 6. Effective purchase cost */}
                   <span
                     className={cx(
-                      'inline-flex items-center rounded px-2 py-0.5 text-sm font-semibold tabular-nums',
-                      best.isBest ? 'bg-[#188038] text-white' : 'bg-[#F8F9FA] text-[#202124] border border-[#DADCE0]',
+                      'inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold tabular-nums',
+                      best.isBest ? 'bg-[#188038] text-white' : 'bg-[#F8FAFC] text-[#202124] border border-[#E1E5EA]',
                     )}
                   >
                     {rs(best.cents! / 100)}
                   </span>
+                  {/* 9. Green BEST PRICE badge */}
                   {best.isBest ? (
                     <Badge tone="solid">{best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>
                   ) : (
                     <Badge>1 valid offer</Badge>
                   )}
+                  {/* 3. Shop name */}
                   <span className="text-[#5F6368]">
                     at <b className="font-medium text-[#202124]">{shopMap.get(best.rec.shop_id)?.name}</b>
                   </span>
+                  {/* 4. Original purchase price & 5. Discount / scheme */}
                   <span className="text-[#5F6368] tabular-nums">
                     Rate {rs(best.rec.base_price)}{best.rec.scheme_text ? ` · ${best.rec.scheme_text}` : ''}
                   </span>
+                  {/* 7. Price per gram / unit when available */}
+                  {best.perUnit && (
+                    <span className="text-xs text-[#5F6368] tabular-nums">
+                      ({rs(best.perUnit.value, 2)}/{best.perUnit.label.replace('Per ', '')})
+                    </span>
+                  )}
+                  {/* 8. Price freshness and survey date */}
                   <span className="text-xs text-[#5F6368] tabular-nums">· {fmtDate(best.rec.observed_on)}</span>
                   {!best.fresh && <Badge tone="amber">Outdated</Badge>}
                 </>
@@ -293,9 +465,10 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
               ) : (
                 <span className="text-xs text-[#5F6368]">No price records yet</span>
               )}
+              {/* 10. Savings compared with next-best offer */}
               {r.cmp.nextBest && (
                 <span className="font-medium text-[#188038] tabular-nums">
-                  · saves {rs(r.cmp.nextBest.saving)} ({r.cmp.nextBest.savingPct.toFixed(1)}%) vs next best
+                  · Saves {rs(r.cmp.nextBest.saving)} ({r.cmp.nextBest.savingPct.toFixed(1)}%) vs next best
                 </span>
               )}
             </div>
@@ -307,14 +480,14 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
           {r.records.length > 0 && (
             <Button variant="ghost" small onClick={onToggle}>
               <span>{open ? 'Hide offers' : `${mode === 'compare' ? 'Compare' : 'Offers'} (${r.records.length})`}</span>
-              <IconChevronDown size={14} className={cx('transition-transform', open && 'rotate-180')} />
+              <IconChevronDown size={14} className={cx('transition-transform duration-150', open && 'rotate-180')} />
             </Button>
           )}
         </div>
       </div>
 
       {open && (
-        <div className="mt-3 space-y-2 border-t border-[#DADCE0] pt-3">
+        <div className="mt-3 space-y-2 border-t border-[#E1E5EA] pt-3">
           {offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} />)}
         </div>
       )}

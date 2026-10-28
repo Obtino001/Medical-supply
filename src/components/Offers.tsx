@@ -37,12 +37,12 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
   return (
     <div
       className={cx(
-        'rounded-lg border p-3.5 transition-colors',
+        'rounded-xl border p-3.5 transition-colors',
         best
           ? 'border-[#188038] bg-[#E6F4EA]/50'
           : o.eligible || isSchemeOnly
-            ? 'border-[#DADCE0] bg-[#F8F9FA]'
-            : 'border-[#DADCE0] bg-[#F8F9FA] opacity-85',
+            ? 'border-[#E1E5EA] bg-[#F8FAFC]'
+            : 'border-[#E1E5EA] bg-[#F8FAFC] opacity-85',
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -52,7 +52,7 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
             {best && <Badge tone="solid">{o.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>}
           </div>
           <div className="mt-0.5 text-xs text-[#5F6368]">
-            Price list date: <span className="font-medium text-[#202124] tabular-nums">{fmtDate(r.observed_on)}</span>
+            Survey date: <span className="font-medium text-[#202124] tabular-nums">{fmtDate(r.observed_on)}</span>
             {shop?.city ? ` · ${shop.city}` : ''}
           </div>
         </div>
@@ -78,7 +78,7 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
         </div>
       </div>
 
-      <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-md border border-[#DADCE0] bg-white px-3 py-2 text-xs sm:grid-cols-4 sm:text-sm">
+      <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-lg border border-[#E1E5EA] bg-white px-3 py-2 text-xs sm:grid-cols-4 sm:text-sm">
         <div>
           <span className="block text-[11px] text-[#5F6368]">Original offer rate</span>
           <b className="font-medium text-[#202124] tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</b>
@@ -145,7 +145,7 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
         {extra}
       </div>
       {open && r.calc_notes && (
-        <pre className="mt-2 whitespace-pre-wrap rounded-md border border-[#DADCE0] bg-white p-2.5 text-xs text-[#5F6368]">
+        <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[#E1E5EA] bg-white p-2.5 text-xs text-[#5F6368]">
           {r.calc_notes}
         </pre>
       )}
