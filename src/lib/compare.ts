@@ -11,6 +11,8 @@ export interface OfferView {
   fresh: boolean
   eligible: boolean
   reason: Reason | null
+  /** True when the supplier provided a valid discount/scheme text, but no base rate in Rs to calculate effective cost */
+  isDiscountOnly: boolean
   cents: number | null // effective cost in paisa, rounded to 2 decimals
   isBest: boolean
   isTied: boolean
@@ -32,6 +34,9 @@ export interface CompareResult {
   tied: boolean
   /** saving of best vs the next different offer */
   nextBest: { cents: number; saving: number; savingPct: number; shopId: string } | null
+  hasIncompleteOffers: boolean
+  hasExpiredOffers: boolean
+  hasStaleOffers: boolean
 }
 
 export function ageInDays(observedOn: string, today = new Date()): number {
@@ -40,35 +45,115 @@ export function ageInDays(observedOn: string, today = new Date()): number {
 }
 
 export function toCents(x: number | null | undefined): number | null {
-  return x == null ? null : Math.round(money(x) * 100)
+  if (x == null || !Number.isFinite(x) || x <= 0) return null
+  return Math.round(money(x) * 100)
 }
 
 export function perUnitMetric(rec: PriceRecord, product: Product | undefined): { label: string; value: number } | null {
-  if (rec.effective_cost == null || !product) return null
+  if (rec.effective_cost == null || rec.effective_cost <= 0 || !product) return null
   if (product.weight_value && product.weight_unit) {
     return { label: `per ${product.weight_unit}`, value: rec.effective_cost / product.weight_value }
   }
   return null
 }
 
+/** Check whether an offer's known validity or expiry date has passed. */
+export function isOfferExpired(rec: PriceRecord, today: Date): boolean {
+  if (rec.valid_until) {
+    const vu = new Date(rec.valid_until.length === 10 ? rec.valid_until + 'T23:59:59' : rec.valid_until)
+    if (!Number.isNaN(vu.getTime()) && vu < today) return true
+  }
+  if (rec.expiry) {
+    const exp = rec.expiry.trim()
+    if (/^expired$/i.test(exp)) return true
+    if (/^\d{4}-\d{2}-\d{2}$/.test(exp)) {
+      const ed = new Date(exp + 'T23:59:59')
+      if (!Number.isNaN(ed.getTime()) && ed < today) return true
+    } else if (/^\d{4}-\d{2}$/.test(exp)) {
+      const [y, m] = exp.split('-').map(Number)
+      const lastDay = new Date(y, m, 0, 23, 59, 59)
+      if (!Number.isNaN(lastDay.getTime()) && lastDay < today) return true
+    }
+  }
+  return false
+}
+
+/** Prevent comparing offers whose explicit strength, weight, or pack size conflicts with the canonical product. */
+export function hasAttributeConflict(rec: PriceRecord, product: Product | undefined): boolean {
+  if (!product) return false
+  if (rec.pack_size != null && product.pack_size != null && rec.pack_size !== product.pack_size) return true
+  const sa = rec.source_attrs
+  if (sa) {
+    if (sa.pack_size != null && product.pack_size != null && sa.pack_size !== product.pack_size) return true
+    if (
+      sa.strength_value != null &&
+      product.strength_value != null &&
+      (sa.strength_value !== product.strength_value ||
+        (sa.strength_unit && product.strength_unit && sa.strength_unit.toLowerCase() !== product.strength_unit.toLowerCase()))
+    ) {
+      return true
+    }
+    if (
+      sa.weight_value != null &&
+      product.weight_value != null &&
+      (sa.weight_value !== product.weight_value ||
+        (sa.weight_unit && product.weight_unit && sa.weight_unit.toLowerCase() !== product.weight_unit.toLowerCase()))
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+const UNVERIFIED_MATCH = new Set(['needs_review', 'unmatched', 'conflicting'])
+
 export function compareOffers(records: PriceRecord[], product: Product | undefined, opt: CompareOptions): CompareResult {
   const today = opt.today ?? new Date()
+  let hasIncompleteOffers = false
+  let hasExpiredOffers = false
+  let hasStaleOffers = false
+
   const offers: OfferView[] = records.map((rec) => {
     const ageDays = ageInDays(rec.observed_on, today)
     const fresh = ageDays <= opt.freshnessDays
+    if (!fresh && !rec.archived) hasStaleOffers = true
+
+    const isDiscountOnly =
+      !rec.archived &&
+      rec.scheme_status === 'ok' &&
+      (rec.effective_cost == null || rec.effective_cost <= 0) &&
+      Boolean(rec.scheme_text || rec.discount_pct != null)
+
+    const validCents = toCents(rec.effective_cost)
+    const expired = isOfferExpired(rec, today)
+    if (expired && !rec.archived) hasExpiredOffers = true
+
     let reason: Reason | null = null
     if (rec.archived) reason = 'archived'
+    else if (UNVERIFIED_MATCH.has(rec.match_status) || hasAttributeConflict(rec, product)) reason = 'review'
     else if (rec.scheme_status === 'review') reason = 'review'
-    else if (rec.scheme_status !== 'ok' || rec.effective_cost == null) reason = 'invalid'
+    else if (rec.scheme_status !== 'ok' || validCents == null || (rec.base_price != null && rec.base_price <= 0)) reason = 'invalid'
     else if (isUnavailable(rec.availability)) reason = 'unavailable'
-    else if (rec.valid_until && new Date(rec.valid_until + 'T23:59:59') < today) reason = 'expired'
+    else if (expired) reason = 'expired'
     else if (opt.excludeStale && !fresh) reason = 'stale'
+
+    if (isDiscountOnly || reason === 'review') hasIncompleteOffers = true
+
     return {
-      rec, ageDays, fresh, eligible: reason === null, reason,
-      cents: reason === 'review' || reason === 'invalid' ? null : toCents(rec.effective_cost),
-      isBest: false, isTied: false, aboveBest: null, perUnit: perUnitMetric(rec, product),
+      rec,
+      ageDays,
+      fresh,
+      eligible: reason === null,
+      reason,
+      isDiscountOnly,
+      cents: reason === 'review' || reason === 'invalid' ? null : validCents,
+      isBest: false,
+      isTied: false,
+      aboveBest: null,
+      perUnit: perUnitMetric(rec, product),
     }
   })
+
   const eligible = offers.filter((o) => o.eligible && o.cents != null)
   let bestCents: number | null = null
   let tied = false
@@ -77,7 +162,7 @@ export function compareOffers(records: PriceRecord[], product: Product | undefin
     bestCents = Math.min(...eligible.map((o) => o.cents!))
     const winners = eligible.filter((o) => o.cents === bestCents)
     tied = winners.length > 1
-    // "best" is only meaningful when at least two comparable offers exist
+    // "best" badge in multi-offer comparison is set when at least two comparable offers exist
     if (eligible.length >= 2) winners.forEach((o) => { o.isBest = true; o.isTied = tied })
     for (const o of eligible) o.aboveBest = (o.cents! - bestCents) / 100
     const higher = eligible.filter((o) => o.cents! > bestCents!).sort((a, b) => a.cents! - b.cents!)
@@ -88,12 +173,13 @@ export function compareOffers(records: PriceRecord[], product: Product | undefin
   }
   offers.sort((a, b) => {
     if (a.eligible !== b.eligible) return a.eligible ? -1 : 1
-    if (a.cents == null && b.cents == null) return 0
-    if (a.cents == null) return 1
-    if (b.cents == null) return -1
-    return a.cents - b.cents
+    if (a.cents != null && b.cents != null && a.cents !== b.cents) return a.cents - b.cents
+    if (a.cents != null && b.cents == null) return -1
+    if (a.cents == null && b.cents != null) return 1
+    if (a.isDiscountOnly !== b.isDiscountOnly) return a.isDiscountOnly ? -1 : 1
+    return b.rec.observed_on.localeCompare(a.rec.observed_on) || a.rec.shop_id.localeCompare(b.rec.shop_id)
   })
-  return { offers, eligibleCount: eligible.length, bestCents, tied, nextBest }
+  return { offers, eligibleCount: eligible.length, bestCents, tied, nextBest, hasIncompleteOffers, hasExpiredOffers, hasStaleOffers }
 }
 
 /** Latest record per (product, shop). Archived and unmatched records are excluded. */

@@ -1,62 +1,131 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
 import { IconArrowRight, IconChevronDown, IconClose, IconFilter, IconSearch, IconUpload } from './icons'
-import { OfferCard } from './Offers'
+import { OfferRow } from './Offers'
 import { WishlistToggle } from './WishlistToggle'
 import { Badge, Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useDebounced, useLocalState, useToast } from './ui'
 
 interface View {
-  q: string; sort: SortKey; group: GroupKey; brand: string; manufacturer: string; strength: string; weight: string; pack: string
-  shop: string; bestOnly: boolean; multiple: boolean; review: boolean; available: boolean; wishlistOnly: boolean
-  excludeStale: boolean; freshness: number | null
+  q: string
+  sort: SortKey
+  group: GroupKey
+  brand: string
+  manufacturer: string
+  strength: string
+  weight: string
+  pack: string
+  shop: string
+  bestOnly: boolean
+  multiple: boolean
+  review: boolean
+  available: boolean
+  incompleteOnly: boolean
+  wishlistOnly: boolean
+  excludeStale: boolean
+  freshOnly: boolean
+  validOnly: boolean
+  expiredOnly: boolean
+  freshness: number | null
 }
-const DEFAULT_VIEW: View = {
-  q: '', sort: 'name_asc', group: 'none', brand: '', manufacturer: '', strength: '', weight: '', pack: '', shop: '',
-  bestOnly: false, multiple: false, review: false, available: false, wishlistOnly: false, excludeStale: false, freshness: null,
+
+function getDefaultView(mode: 'compare' | 'master'): View {
+  return {
+    q: '',
+    sort: mode === 'compare' ? 'price_low' : 'price_low',
+    group: 'none',
+    brand: '',
+    manufacturer: '',
+    strength: '',
+    weight: '',
+    pack: '',
+    shop: '',
+    bestOnly: false,
+    multiple: false,
+    review: false,
+    available: false,
+    incompleteOnly: false,
+    wishlistOnly: false,
+    excludeStale: false,
+    freshOnly: false,
+    validOnly: false,
+    expiredOnly: false,
+    freshness: null,
+  }
 }
+
 const PAGE = 50
 
-const distinct = (vals: (string | null)[]) => [...new Set(vals.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+const distinct = (vals: (string | null)[]) =>
+  [...new Set(vals.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
 
 const DESKTOP_GRID =
-  'md:grid-cols-[20px_minmax(210px,2.2fr)_minmax(190px,1.6fr)_minmax(150px,1.2fr)_168px] md:items-center md:gap-x-4'
+  'md:grid-cols-[20px_minmax(190px,1.45fr)_minmax(270px,2.25fr)_168px] md:items-center md:gap-x-3.5'
 
 export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   const { products, current, shopMap, shops, settings, wishlistMap, selected, setSelected } = useData()
   const toast = useToast()
   const [params] = useSearchParams()
-  const [stored, setView] = useLocalState<View>('view:' + mode, DEFAULT_VIEW)
+  const defaultView = useMemo(() => getDefaultView(mode), [mode])
+  const [stored, setView] = useLocalState<View>(`view:${mode}:v2`, defaultView)
   const urlQ = params.get('q')
   const view = urlQ !== null ? { ...stored, q: urlQ } : stored
-  const v = { ...DEFAULT_VIEW, ...view }
-  const set = (patch: Partial<View>) => { setView({ ...v, ...patch }); setPage(0) }
-  const [qInput, setQInput] = useState(v.q)
-  const dq = useDebounced(qInput, 200)
-  useEffect(() => { if (dq !== v.q) set({ q: dq }) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [dq])
+  const v: View = { ...defaultView, ...view }
+
   const [page, setPage] = useState(0)
+  const [extraPages, setExtraPages] = useState(0)
+  const set = useCallback(
+    (patch: Partial<View>) => {
+      setView({ ...v, ...patch })
+      setPage(0)
+      setExtraPages(0)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [v, setView],
+  )
+
+  const [qInput, setQInput] = useState(v.q)
+  const dq = useDebounced(qInput, 180)
+  useEffect(() => {
+    if (dq !== v.q) set({ q: dq })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dq])
+
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [saved, setSaved] = useState<{ id: string; name: string; config: View }[]>([])
 
   useEffect(() => {
-    supabase.from('saved_views').select('id,name,config').eq('page', mode).order('created_at').then((r) => setSaved((r.data ?? []) as typeof saved))
+    supabase
+      .from('saved_views')
+      .select('id,name,config')
+      .eq('page', mode)
+      .order('created_at')
+      .then((r) => setSaved((r.data ?? []) as typeof saved))
   }, [mode])
 
   const freshness = v.freshness ?? settings.freshness_days
   const rows = useMemo(
-    () => buildProductRows(products.filter((p) => !p.archived), current, shopMap, { freshnessDays: freshness, excludeStale: v.excludeStale }),
-    [products, current, shopMap, freshness, v.excludeStale],
+    () =>
+      buildProductRows(products.filter((p) => !p.archived), current, shopMap, {
+        freshnessDays: freshness,
+        excludeStale: v.excludeStale || v.freshOnly,
+      }),
+    [products, current, shopMap, freshness, v.excludeStale, v.freshOnly],
   )
-  const options = useMemo(() => ({
-    brand: distinct(rows.map((r) => r.product.brand)),
-    manufacturer: distinct(rows.map((r) => r.product.manufacturer)),
-    strength: distinct(rows.map((r) => (r.product.strength_value != null ? `${r.product.strength_value}${r.product.strength_unit ?? ''}` : null))),
-    weight: distinct(rows.map((r) => (r.product.weight_value != null ? `${r.product.weight_value}${r.product.weight_unit ?? ''}` : null))),
-    pack: distinct(rows.map((r) => (r.product.pack_size != null ? String(r.product.pack_size) : null))),
-  }), [rows])
+
+  const options = useMemo(
+    () => ({
+      brand: distinct(rows.map((r) => r.product.brand)),
+      manufacturer: distinct(rows.map((r) => r.product.manufacturer)),
+      strength: distinct(rows.map((r) => (r.product.strength_value != null ? `${r.product.strength_value}${r.product.strength_unit ?? ''}` : null))),
+      weight: distinct(rows.map((r) => (r.product.weight_value != null ? `${r.product.weight_value}${r.product.weight_unit ?? ''}` : null))),
+      pack: distinct(rows.map((r) => (r.product.pack_size != null ? String(r.product.pack_size) : null))),
+    }),
+    [rows],
+  )
 
   const filtered = useMemo(() => {
     const out = rows.filter((r) => {
@@ -70,12 +139,16 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
       if (v.shop && !r.records.some((x) => x.shop_id === v.shop)) return false
       if (v.bestOnly && r.cmp.eligibleCount < 2) return false
       if (v.multiple && r.records.length < 2) return false
-      if (v.review && !r.records.some((x) => x.scheme_status !== 'ok')) return false
+      if (v.review && !r.hasIncompleteOffer) return false
       if (v.available && r.cmp.eligibleCount === 0) return false
+      if (v.incompleteOnly && (r.cmp.eligibleCount > 0 || r.records.length === 0)) return false
+      if (v.freshOnly && !r.hasFreshOffer) return false
+      if (v.validOnly && (r.cmp.eligibleCount === 0 || (r.hasExpiredOffer && r.cmp.eligibleCount === 0))) return false
+      if (v.expiredOnly && !r.hasExpiredOffer) return false
       if (v.wishlistOnly && !wishlistMap.has(p.id)) return false
       return true
     })
-    return sortRows(out, v.sort)
+    return sortRows(out, v.sort, wishlistMap)
   }, [rows, v, shopMap, wishlistMap])
 
   const items = useMemo(() => {
@@ -86,8 +159,11 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
     }
     return flat
   }, [filtered, v.group])
+
   const pages = Math.max(1, Math.ceil(items.length / PAGE))
-  const pageItems = items.slice(page * PAGE, page * PAGE + PAGE)
+  const startIdx = page * PAGE
+  const endIdx = Math.min(items.length, (page + 1 + extraPages) * PAGE)
+  const pageItems = useMemo(() => items.slice(startIdx, endIdx), [items, startIdx, endIdx])
 
   const sheetFilterCount = [
     v.brand,
@@ -97,21 +173,44 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
     v.pack,
     v.shop,
     v.excludeStale,
+    v.freshOnly,
+    v.validOnly,
+    v.expiredOnly,
     v.multiple,
     v.available,
+    v.incompleteOnly,
     v.review,
     v.freshness != null && v.freshness !== settings.freshness_days,
   ].filter(Boolean).length
 
-  const hasAnyFilter =
-    Boolean(v.q || qInput || v.bestOnly || v.wishlistOnly || sheetFilterCount > 0 || v.sort !== 'name_asc' || v.group !== 'none')
+  const hasAnyFilter = Boolean(
+    v.q ||
+      qInput ||
+      v.bestOnly ||
+      v.wishlistOnly ||
+      sheetFilterCount > 0 ||
+      v.sort !== defaultView.sort ||
+      v.group !== 'none',
+  )
 
-  const toggleSel = (id: string) => {
-    const s = new Set(selected)
-    if (s.has(id)) s.delete(id)
-    else s.add(id)
-    setSelected(s)
-  }
+  const toggleSel = useCallback(
+    (id: string) => {
+      const s = new Set(selected)
+      if (s.has(id)) s.delete(id)
+      else s.add(id)
+      setSelected(s)
+    },
+    [selected, setSelected],
+  )
+
+  const toggleOpen = useCallback((id: string) => {
+    setOpen((prev) => {
+      const s = new Set(prev)
+      if (s.has(id)) s.delete(id)
+      else s.add(id)
+      return s
+    })
+  }, [])
 
   const pageProductIds = useMemo(
     () => pageItems.filter((it): it is { type: 'row'; row: ProductRow } => it.type === 'row').map((it) => it.row.product.id),
@@ -129,16 +228,33 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   }
 
   const saveView = async () => {
-    const name = window.prompt('Name for this view (e.g. "Creams by weight")')
+    const name = window.prompt('Name for this view (e.g. "Best prices by supplier")')
     if (!name?.trim()) return
-    const { data, error } = await supabase.from('saved_views').insert({ page: mode, name: name.trim(), config: v }).select('id,name,config').single()
+    const { data, error } = await supabase
+      .from('saved_views')
+      .insert({ page: mode, name: name.trim(), config: v })
+      .select('id,name,config')
+      .single()
     if (error) return toast('err', error.message)
     setSaved([...saved, data as (typeof saved)[number]])
     toast('ok', 'View saved')
   }
 
+  // Summary counts for quick context
+  const stats = useMemo(() => {
+    let withBestPrice = 0
+    let multiShopComparable = 0
+    let incompleteOnlyCount = 0
+    for (const r of rows) {
+      if (r.cmp.eligibleCount >= 1) withBestPrice++
+      if (r.cmp.eligibleCount >= 2) multiShopComparable++
+      else if (r.cmp.eligibleCount === 0 && r.records.length > 0) incompleteOnlyCount++
+    }
+    return { withBestPrice, multiShopComparable, incompleteOnlyCount }
+  }, [rows])
+
   return (
-    <div className="space-y-2.5">
+    <div className="min-w-0 space-y-2.5">
       {/* Compact Product Toolbar */}
       <Card className="!p-2.5 sm:!p-3">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
@@ -147,7 +263,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
             <IconSearch size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
               type="search"
-              placeholder="Search medicine name, shop, strength, or code…"
+              placeholder="Search medicine name, supplier, strength, form, or code…"
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
               aria-label="Search products"
@@ -156,7 +272,10 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
             {qInput && (
               <button
                 type="button"
-                onClick={() => { setQInput(''); set({ q: '' }) }}
+                onClick={() => {
+                  setQInput('')
+                  set({ q: '' })
+                }}
                 aria-label="Clear search"
                 className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               >
@@ -165,23 +284,32 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
             )}
           </div>
 
-          {/* Sort, Group & Filters Button */}
+          {/* Sort, Supplier Quick Filter & Filters Button */}
           <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center">
             <Select
               value={v.sort}
               onChange={(e) => set({ sort: e.target.value as SortKey })}
-              aria-label="Sort"
-              className="!min-h-9 sm:!min-h-8.5 sm:!w-44 !py-1 !px-2.5 text-xs sm:text-[13px]"
+              aria-label="Sort products"
+              className="!min-h-9 sm:!min-h-8.5 sm:!w-52 !py-1 !px-2.5 text-xs sm:text-[13px]"
             >
-              {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>Sort: {o.label}</option>)}
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  Sort: {o.label}
+                </option>
+              ))}
             </Select>
             <Select
-              value={v.group}
-              onChange={(e) => set({ group: e.target.value as GroupKey })}
-              aria-label="Group"
+              value={v.shop}
+              onChange={(e) => set({ shop: e.target.value })}
+              aria-label="Filter by supplier"
               className="!min-h-9 sm:!min-h-8.5 sm:!w-40 !py-1 !px-2.5 text-xs sm:text-[13px]"
             >
-              {GROUP_OPTIONS.map((o) => <option key={o.key} value={o.key}>Group: {o.label}</option>)}
+              <option value="">All suppliers ({shops.length})</option>
+              {shops.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
             </Select>
             <Button
               variant="secondary"
@@ -203,32 +331,31 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
         {/* Secondary Compact Filter Pills & View Actions */}
         <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 border-t border-[var(--border-default)]/70 pt-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
+            <FilterPill
+              active={v.available}
+              onClick={() => set({ available: !v.available, incompleteOnly: false })}
+              label={`Valid Rs price (${stats.withBestPrice})`}
+            />
+            <FilterPill
+              active={v.bestOnly}
               onClick={() => set({ bestOnly: !v.bestOnly })}
-              aria-pressed={v.bestOnly}
-              className={cx(
-                'inline-flex min-h-7.5 items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors',
-                v.bestOnly
-                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
-                  : 'border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
-              )}
-            >
-              <span>Best-price only</span>
-            </button>
-            <button
-              type="button"
+              label={`2+ comparable (${stats.multiShopComparable})`}
+            />
+            <FilterPill
+              active={v.multiple}
+              onClick={() => set({ multiple: !v.multiple })}
+              label="2+ suppliers"
+            />
+            <FilterPill
+              active={v.freshOnly}
+              onClick={() => set({ freshOnly: !v.freshOnly })}
+              label="Fresh only"
+            />
+            <FilterPill
+              active={v.wishlistOnly}
               onClick={() => set({ wishlistOnly: !v.wishlistOnly })}
-              aria-pressed={v.wishlistOnly}
-              className={cx(
-                'inline-flex min-h-7.5 items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors',
-                v.wishlistOnly
-                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
-                  : 'border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
-              )}
-            >
-              <span>Wishlist only</span>
-            </button>
+              label="Wishlist"
+            />
             {saved.length > 0 && (
               <Select
                 className="!min-h-7.5 !w-auto !py-0.5 !px-2 text-xs"
@@ -236,20 +363,34 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 onChange={(e) => {
                   const s = saved.find((x) => x.id === e.target.value)
                   if (s) {
-                    setView({ ...DEFAULT_VIEW, ...s.config })
+                    setView({ ...defaultView, ...s.config })
                     setQInput(s.config.q ?? '')
                     setPage(0)
+                    setExtraPages(0)
                   }
                 }}
                 aria-label="Saved views"
               >
                 <option value="">Saved views…</option>
-                {saved.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {saved.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
               </Select>
             )}
           </div>
 
           <div className="flex items-center gap-1">
+            {open.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setOpen(new Set())}
+                className="rounded-md px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              >
+                Collapse ({open.size})
+              </button>
+            )}
             <button
               type="button"
               onClick={saveView}
@@ -261,8 +402,10 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
               <button
                 type="button"
                 onClick={() => {
-                  setView(DEFAULT_VIEW)
+                  setView(defaultView)
                   setQInput('')
+                  setPage(0)
+                  setExtraPages(0)
                 }}
                 className="rounded-md px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               >
@@ -274,37 +417,63 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
       </Card>
 
       {/* Filters Bottom Sheet / Dialog */}
-      <Modal open={showFilters} onClose={() => setShowFilters(false)} title="Filter products">
+      <Modal open={showFilters} onClose={() => setShowFilters(false)} title="Filter & group products">
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {(['brand', 'manufacturer', 'strength', 'weight', 'pack'] as const).map((k) => (
               <Field key={k} label={{ brand: 'Brand', manufacturer: 'Manufacturer', strength: 'Strength', weight: 'Grams / volume', pack: 'Pack size' }[k]}>
                 <Select value={v[k]} onChange={(e) => set({ [k]: e.target.value })}>
                   <option value="">All</option>
-                  {options[k].map((o) => <option key={o}>{o}</option>)}
+                  {options[k].map((o) => (
+                    <option key={o}>{o}</option>
+                  ))}
                 </Select>
               </Field>
             ))}
-            <Field label="Shop">
+            <Field label="Supplier / Shop">
               <Select value={v.shop} onChange={(e) => set({ shop: e.target.value })}>
-                <option value="">All shops</option>
-                {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                <option value="">All suppliers</option>
+                {shops.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
               </Select>
             </Field>
-            <Field label="Price freshness (days)">
+            <Field label="Group rows by">
+              <Select value={v.group} onChange={(e) => set({ group: e.target.value as GroupKey })}>
+                {GROUP_OPTIONS.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Price freshness threshold">
               <Select value={String(freshness)} onChange={(e) => set({ freshness: Number(e.target.value) })}>
-                {[7, 15, 30, 60, 90].map((d) => <option key={d} value={d}>{d} days</option>)}
+                {[7, 15, 30, 60, 90].map((d) => (
+                  <option key={d} value={d}>
+                    {d} days
+                  </option>
+                ))}
               </Select>
             </Field>
           </div>
 
           <div className="space-y-2 rounded-xl border border-[var(--border-default)] bg-[var(--bg-subtle)] p-3.5 text-sm text-[var(--text-primary)]">
-            {([
-              ['excludeStale', 'Exclude outdated quotes'],
-              ['multiple', 'Multiple supplier offers (2+ shops)'],
-              ['available', 'Has a valid purchase price'],
-              ['review', 'Needs scheme or calculation review'],
-            ] as const).map(([k, label]) => (
+            {(
+              [
+                ['available', 'Only products with complete, calculable Rs purchase prices'],
+                ['incompleteOnly', 'Only products with incomplete (discount-only / missing Rs rate) offers'],
+                ['bestOnly', 'Only best-price opportunities (2+ valid supplier Rs prices)'],
+                ['multiple', 'Listed by multiple suppliers (2+ shops)'],
+                ['freshOnly', 'Only fresh survey offers (exclude stale quotes)'],
+                ['excludeStale', 'Exclude outdated quotes from best-price ranking'],
+                ['validOnly', 'Valid (non-expired) offers only'],
+                ['expiredOnly', 'Has expired supplier quotes'],
+                ['review', 'Needs scheme or calculation review'],
+              ] as const
+            ).map(([k, label]) => (
               <label key={k} className="flex items-center gap-2.5">
                 <input type="checkbox" checked={v[k]} onChange={(e) => set({ [k]: e.target.checked })} />
                 <span>{label}</span>
@@ -316,8 +485,10 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
             <Button
               variant="ghost"
               onClick={() => {
-                setView(DEFAULT_VIEW)
+                setView(defaultView)
                 setQInput('')
+                setPage(0)
+                setExtraPages(0)
               }}
             >
               Reset all
@@ -332,7 +503,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
       {/* Status & Bulk Selection Strip */}
       {rows.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-[var(--text-secondary)]">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             {pageProductIds.length > 0 && (
               <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] md:hidden">
                 <input
@@ -349,6 +520,11 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
               Showing <b className="font-medium text-[var(--text-primary)]">{filtered.length}</b> of {rows.length} products
               {selected.size > 0 && ` · ${selected.size} selected`}
             </span>
+            {stats.incompleteOnlyCount > 0 && stats.withBestPrice === 0 && (
+              <span className="text-[11.5px] text-[var(--color-warning-text)]">
+                · Current imports contain discount % only (import Rs rates to rank cheapest suppliers)
+              </span>
+            )}
           </div>
           {selected.size > 0 && (
             <span className="flex items-center gap-3">
@@ -356,7 +532,11 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 <span>Export selected ({selected.size})</span>
                 <IconArrowRight size={13} />
               </Link>
-              <button type="button" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline" onClick={() => setSelected(new Set())}>
+              <button
+                type="button"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
+                onClick={() => setSelected(new Set())}
+              >
                 Clear
               </button>
             </span>
@@ -386,8 +566,10 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 variant="secondary"
                 small
                 onClick={() => {
-                  setView(DEFAULT_VIEW)
+                  setView(defaultView)
                   setQInput('')
+                  setPage(0)
+                  setExtraPages(0)
                 }}
               >
                 Reset filters
@@ -397,7 +579,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
         )
       ) : (
         <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] divide-y divide-[var(--border-default)]">
-          {/* Desktop Column Header Strip — 5 explicit in-flow columns matching DESKTOP_GRID */}
+          {/* Desktop Column Header Strip — 4 explicit in-flow columns matching DESKTOP_GRID */}
           <div
             className={cx(
               'hidden md:grid bg-[var(--bg-subtle)] px-3.5 sm:px-4 py-2 text-[11px] font-semibold tracking-wider text-[var(--text-secondary)] uppercase',
@@ -415,8 +597,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
               />
             </div>
             <div>Product &amp; form</div>
-            <div>Best offer / rate</div>
-            <div>Supplier &amp; updated</div>
+            <div>Best supplier &amp; effective price</div>
             <div className="text-right">Actions</div>
           </div>
 
@@ -426,8 +607,8 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 key={'g' + i + it.label}
                 className="flex items-center justify-between bg-[var(--bg-elevated)] px-3.5 sm:px-4 py-1.5 text-xs font-medium tracking-wide text-[var(--text-primary)] uppercase"
               >
-                <span>{it.label}</span>
-                <span className="rounded-full bg-[var(--color-primary-light)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-primary)] tabular-nums">
+                <span className="truncate">{it.label}</span>
+                <span className="shrink-0 rounded-full bg-[var(--color-primary-light)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-primary)] tabular-nums">
                   {it.count}
                 </span>
               </div>
@@ -437,26 +618,58 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 r={it.row}
                 mode={mode}
                 selected={selected.has(it.row.product.id)}
-                onSelect={() => toggleSel(it.row.product.id)}
+                onSelect={toggleSel}
                 open={open.has(it.row.product.id)}
-                onToggle={() => {
-                  const s = new Set(open)
-                  if (s.has(it.row.product.id)) s.delete(it.row.product.id)
-                  else s.add(it.row.product.id)
-                  setOpen(s)
-                }}
+                onToggle={toggleOpen}
                 bestOnly={v.bestOnly}
               />
             ),
           )}
         </div>
       )}
-      <Pagination page={page} pages={pages} onPage={(p) => { setPage(p); window.scrollTo({ top: 0 }) }} />
+
+      {/* Progressive Load More + Page Navigation */}
+      {endIdx < items.length && (
+        <div className="flex justify-center pt-1">
+          <Button variant="secondary" small onClick={() => setExtraPages((p) => p + 1)}>
+            <span>
+              Show {Math.min(PAGE, items.length - endIdx)} more products ({endIdx} of {items.length} shown)
+            </span>
+          </Button>
+        </div>
+      )}
+      <Pagination
+        page={page}
+        pages={pages}
+        onPage={(p) => {
+          setPage(p)
+          setExtraPages(0)
+          window.scrollTo({ top: 0 })
+        }}
+      />
     </div>
   )
 }
 
-function Row({
+function FilterPill({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cx(
+        'inline-flex min-h-7.5 items-center gap-1 rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors',
+        active
+          ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
+          : 'border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
+      )}
+    >
+      <span>{label}</span>
+    </button>
+  )
+}
+
+const Row = memo(function Row({
   r,
   mode,
   selected,
@@ -468,39 +681,37 @@ function Row({
   r: ProductRow
   mode: 'compare' | 'master'
   selected: boolean
-  onSelect: () => void
+  onSelect: (id: string) => void
   open: boolean
-  onToggle: () => void
+  onToggle: (id: string) => void
   bestOnly: boolean
 }) {
   const { shopMap } = useData()
   const p = r.product
-  const best = r.cmp.offers.find((o) => o.eligible)
-  const schemeOnlyOffer = !best ? r.records.find((x) => x.scheme_status === 'ok' && x.scheme_text) : undefined
-  const primaryRec = best?.rec ?? schemeOnlyOffer ?? r.records[0]
-  const shopName = primaryRec ? shopMap.get(primaryRec.shop_id)?.name : null
-  const updatedDate = primaryRec?.observed_on ?? p.updated_at?.slice(0, 10)
-  const offers = bestOnly ? r.cmp.offers.filter((o) => o.isBest) : r.cmp.offers
-  const codeAndMeta = [
-    `#${p.product_no}`,
-    p.mfr_code ? `Code ${p.mfr_code}` : null,
-    p.brand,
-    p.manufacturer,
-  ]
+  const best = r.bestOffer
+  const schemeOnlyOffer = r.schemeOnlyOffer
+  const bestShopName = r.bestShop?.name ?? (best ? shopMap.get(best.rec.shop_id)?.name : null)
+  const schemeShopName = schemeOnlyOffer ? shopMap.get(schemeOnlyOffer.shop_id)?.name : null
+  const fallbackRec = r.records[0]
+  const fallbackShopName = fallbackRec ? shopMap.get(fallbackRec.shop_id)?.name : null
+
+  const offers = bestOnly ? r.cmp.offers.filter((o) => o.isBest || o.eligible) : r.cmp.offers
+  const formBadge = r.variant || p.dosage_form
+  const codeAndMeta = [`#${p.product_no}`, p.mfr_code ? `Code ${p.mfr_code}` : null, p.brand, p.manufacturer]
     .filter(Boolean)
     .join(' · ')
 
   return (
     <div
       className={cx(
-        'transition-colors duration-100',
-        selected ? 'bg-[var(--color-primary-light)]/40' : 'hover:bg-[var(--bg-hover)]/70',
+        'min-w-0 transition-colors duration-100',
+        selected ? 'bg-[var(--color-primary-light)]/35' : 'hover:bg-[var(--bg-hover)]/60',
       )}
     >
-      {/* Flat 5-column CSS Grid on desktop, compact 2-row grid on mobile */}
+      {/* Compact 4-column CSS Grid on desktop, compact 2-row grid on mobile */}
       <div
         className={cx(
-          'grid grid-cols-[20px_1fr_auto] items-start gap-x-2.5 gap-y-1 px-3.5 py-2.5 sm:px-4 md:py-2',
+          'grid grid-cols-[20px_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5 px-3 py-2.5 sm:px-4 md:py-2',
           DESKTOP_GRID,
         )}
       >
@@ -510,24 +721,24 @@ function Row({
             type="checkbox"
             className="h-4 w-4 shrink-0 rounded border-[var(--border-default)]"
             checked={selected}
-            onChange={onSelect}
+            onChange={() => onSelect(p.id)}
             aria-label={`Select ${p.name} for export`}
           />
         </div>
 
-        {/* Col 2: Product Identity & Variant */}
+        {/* Col 2 (Left): Product Name, Form/Strength & Code */}
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             <Link
               to={`/products/${p.id}`}
               title={p.name}
-              className="text-[13.5px] sm:text-sm font-medium leading-snug text-[var(--text-primary)] hover:text-[var(--color-primary)] hover:underline"
+              className="truncate text-[13.5px] sm:text-sm font-medium leading-snug text-[var(--text-primary)] hover:text-[var(--color-primary)] hover:underline"
             >
               {p.name}
             </Link>
-            {r.variant && (
-              <span className="rounded bg-[var(--color-primary-light)] px-1.5 py-0.5 text-[11px] font-medium leading-none text-[var(--color-primary)] whitespace-nowrap">
-                {r.variant}
+            {formBadge && (
+              <span className="shrink-0 rounded bg-[var(--color-primary-light)] px-1.5 py-0.5 text-[10.5px] font-medium leading-none text-[var(--color-primary)] whitespace-nowrap">
+                {formBadge}
               </span>
             )}
           </div>
@@ -536,93 +747,108 @@ function Row({
           </div>
         </div>
 
-        {/* Col 3: Best Offer / Rate */}
-        <div className="col-span-2 col-start-2 min-w-0 md:col-auto">
+        {/* Col 3 (Middle): Winning Supplier Offer Highlight (spans full width below title on mobile) */}
+        <div className="col-span-3 col-start-1 min-w-0 md:col-auto">
           {best ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span
-                className={cx(
-                  'text-[13.5px] sm:text-sm font-semibold tabular-nums',
-                  best.isBest ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]',
-                )}
-              >
-                {rs(best.cents! / 100)}
-              </span>
-              {best.isBest && (
-                <span className="rounded bg-[var(--color-best-solid)] px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide text-[var(--color-best-solid-text)] uppercase">
-                  {best.isTied ? 'Best (Tied)' : 'Best'}
+            <div className="rounded-lg border border-[var(--color-best-border)] border-l-3 border-l-[var(--color-best-solid)] bg-[var(--color-best-bg)] px-2.5 py-1.5">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="shrink-0 rounded bg-[var(--color-best-solid)] px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide text-[var(--color-best-solid-text)] uppercase">
+                    {best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}
+                  </span>
+                  <span
+                    className="truncate text-xs sm:text-[13px] font-semibold text-[var(--text-primary)]"
+                    title={bestShopName ?? undefined}
+                  >
+                    {bestShopName ?? 'Supplier'}
+                  </span>
+                </div>
+                <span className="shrink-0 text-sm sm:text-[15px] font-bold text-[var(--color-best)] tabular-nums">
+                  {rs(best.cents! / 100)}
                 </span>
-              )}
-              <span className="text-[11.5px] text-[var(--text-secondary)] tabular-nums">
-                {best.rec.scheme_text
-                  ? `Rate ${rs(best.rec.base_price)} · ${best.rec.scheme_text}`
-                  : best.rec.base_price != null && best.rec.base_price !== best.cents! / 100
-                    ? `Rate ${rs(best.rec.base_price)}`
-                    : 'Net rate'}
-              </span>
-              {best.perUnit && (
-                <span className="text-[11px] text-[var(--text-secondary)] tabular-nums">
-                  ({rs(best.perUnit.value, 2)}/{best.perUnit.label.replace('Per ', '')})
-                </span>
-              )}
-              {r.cmp.nextBest && (
-                <span className="text-[11px] font-medium text-[var(--color-best)] tabular-nums">
-                  · Save {rs(r.cmp.nextBest.saving)} ({r.cmp.nextBest.savingPct.toFixed(0)}%)
-                </span>
-              )}
+              </div>
+
+              <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px] text-[var(--text-secondary)] tabular-nums">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+                  <span>
+                    {best.rec.scheme_text
+                      ? best.rec.base_price != null
+                        ? `Rate ${rs(best.rec.base_price)} · ${best.rec.scheme_text}`
+                        : best.rec.scheme_text
+                      : best.rec.base_price != null && best.rec.base_price !== best.cents! / 100
+                        ? `Rate ${rs(best.rec.base_price)}`
+                        : 'Net rate'}
+                  </span>
+                  {best.perUnit && (
+                    <span>
+                      ({rs(best.perUnit.value, 2)}/{best.perUnit.label.replace('per ', '')})
+                    </span>
+                  )}
+                  {r.cmp.nextBest && (
+                    <span className="font-semibold text-[var(--color-best)]">
+                      · Save {rs(r.cmp.nextBest.saving)} ({r.cmp.nextBest.savingPct.toFixed(0)}%)
+                      {r.nextBestShop ? ` vs ${r.nextBestShop.name}` : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span>{fmtDate(best.rec.observed_on)}</span>
+                  {!best.fresh && <span className="font-medium text-[var(--color-warning-text)]">· Stale</span>}
+                </div>
+              </div>
             </div>
           ) : schemeOnlyOffer ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge>
-              <span className="text-[11.5px] text-[var(--text-secondary)]">Trade / scheme offer</span>
+            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2.5 py-1.5">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge>
+                  <span
+                    className="truncate text-xs font-medium text-[var(--text-primary)]"
+                    title={schemeShopName ?? undefined}
+                  >
+                    {schemeShopName ?? 'Supplier'}
+                  </span>
+                </div>
+                <span className="shrink-0 rounded border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-warning-text)]">
+                  Incomplete · no Rs rate
+                </span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 text-[11px] text-[var(--text-secondary)] tabular-nums">
+                <span>
+                  Discount/scheme only — absolute Rs comparison unavailable
+                  {r.records.length > 1 ? ` (${r.records.length} suppliers)` : ''}
+                </span>
+                <span>{fmtDate(schemeOnlyOffer.observed_on)}</span>
+              </div>
             </div>
-          ) : r.records.length ? (
-            <Badge tone="amber">Needs review ({r.records.length})</Badge>
+          ) : r.records.length > 0 ? (
+            <div className="rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-2.5 py-1.5 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-[var(--color-warning-text)]">
+                  {r.hasExpiredOffer ? 'Offer expired — not ranked' : 'Comparison incomplete — needs review'}
+                </span>
+                <span className="text-[11px] text-[var(--text-secondary)] tabular-nums">
+                  {fallbackShopName ? `${fallbackShopName} · ` : ''}
+                  {fmtDate(fallbackRec?.observed_on)}
+                </span>
+              </div>
+            </div>
           ) : (
-            <span className="text-xs text-[var(--text-secondary)]">No price records</span>
+            <div className="px-1 text-xs text-[var(--text-secondary)]">
+              No supplier offers recorded · Updated {fmtDate(p.updated_at?.slice(0, 10))}
+            </div>
           )}
-
-          {/* Mobile-only inline supplier + date */}
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--text-secondary)] md:hidden">
-            {shopName && (
-              <span>
-                at <b className="font-medium text-[var(--text-primary)]">{shopName}</b>
-              </span>
-            )}
-            {updatedDate && <span className="tabular-nums">· {fmtDate(updatedDate)}</span>}
-            {best && !best.fresh && <span className="text-[var(--color-warning-text)]">· Outdated</span>}
-          </div>
         </div>
 
-        {/* Col 4 (Desktop): Supplier & Updated */}
-        <div className="hidden min-w-0 md:block">
-          {shopName ? (
-            <>
-              <div className="truncate text-xs font-medium text-[var(--text-primary)]" title={shopName}>
-                {shopName}
-              </div>
-              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] tabular-nums">
-                <span>{fmtDate(updatedDate)}</span>
-                {best && !best.fresh && (
-                  <span className="font-medium text-[var(--color-warning-text)]">· Outdated</span>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="text-[11px] text-[var(--text-secondary)] tabular-nums">
-              Updated {fmtDate(updatedDate)}
-            </div>
-          )}
-        </div>
-
-        {/* Col 5: Actions (Wishlist + Offers) */}
+        {/* Col 4 (Right): Actions (Wishlist + Expand Offers) */}
         <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-1.5 md:col-auto md:row-auto">
           <WishlistToggle productId={p.id} compact />
           {r.records.length > 0 ? (
             <button
               type="button"
-              onClick={onToggle}
+              onClick={() => onToggle(p.id)}
               aria-expanded={open}
+              title={open ? 'Collapse supplier offers' : `Compare all ${r.records.length} supplier offers`}
               className={cx(
                 'inline-flex h-8 sm:h-7.5 items-center gap-1 rounded-md border px-2 sm:px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]',
                 open
@@ -631,7 +857,13 @@ function Row({
               )}
             >
               <span className="tabular-nums">
-                {open ? 'Hide' : <><span className="hidden sm:inline">{mode === 'compare' ? 'Compare' : 'Offers'} </span>({r.records.length})</>}
+                {open ? (
+                  'Hide'
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">{mode === 'compare' ? 'Compare' : 'Offers'} </span>({r.records.length})
+                  </>
+                )}
               </span>
               <IconChevronDown size={13} className={cx('transition-transform duration-150', open && 'rotate-180')} />
             </button>
@@ -646,22 +878,30 @@ function Row({
         </div>
       </div>
 
-      {/* Expandable Competing Offer Details */}
+      {/* Expandable Competing Supplier Offers — Ranked Lowest Effective Cost First */}
       {open && (
-        <div className="border-t border-[var(--border-default)] bg-[var(--bg-subtle)] px-3.5 py-2.5 sm:px-4 sm:py-3">
-          <div className="mb-2 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+        <div className="border-t border-[var(--border-default)] bg-[var(--bg-subtle)] px-3 py-2.5 sm:px-4 sm:py-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-secondary)]">
             <span>
-              All recorded supplier offers for <b className="font-medium text-[var(--text-primary)]">{p.name}</b>
+              Supplier offers for <b className="font-medium text-[var(--text-primary)]">{p.name}</b> — ranked cheapest to most expensive ({offers.length})
             </span>
             <Link to={`/products/${p.id}`} className="font-medium text-[var(--color-primary)] hover:underline">
               Full price history →
             </Link>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} />)}
+          <div className="space-y-1.5">
+            {offers.map((o, idx) => (
+              <OfferRow
+                key={o.rec.id}
+                o={o}
+                rank={o.eligible ? idx + 1 : undefined}
+                isWinner={best ? o.rec.id === best.rec.id || o.isBest : false}
+                shop={shopMap.get(o.rec.shop_id)}
+              />
+            ))}
           </div>
         </div>
       )}
     </div>
   )
-}
+})
