@@ -53,7 +53,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
       if (oldestDate == null || r.observed_on < oldestDate) oldestDate = r.observed_on
       if (r.discount_pct != null && (maxDiscount == null || r.discount_pct > maxDiscount)) maxDiscount = r.discount_pct
     }
-    const searchParts = [
+    const searchParts: (string | null | undefined)[] = [
       product.name,
       product.normalized_name,
       product.brand,

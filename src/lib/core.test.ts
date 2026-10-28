@@ -439,6 +439,57 @@ describe('comparison engine', () => {
     const a = compareOffers([...recs], undefined, OPT), b = compareOffers([...recs].reverse(), undefined, OPT)
     expect(a.offers.map((o) => o.rec.shop_id)).toEqual(b.offers.map((o) => o.rec.shop_id))
   })
+  it('never treats zero or negative prices as valid cheapest offers', () => {
+    const r = compareOffers([
+      rec({ shop_id: 'Zero', base_price: 0, effective_cost: 0 }),
+      rec({ shop_id: 'Neg', base_price: -10, effective_cost: -10 }),
+      rec({ shop_id: 'Valid1', base_price: 150, effective_cost: 140 }),
+      rec({ shop_id: 'Valid2', base_price: 160, effective_cost: 150 }),
+    ], undefined, OPT)
+    expect(r.eligibleCount).toBe(2)
+    expect(r.offers[0].rec.shop_id).toBe('Valid1')
+    expect(r.offers[0].isBest).toBe(true)
+    expect(r.offers.find((o) => o.rec.shop_id === 'Zero')!.eligible).toBe(false)
+    expect(r.offers.find((o) => o.rec.shop_id === 'Neg')!.eligible).toBe(false)
+  })
+  it('prevents expired offers (via valid_until or expiry) from winning best price', () => {
+    const r = compareOffers([
+      rec({ shop_id: 'ExpiredValidUntil', effective_cost: 50, valid_until: '2026-10-15' }),
+      rec({ shop_id: 'ExpiredDate', effective_cost: 60, expiry: '2026-09' }),
+      rec({ shop_id: 'ActiveWinner', effective_cost: 90, valid_until: '2026-12-31' }),
+      rec({ shop_id: 'ActiveSecond', effective_cost: 100 }),
+    ], undefined, OPT)
+    expect(r.eligibleCount).toBe(2)
+    expect(r.hasExpiredOffers).toBe(true)
+    expect(r.offers[0].rec.shop_id).toBe('ActiveWinner')
+    expect(r.offers[0].isBest).toBe(true)
+    expect(r.offers.find((o) => o.rec.shop_id === 'ExpiredValidUntil')!.reason).toBe('expired')
+    expect(r.offers.find((o) => o.rec.shop_id === 'ExpiredDate')!.reason).toBe('expired')
+  })
+  it('excludes offers with conflicting pack size or strength from winning best price', () => {
+    const canonical = prod('Panadol 500mg Pack of 10', { strength_value: 500, strength_unit: 'mg', pack_size: 10 })
+    const r = compareOffers([
+      rec({ shop_id: 'WrongPack', effective_cost: 40, pack_size: 20 }),
+      rec({ shop_id: 'UnverifiedMatch', effective_cost: 45, match_status: 'needs_review' }),
+      rec({ shop_id: 'ShopA', effective_cost: 85, pack_size: 10 }),
+      rec({ shop_id: 'ShopB', effective_cost: 92, pack_size: 10 }),
+    ], canonical, OPT)
+    expect(r.eligibleCount).toBe(2)
+    expect(r.offers[0].rec.shop_id).toBe('ShopA')
+    expect(r.offers[0].isBest).toBe(true)
+    expect(r.offers.find((o) => o.rec.shop_id === 'WrongPack')!.eligible).toBe(false)
+    expect(r.offers.find((o) => o.rec.shop_id === 'UnverifiedMatch')!.eligible).toBe(false)
+  })
+  it('marks discount-only offers without a base rate as incomplete rather than ranking by % alone', () => {
+    const r = compareOffers([
+      rec({ shop_id: 'Disc20', base_price: null, effective_cost: null, discount_pct: 20, scheme_text: '20% discount', scheme_status: 'ok' }),
+      rec({ shop_id: 'Disc15', base_price: null, effective_cost: null, discount_pct: 15, scheme_text: '15% discount', scheme_status: 'ok' }),
+    ], undefined, OPT)
+    expect(r.eligibleCount).toBe(0)
+    expect(r.bestCents).toBeNull()
+    expect(r.hasIncompleteOffers).toBe(true)
+    expect(r.offers.every((o) => o.isDiscountOnly && !o.isBest)).toBe(true)
+  })
 })
 
 // ---------- sorting / grouping
@@ -465,6 +516,39 @@ describe('sorting and grouping', () => {
   })
   it('sorts by weight numerically', () => {
     expect(sortRows(rows, 'weight').map((r) => r.product.weight_value)).toEqual([10, 25, 50, 100, 200])
+  })
+  it('sorts by lowest effective price, largest verified savings, survey date, and wishlist first', () => {
+    const pCheap = prod('Med Cheap 10mg')
+    const pMid = prod('Med Mid 10mg')
+    const pNoPrice = prod('Med NoPrice 10mg')
+    const shops = new Map<string, Shop>([
+      ['S1', { id: 'S1', name: 'Alpha Wholesale' } as Shop],
+      ['S2', { id: 'S2', name: 'Beta Wholesale' } as Shop],
+    ])
+    const cur = [
+      rec({ product_id: pCheap.id, shop_id: 'S1', effective_cost: 80, observed_on: '2026-10-20' }),
+      rec({ product_id: pCheap.id, shop_id: 'S2', effective_cost: 90, observed_on: '2026-10-21' }),
+      rec({ product_id: pMid.id, shop_id: 'S1', effective_cost: 120, observed_on: '2026-10-27' }),
+      rec({ product_id: pMid.id, shop_id: 'S2', effective_cost: 160, observed_on: '2026-10-26' }),
+    ]
+    const built = buildProductRows([pNoPrice, pMid, pCheap], cur, shops, OPT)
+
+    // Best effective price — lowest first (missing prices last)
+    expect(sortRows(built, 'price_low').map((r) => r.product.id)).toEqual([pCheap.id, pMid.id, pNoPrice.id])
+
+    // Best effective price — highest first (missing prices last)
+    expect(sortRows(built, 'price_high').map((r) => r.product.id)).toEqual([pMid.id, pCheap.id, pNoPrice.id])
+
+    // Largest verified savings (pMid saves Rs 40 vs pCheap saves Rs 10)
+    expect(sortRows(built, 'opportunity').map((r) => r.product.id)).toEqual([pMid.id, pCheap.id, pNoPrice.id])
+
+    // Most recently surveyed vs oldest survey first
+    expect(sortRows(built, 'survey').map((r) => r.product.id)).toEqual([pMid.id, pCheap.id, pNoPrice.id])
+    expect(sortRows(built, 'survey_asc').map((r) => r.product.id)).toEqual([pCheap.id, pMid.id, pNoPrice.id])
+
+    // Wishlist products first
+    const wl = new Set([pMid.id])
+    expect(sortRows(built, 'wishlist_first', wl).map((r) => r.product.id)).toEqual([pMid.id, pCheap.id, pNoPrice.id])
   })
 })
 
