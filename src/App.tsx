@@ -95,7 +95,7 @@ function Shell() {
   }
 
   return (
-    <div className="flex min-h-full w-full max-w-full flex-col overflow-x-hidden bg-[var(--bg-app)] text-[var(--text-primary)] md:flex-row">
+    <div className="flex min-h-full w-full max-w-full flex-col overflow-x-clip bg-[var(--bg-app)] text-[var(--text-primary)] md:flex-row">
       {/* Desktop Sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--border-default)] bg-[var(--bg-nav)] md:sticky md:top-0 md:flex md:h-screen">
         <div className="flex items-center gap-2.5 border-b border-[var(--border-default)] px-4 py-3.5">
@@ -206,7 +206,7 @@ function Shell() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl min-w-0 flex-1 overflow-x-hidden px-3 pb-28 pt-3.5 sm:px-6 md:pb-10 md:pt-5" key={loc.pathname.split('/')[1]}>
+        <main className="mx-auto w-full max-w-6xl min-w-0 flex-1 overflow-x-clip px-3 pb-28 pt-3.5 sm:px-6 md:pb-10 md:pt-5" key={loc.pathname.split('/')[1]}>
           {error && (
             <div role="alert" className="mb-4 flex items-start gap-2.5 rounded-lg border border-[var(--color-error-border)] bg-[var(--color-error-bg)] p-3.5 text-sm text-[var(--color-error-text)]">
               <IconAlert size={18} className="mt-0.5 shrink-0 text-[var(--color-error-text)]" />
