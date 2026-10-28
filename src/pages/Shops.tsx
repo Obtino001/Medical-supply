@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { IconPlus } from '../components/icons'
 import { ShopForm } from '../components/ShopForm'
 import { Badge, Button, Card, Empty, Input, PageHeader, Select, fmtDate } from '../components/ui'
 import { useData } from '../lib/data'
@@ -24,7 +25,10 @@ export default function Shops() {
         title="Shops"
         subtitle="Manage wholesale suppliers and market shops across Karachi, Nawabshah, and regional hubs."
       >
-        <Button onClick={() => setAdding(true)}>+ Add shop</Button>
+        <Button onClick={() => setAdding(true)}>
+          <IconPlus size={15} />
+          <span>Add shop</span>
+        </Button>
       </PageHeader>
       <Card className="!p-3.5">
         <div className="grid gap-2.5 sm:grid-cols-3">

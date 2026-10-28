@@ -2,7 +2,7 @@
 import { matchHeaderField, suggestMapping, type FieldKey, type ImportOptions, type Mapping } from './columns'
 import type { IncomingProduct } from './matching'
 import { identityKey, normalizeText, parseTitle, sourceKey } from './productParse'
-import { calculateEffectiveCost, parseNumber, parseSchemeText, type CostResult, type SchemeComponents } from './scheme'
+import { calculateEffectiveCost, parseNumber, parseOfferRateCell, parseSchemeText, type CostResult, type SchemeComponents } from './scheme'
 
 export type RowKind = 'valid' | 'review' | 'invalid' | 'duplicate'
 
@@ -92,7 +92,11 @@ export function detectHeaderRow(grid: string[][]): number {
 export function detectColumns(headers: string[], sample: string[][]) {
   return headers.map((h, i) => {
     const vals = sample.map((r) => r[i] ?? '').filter(Boolean)
-    const numeric = vals.filter((v) => parseNumber(v) !== null).length
+    const numeric = vals.filter((v) => {
+      if (parseNumber(v) !== null) return true
+      const p = parseOfferRateCell(v)
+      return p.price !== null || p.scheme !== null
+    }).length
     return { header: h, filled: vals.length, numericShare: vals.length ? numeric / vals.length : 0 }
   })
 }
@@ -321,14 +325,17 @@ export function buildRows(
 
       // ---- price & scheme
       const priceRaw = get(idx.price)
-      let price = parseNumber(priceRaw)
+      const parsedOffer = parseOfferRateCell(priceRaw)
+      let price = parsedOffer.price
+      const inlineScheme = parsedOffer.scheme
+
       if (!priceRaw) {
         errors.push('Missing price')
         stats.missingPrice++
-      } else if (price === null) {
+      } else if (price === null && !inlineScheme) {
         errors.push(`Price "${priceRaw}" is not a number`)
         stats.badNumbers++
-      } else if (price <= 0) {
+      } else if (price !== null && price <= 0) {
         errors.push('Price must be greater than zero')
         price = null
       }
@@ -336,7 +343,13 @@ export function buildRows(
       const mrp = parseNumber(mrpRaw)
       if (mrpRaw && mrp === null) warnings.push(`MRP "${mrpRaw}" is not a number; ignored`)
 
-      const comp: SchemeComponents = { discountPct: null, flatDiscount: null, bonusBuy: null, bonusFree: null, ambiguous: false, notes: [] }
+      if (price === null && inlineScheme && mrp !== null && mrp > 0) {
+        price = mrp
+      }
+
+      const comp: SchemeComponents = inlineScheme
+        ? { ...inlineScheme, notes: [...inlineScheme.notes] }
+        : { discountPct: null, flatDiscount: null, bonusBuy: null, bonusFree: null, ambiguous: false, notes: [] }
       const discRaw = get(idx.discount)
       const schemeRaw = get(idx.scheme)
       if (discRaw) {
@@ -367,16 +380,23 @@ export function buildRows(
       const qty = parseNumber(qtyRaw)
       if (qtyRaw && qty === null) warnings.push(`Quantity "${qtyRaw}" is not a number; ignored`)
 
-      const cost = calculateEffectiveCost({
-        basePrice: price,
-        discountPct: comp.discountPct,
-        flatDiscount: comp.flatDiscount,
-        bonusBuy: comp.bonusBuy,
-        bonusFree: comp.bonusFree,
-        priceIsNet: options.priceIsNet,
-        combine: options.combine,
-        ambiguous: comp.ambiguous,
-      })
+      const cost: CostResult =
+        price === null && inlineScheme && !comp.ambiguous
+          ? {
+              status: 'ok',
+              effective: null,
+              steps: [comp.summary || priceRaw],
+            }
+          : calculateEffectiveCost({
+              basePrice: price,
+              discountPct: comp.discountPct,
+              flatDiscount: comp.flatDiscount,
+              bonusBuy: comp.bonusBuy,
+              bonusFree: comp.bonusFree,
+              priceIsNet: options.priceIsNet && !inlineScheme,
+              combine: options.combine,
+              ambiguous: comp.ambiguous,
+            })
       if (price !== null && cost.status === 'invalid') errors.push(cost.steps[0])
       if (cost.status === 'review') warnings.push('Scheme needs review: offer will not be ranked until corrected')
 
@@ -396,9 +416,12 @@ export function buildRows(
       }
       const identity = identityKey({ normalizedName, strengthValue, strengthUnit, weightValue, weightUnit, packSize, dosageForm, manufacturer: incoming.manufacturer })
 
+      const inlineLabel = inlineScheme ? (comp.summary || priceRaw) : null
+      const schemeText = [inlineLabel, discRaw, schemeRaw].filter(Boolean).join(' | ') || null
+
       let kind: RowKind = errors.length ? 'invalid' : cost.status === 'review' ? 'review' : 'valid'
       if (kind !== 'invalid') {
-        const dk = [normalizeText(code), identity, price, discRaw.toLowerCase(), schemeRaw.toLowerCase()].join('~')
+        const dk = [normalizeText(code), identity, price, (schemeText ?? '').toLowerCase(), discRaw.toLowerCase(), schemeRaw.toLowerCase()].join('~')
         if (seen.has(dk)) {
           kind = 'duplicate'
           warnings.push('Duplicate of an earlier row in this file')
@@ -411,7 +434,7 @@ export function buildRows(
       rows.push({
         rowNumber, raw, kind, errors, warnings, incoming, identity, title, code, price, mrp,
         discountPct: comp.discountPct, flatDiscount: comp.flatDiscount, bonusBuy: comp.bonusBuy, bonusFree: comp.bonusFree,
-        schemeText: [discRaw, schemeRaw].filter(Boolean).join(' | ') || null,
+        schemeText,
         minOrderQty: qty, availability: get(idx.avail) || null, expiry: get(idx.expiry) || null, notes: get(idx.notes) || null,
         taxIncluded: tax, priceIsNet: options.priceIsNet, combine: options.combine, packSize, cost,
       })

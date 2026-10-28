@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { IconPlus } from '../components/icons'
 import { ProductBrowser } from '../components/ProductBrowser'
 import { ProductForm } from '../components/ProductForm'
 import { Button, PageHeader, useToast } from '../components/ui'
@@ -16,7 +17,10 @@ export default function Products() {
         title="Product master"
         subtitle="Normalized catalog of medical products, strengths, and dosage forms across all shops."
       >
-        <Button onClick={() => setCreating(true)}>+ New product</Button>
+        <Button onClick={() => setCreating(true)}>
+          <IconPlus size={15} />
+          <span>New product</span>
+        </Button>
       </PageHeader>
       <ProductBrowser mode="master" />
       {creating && (

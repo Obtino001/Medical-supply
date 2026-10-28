@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { IconPlus } from '../components/icons'
 import { Button, Card, Empty, Modal, PageHeader, Pagination, Textarea, fmtDate, useToast } from '../components/ui'
 import { useData } from '../lib/data'
 import { updateChecked } from '../lib/supabase'
@@ -23,7 +24,12 @@ export default function Surveys() {
         title="Surveys"
         subtitle="A survey represents a market visit or price list collection from a single shop."
       >
-        <Link to="/import"><Button>+ Create survey (import a price list)</Button></Link>
+        <Link to="/import">
+          <Button>
+            <IconPlus size={15} />
+            <span>Create survey (import a price list)</span>
+          </Button>
+        </Link>
       </PageHeader>
       {surveys.length === 0 ? <Empty title="No surveys yet" /> : (
         <div className="space-y-2">

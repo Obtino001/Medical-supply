@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { IconPlus } from '../components/icons'
 import { OfferCard } from '../components/Offers'
 import { ProductPicker } from '../components/Match'
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, Pagination, Select, Stat, Textarea, fmtDate, rs, useConfirm, useLocalState, useToast } from '../components/ui'
@@ -114,7 +115,10 @@ export default function Wishlist() {
         title="My Wishlist"
         subtitle="Shared priority products: both partners see and edit the same list. Only the exact variant is compared; other sizes are shown separately as alternatives."
       >
-        <Button onClick={() => setAdding(true)}>+ Add product</Button>
+        <Button onClick={() => setAdding(true)}>
+          <IconPlus size={15} />
+          <span>Add product</span>
+        </Button>
       </PageHeader>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
         {tiles.map((t) => (
