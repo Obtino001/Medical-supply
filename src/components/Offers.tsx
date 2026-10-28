@@ -33,13 +33,14 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
   const [open, setOpen] = useState(false)
   const r = o.rec
   const best = o.isBest
+  const isSchemeOnly = !o.eligible && r.scheme_status === 'ok' && r.effective_cost == null && !!r.scheme_text
   return (
     <div
       className={cx(
         'rounded-lg border p-3.5 transition-colors',
         best
           ? 'border-[#188038] bg-[#E6F4EA]/50'
-          : o.eligible
+          : o.eligible || isSchemeOnly
             ? 'border-[#DADCE0] bg-[#F8F9FA]'
             : 'border-[#DADCE0] bg-[#F8F9FA] opacity-85',
       )}
@@ -56,17 +57,31 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
           </div>
         </div>
         <div className="text-right">
-          <div className={cx('text-lg font-semibold tabular-nums sm:text-xl', best ? 'text-[#188038]' : 'text-[#202124]')}>
-            {o.eligible ? rs(o.cents! / 100) : '—'}
-          </div>
-          <div className="text-[11px] text-[#5F6368]">effective purchase price</div>
+          {o.eligible ? (
+            <>
+              <div className={cx('text-lg font-semibold tabular-nums sm:text-xl', best ? 'text-[#188038]' : 'text-[#202124]')}>
+                {rs(o.cents! / 100)}
+              </div>
+              <div className="text-[11px] text-[#5F6368]">effective purchase price</div>
+            </>
+          ) : isSchemeOnly ? (
+            <>
+              <div className="text-base font-semibold text-[#1A73E8] sm:text-lg">{r.scheme_text}</div>
+              <div className="text-[11px] text-[#5F6368]">trade price / discount offer</div>
+            </>
+          ) : (
+            <>
+              <div className="text-lg font-semibold text-[#202124] tabular-nums sm:text-xl">—</div>
+              <div className="text-[11px] text-[#5F6368]">effective purchase price</div>
+            </>
+          )}
         </div>
       </div>
 
       <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-md border border-[#DADCE0] bg-white px-3 py-2 text-xs sm:grid-cols-4 sm:text-sm">
         <div>
           <span className="block text-[11px] text-[#5F6368]">Original offer rate</span>
-          <b className="font-medium text-[#202124] tabular-nums">{rs(r.base_price)}</b>
+          <b className="font-medium text-[#202124] tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</b>
         </div>
         <div>
           <span className="block text-[11px] text-[#5F6368]">Discount / scheme</span>
@@ -107,7 +122,11 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <FreshBadge ageDays={o.ageDays} fresh={o.fresh} />
         <MatchBadge status={r.match_status} />
-        {!o.eligible && o.reason && <Badge tone="amber">{REASON[o.reason]}</Badge>}
+        {isSchemeOnly ? (
+          <Badge tone="blue">Trade price / discount offer</Badge>
+        ) : (
+          !o.eligible && o.reason && <Badge tone="amber">{REASON[o.reason]}</Badge>
+        )}
         {r.scheme_status === 'review' && <Badge tone="amber">Calculation needs review</Badge>}
       </div>
 
