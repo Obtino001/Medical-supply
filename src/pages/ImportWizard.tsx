@@ -4,10 +4,10 @@ import { AttrTable, ProductPicker, productView, type IncomingView } from '../com
 import { ShopForm } from '../components/ShopForm'
 import { WishlistToggle } from '../components/WishlistToggle'
 import { Badge, Button, Card, ErrorBox, Field, Input, Pagination, Select, Stat, Textarea, fmtDate, rs, useToast } from '../components/ui'
-import { DEFAULT_OPTIONS, FIELDS, suggestMapping, type ImportOptions, type Mapping } from '../lib/columns'
+import { ADDITIONAL_FIELDS, DEFAULT_OPTIONS, REQUIRED_FIELDS, suggestMapping, type ImportOptions, type Mapping } from '../lib/columns'
 import { useData } from '../lib/data'
 import { download, toCsv, toMatrix } from '../lib/exporter'
-import { buildRows, detectColumns, errorReportRows, getHeaders, type BuiltRow, type RowKind } from '../lib/importBuild'
+import { buildRows, detectColumns, detectHeaderRow, detectSideBySide, errorReportRows, getHeaders, type BuiltRow, type RowKind } from '../lib/importBuild'
 import { buildCommitPayload, defaultChoice, runMatching, type Choice, type RowMatch } from '../lib/importPlan'
 import { buildIndex, matchProduct, type CatalogDecision, type CatalogIdentifier, type CatalogRejection } from '../lib/matching'
 import { FileError, readFile, type ParsedGrid } from '../lib/parseFile'
@@ -34,6 +34,7 @@ export default function ImportWizard() {
   const [allowDup, setAllowDup] = useState(false)
   const [options, setOptions] = useState<ImportOptions>(DEFAULT_OPTIONS)
   const [mapping, setMapping] = useState<Mapping>({})
+  const [showAdditionalCols, setShowAdditionalCols] = useState(false)
   const [savePreset, setSavePreset] = useState(true)
   const [preset, setPreset] = useState<{ mapping: Mapping; options: ImportOptions } | null>(null)
   const [vPage, setVPage] = useState(0)
@@ -61,6 +62,7 @@ export default function ImportWizard() {
   }, [shopId])
 
   const headers = useMemo(() => (file ? getHeaders(file.grid, options.headerRow) : []), [file, options.headerRow])
+  const sideBySide = useMemo(() => (file ? detectSideBySide(file.grid, options.headerRow) : { status: 'none' as const, groups: [] }), [file, options.headerRow])
 
   const applyMapping = (g: ParsedGrid, opt: ImportOptions, p: typeof preset) => {
     const hs = getHeaders(g.grid, opt.headerRow)
@@ -78,12 +80,7 @@ export default function ImportWizard() {
     try {
       const g = await readFile(f)
       if (g.grid.filter((r) => r.some(Boolean)).length < 2) throw new FileError('The file has no data rows.')
-      // pick the first row that looks like a header (>= 2 filled cells, mostly non-numeric)
-      let hr = 1
-      for (let i = 0; i < Math.min(g.grid.length, 15); i++) {
-        const cells = g.grid[i].filter(Boolean)
-        if (cells.length >= 2 && cells.filter((c) => isNaN(Number(c.replace(/,/g, '')))).length >= cells.length * 0.8) { hr = i + 1; break }
-      }
+      const hr = detectHeaderRow(g.grid)
       const opt = { ...(preset?.options ?? DEFAULT_OPTIONS), headerRow: hr }
       setOptions(opt)
       setFile(g)
@@ -148,7 +145,7 @@ export default function ImportWizard() {
   const canNext = (): string | null => {
     if (step === 0 && !shopId) return 'Select or add a shop first.'
     if (step === 1) { if (!file) return 'Choose a CSV or Excel file.'; if (dupJob && !allowDup) return 'This exact file was already imported for this shop. Tick the box to import it again.' }
-    if (step === 2 && (!mapping.title || !mapping.price)) return 'Map at least the Product name and Rate/price columns.'
+    if (step === 2 && (!mapping.title || !mapping.price)) return 'Map at least the Product Name / Item Name and Offer Rate / Price columns.'
     if (step === 3 && importable.length === 0) return 'There are no importable rows. Fix the mapping or the file.'
     return null
   }
@@ -185,11 +182,12 @@ export default function ImportWizard() {
     )
   }
 
-  const attention = (r: BuiltRow) => { const m = matches.get(r.rowNumber); return !!m && (m.match.confidence === 'needs_review' || m.match.confidence === 'conflicting' || (m.match.confidence === 'unmatched' && false)) }
+  const attention = (r: BuiltRow) => { const m = matches.get(r.rowNumber); return !!m && (m.match.confidence === 'needs_review' || m.match.confidence === 'conflicting') }
   const mRows = importable.filter((r) => mFilter === 'all' || attention(r))
   const counts = { exact: 0, high: 0, needs_review: 0, conflicting: 0, unmatched: 0 }
   for (const r of importable) { const m = matches.get(r.rowNumber); if (m) counts[m.match.confidence]++ }
   const vRows = (built?.rows ?? []).filter((r) => (vFilter === 'all' ? true : vFilter === 'problems' ? r.kind !== 'valid' || r.warnings.length > 0 : r.kind === vFilter))
+  const mappedOptionalCount = ADDITIONAL_FIELDS.filter((f) => !!mapping[f.key]).length
 
   return (
     <div>
@@ -240,6 +238,26 @@ export default function ImportWizard() {
                 {file.grid.slice(0, 15).map((r, i) => <option key={i} value={i + 1}>Row {i + 1}: {r.filter(Boolean).slice(0, 4).join(' | ').slice(0, 60)}</option>)}
               </Select>
             </Field>
+            {sideBySide.status === 'detected' && (
+              <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">
+                <div className="font-bold">Side-by-side price list detected</div>
+                <p className="mt-0.5">{sideBySide.reason}</p>
+                <label className="mt-2 flex items-center gap-2 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={options.combineSideBySide !== false}
+                    onChange={(e) => setOptions({ ...options, combineSideBySide: e.target.checked })}
+                  />
+                  Combine all side-by-side product/rate pairs into one list ({built?.rows.length ?? 0} total items detected)
+                </label>
+              </div>
+            )}
+            {sideBySide.status === 'ambiguous' && (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <div className="font-bold">Please verify column mapping</div>
+                <p className="mt-0.5">{sideBySide.reason}</p>
+              </div>
+            )}
             <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
               <table className="min-w-full text-xs">
                 <thead className="bg-slate-100"><tr>{headers.map((h) => <th key={h} className="whitespace-nowrap px-2 py-1.5 text-left">{h}</th>)}</tr></thead>
@@ -250,29 +268,64 @@ export default function ImportWizard() {
               {detectColumns(headers, file.grid.slice(options.headerRow, options.headerRow + 50)).map((c) => c.numericShare > 0.8 && <Badge key={c.header} tone="blue">{c.header}: numeric</Badge>)}
             </div>
           </Card>
-          <Card>
-            <h2 className="mb-1 font-bold">Map columns</h2>
-            <p className="mb-3 text-sm text-slate-600">Suggestions are automatic. Correct anything that is wrong. Fields you leave empty are stored as missing.</p>
+
+          <Card className="space-y-3">
+            <div>
+              <h2 className="font-bold">Map columns</h2>
+              <p className="text-sm text-slate-600">Only <b>Product Name / Item Name</b> and <b>Offer Rate / Price</b> are required. Common headers like <code>ITEM NAME</code> and <code>OFFER RATE</code> are detected automatically.</p>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {FIELDS.map((f) => (
-                <Field key={f.key} label={`${f.label}${f.hint ? ` (${f.hint})` : ''}`} hint={mapping[f.key] ? `e.g. ${file.grid[options.headerRow]?.[headers.indexOf(mapping[f.key]!)] ?? ''}` : undefined}>
+              {REQUIRED_FIELDS.map((f) => (
+                <Field key={f.key} label={`${f.label} (${f.hint})`} hint={mapping[f.key] ? `Sample: ${file.grid[options.headerRow]?.[headers.indexOf(mapping[f.key]!)] ?? ''}` : undefined}>
                   <Select value={mapping[f.key] ?? ''} onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || undefined })}>
-                    <option value="">— not in file —</option>
+                    <option value="">— select column —</option>
                     {headers.map((h) => <option key={h}>{h}</option>)}
                   </Select>
                 </Field>
               ))}
             </div>
-          </Card>
-          <Card className="space-y-3">
-            <h2 className="font-bold">How this shop writes prices</h2>
-            <Field label="A plain number in the Discount column means" hint="e.g. “2” = 2% or Rs 2. Text such as “2%” or “Rs. 20” is always read as written.">
-              <Select value={options.discountMode} onChange={(e) => setOptions({ ...options, discountMode: e.target.value as ImportOptions['discountMode'] })}><option value="percent">Percent</option><option value="flat">Flat Rs per unit</option></Select>
-            </Field>
-            <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={options.priceIsNet} onChange={(e) => setOptions({ ...options, priceIsNet: e.target.checked })} /><span>The Rate column is <b>already net</b> of the discount (do not apply the discount again)</span></label>
-            <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={options.combine} onChange={(e) => setOptions({ ...options, combine: e.target.checked })} /><span>This shop's percent discount, flat discount and bonus schemes <b>stack</b> (otherwise offers with several kinds are flagged for review and not ranked)</span></label>
-            <Field label="Prices include tax?"><Select value={options.taxIncluded} onChange={(e) => setOptions({ ...options, taxIncluded: e.target.value as ImportOptions['taxIncluded'] })}><option value="unknown">Unknown</option><option value="yes">Yes</option><option value="no">No</option></Select></Field>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={savePreset} onChange={(e) => setSavePreset(e.target.checked)} />Remember this mapping for {shop?.name}</label>
+
+            <div className="border-t border-slate-200 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAdditionalCols(!showAdditionalCols)}
+                className="flex w-full items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-800 hover:bg-slate-100"
+              >
+                <span>
+                  Additional columns <span className="font-normal text-slate-600">(optional: Discount, Scheme / Bonus, Notes, etc.)</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  {mappedOptionalCount > 0 && <Badge tone="green">{mappedOptionalCount} mapped</Badge>}
+                  <span>{showAdditionalCols ? '▲ Hide' : '▼ Show'}</span>
+                </span>
+              </button>
+
+              {showAdditionalCols && (
+                <div className="mt-3 space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {ADDITIONAL_FIELDS.map((f) => (
+                      <Field key={f.key} label={`${f.label}${f.hint ? ` (${f.hint})` : ''}`} hint={mapping[f.key] ? `Sample: ${file.grid[options.headerRow]?.[headers.indexOf(mapping[f.key]!)] ?? ''}` : undefined}>
+                        <Select value={mapping[f.key] ?? ''} onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || undefined })}>
+                          <option value="">— not in file —</option>
+                          {headers.map((h) => <option key={h}>{h}</option>)}
+                        </Select>
+                      </Field>
+                    ))}
+                  </div>
+                  <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="text-sm font-bold text-slate-800">Discount &amp; scheme options</h3>
+                    <Field label="A plain number in the Discount column means" hint="e.g. “2” = 2% or Rs 2. Text such as “2%” or “Rs. 20” is always read as written.">
+                      <Select value={options.discountMode} onChange={(e) => setOptions({ ...options, discountMode: e.target.value as ImportOptions['discountMode'] })}><option value="percent">Percent</option><option value="flat">Flat Rs per unit</option></Select>
+                    </Field>
+                    <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={options.priceIsNet} onChange={(e) => setOptions({ ...options, priceIsNet: e.target.checked })} /><span>The Rate column is <b>already net</b> of the discount (do not apply the discount again)</span></label>
+                    <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={options.combine} onChange={(e) => setOptions({ ...options, combine: e.target.checked })} /><span>This shop's percent discount, flat discount and bonus schemes <b>stack</b> (otherwise offers with several kinds are flagged for review and not ranked)</span></label>
+                    <Field label="Prices include tax?"><Select value={options.taxIncluded} onChange={(e) => setOptions({ ...options, taxIncluded: e.target.value as ImportOptions['taxIncluded'] })}><option value="unknown">Unknown</option><option value="yes">Yes</option><option value="no">No</option></Select></Field>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 pt-1 text-sm"><input type="checkbox" checked={savePreset} onChange={(e) => setSavePreset(e.target.checked)} />Remember this mapping for {shop?.name}</label>
           </Card>
         </div>
       )}
@@ -313,7 +366,7 @@ export default function ImportWizard() {
               <Stat label="Exact" value={counts.exact} /><Stat label="High confidence" value={counts.high} /><Stat label="Needs review" value={counts.needs_review} tone={counts.needs_review ? 'amber' : undefined} />
               <Stat label="Conflicting" value={counts.conflicting} tone={counts.conflicting ? 'amber' : undefined} /><Stat label="New products" value={counts.unmatched} />
             </div>
-            <p className="text-sm text-slate-600">Different grams, strengths or pack sizes are always separate products. Uncertain rows are not merged automatically: confirm, pick another product, create a new one, or decide later in <b>Match review</b>.</p>
+            <p className="text-sm text-slate-600">Products are matched by normalized product name while keeping different strengths, formulations or quantities separate. Uncertain rows are never merged silently: confirm, pick another product, create a new one, or decide later in <b>Match review</b>.</p>
             <Select className="!w-auto" value={mFilter} onChange={(e) => { setMFilter(e.target.value as typeof mFilter); setMPage(0) }}><option value="attention">Needs my attention</option><option value="all">All importable rows</option></Select>
             {mRows.length === 0 && <Card>Nothing needs your attention. Everything is either matched or will become a new product.</Card>}
             {mRows.slice(mPage * 15, mPage * 15 + 15).map((r) => {
@@ -331,7 +384,7 @@ export default function ImportWizard() {
                   <div className="my-2"><AttrTable imported={incomingView(r)} existing={existing ? productView(existing) : null} /></div>
                   {m.match.candidates.length > 1 && (
                     <Field label="Other possible products"><Select value={sel ?? ''} onChange={(e) => e.target.value && setChoice(r, { action: 'use', productId: e.target.value })}>
-                      {m.match.candidates.map((c) => { const p = productMap.get(c.productId); return <option key={c.productId} value={c.productId}>{p?.name} ({variantLabel(p ?? {}) || 'no size'}) — {c.reason}</option> })}
+                      {m.match.candidates.map((c) => { const p = productMap.get(c.productId); const vl = variantLabel(p ?? {}); return <option key={c.productId} value={c.productId}>{p?.name}{vl ? ` (${vl})` : ''} — {c.reason}</option> })}
                     </Select></Field>
                   )}
                   <div className="mt-2 flex flex-wrap gap-2">

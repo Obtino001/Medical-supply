@@ -9,13 +9,58 @@ export interface FieldDef {
   key: FieldKey
   label: string
   hint?: string
+  required?: boolean
+  essential?: boolean
   synonyms: string[]
 }
 
 export const FIELDS: FieldDef[] = [
-  { key: 'title', label: 'Product name / title', hint: 'Required', synonyms: ['product name', 'product title', 'product', 'item name', 'item', 'name', 'title', 'medicine', 'medicine name', 'particulars', 'description of goods'] },
-  { key: 'price', label: 'Rate / price', hint: 'Required (purchase price)', synonyms: ['rate', 'price', 'trade price', 'tp', 'unit price', 'purchase price', 'cost', 'net rate', 'sale rate', 'dp', 'wholesale price'] },
-  { key: 'code', label: 'Product ID / item code', synonyms: ['product id', 'item code', 'code', 'item id', 'sku', 'product code', 'id', 'item no', 'sr no'] },
+  {
+    key: 'title',
+    label: 'Product Name / Item Name',
+    hint: 'Required',
+    required: true,
+    essential: true,
+    synonyms: [
+      'item name', 'product name', 'medicine', 'medicine name', 'medicines', 'product title',
+      'product', 'products', 'item', 'items', 'name', 'title', 'particulars',
+      'description of goods', 'item description', 'product description', 'drug name',
+    ],
+  },
+  {
+    key: 'price',
+    label: 'Offer Rate / Price',
+    hint: 'Required',
+    required: true,
+    essential: true,
+    synonyms: [
+      'offer rate', 'rate', 'price', 'offer price', 'purchase price', 'trade price', 'tp',
+      'unit price', 'cost', 'net rate', 'net price', 'sale rate', 'dp', 'wholesale price',
+      'wholesale rate', 'market rate', 'invoice rate',
+    ],
+  },
+  {
+    key: 'discount',
+    label: 'Discount',
+    hint: 'Optional',
+    essential: true,
+    synonyms: ['discount', 'disc', 'disc %', 'discount %', 'less', 'dis', 'less %'],
+  },
+  {
+    key: 'scheme',
+    label: 'Scheme / Bonus',
+    hint: 'Optional',
+    essential: true,
+    synonyms: ['scheme', 'bonus', 'bonus scheme', 'offer', 'free', 'deal', 'promo'],
+  },
+  {
+    key: 'notes',
+    label: 'Notes',
+    hint: 'Optional',
+    essential: true,
+    synonyms: ['notes', 'note', 'remarks', 'remark', 'comment', 'comments'],
+  },
+  { key: 'code', label: 'Product ID / item code', synonyms: ['product id', 'item code', 'code', 'item id', 'sku', 'product code', 'id', 'item no', 'sr no', 's no', 'sno'] },
   { key: 'barcode', label: 'Barcode', synonyms: ['barcode', 'bar code', 'ean', 'upc', 'gtin'] },
   { key: 'mfr_code', label: 'Manufacturer product code', synonyms: ['mfr code', 'manufacturer code', 'mfg code', 'company code'] },
   { key: 'description', label: 'Description', synonyms: ['description', 'desc', 'details', 'detail'] },
@@ -25,23 +70,41 @@ export const FIELDS: FieldDef[] = [
   { key: 'grams', label: 'Grams / weight / volume', synonyms: ['grams', 'gram', 'gm', 'weight', 'wt', 'size', 'volume', 'net weight', 'net content'] },
   { key: 'pack_size', label: 'Pack size', synonyms: ['pack size', 'pack', 'packing', 'pack qty', 'qty per pack', 'unit size', 'pcs per pack', 'packsize'] },
   { key: 'mrp', label: 'MRP / retail price', synonyms: ['mrp', 'retail price', 'retail', 'm.r.p', 'print price', 'max retail price'] },
-  { key: 'discount', label: 'Discount', synonyms: ['discount', 'disc', 'disc %', 'discount %', 'less', 'dis'] },
-  { key: 'scheme', label: 'Scheme / bonus', synonyms: ['scheme', 'bonus', 'offer', 'free', 'deal', 'promo'] },
   { key: 'quantity', label: 'Minimum order qty', synonyms: ['quantity', 'qty', 'min qty', 'moq', 'minimum order', 'min order'] },
   { key: 'expiry', label: 'Expiry', synonyms: ['expiry', 'exp', 'expiry date', 'exp date', 'best before'] },
   { key: 'availability', label: 'Stock / availability', synonyms: ['stock', 'availability', 'available', 'in stock', 'status', 'stock status'] },
-  { key: 'notes', label: 'Notes', synonyms: ['notes', 'remarks', 'remark', 'comment', 'comments'] },
 ]
+
+export const REQUIRED_FIELDS = FIELDS.filter((f) => f.required)
+export const ADDITIONAL_FIELDS = FIELDS.filter((f) => !f.required)
 
 export type Mapping = Partial<Record<FieldKey, string>> // field -> source header
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim()
+export const normHeader = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\(\d+\)\s*$/, '') // strip getHeaders duplicate suffix like "(2)"
+    .replace(/[^a-z0-9%]+/g, ' ')
+    .trim()
+
+/** Classify a single header string into a FieldKey if it matches known synonyms. */
+export function matchHeaderField(header: string): FieldKey | null {
+  const hn = normHeader(header)
+  if (!hn) return null
+  for (const f of FIELDS) {
+    if (f.synonyms.some((syn) => hn === syn)) return f.key
+  }
+  for (const f of FIELDS) {
+    if (f.synonyms.some((syn) => syn.length >= 4 && (hn.startsWith(syn + ' ') || hn.endsWith(' ' + syn)))) return f.key
+  }
+  return null
+}
 
 /** Suggest a mapping from headers. Exact synonym match wins, then "contains". Each header is used once. */
 export function suggestMapping(headers: string[]): Mapping {
   const result: Mapping = {}
   const used = new Set<string>()
-  const normed = headers.map((h) => ({ h, n: norm(h) }))
+  const normed = headers.map((h) => ({ h, n: normHeader(h) }))
   const pass = (test: (hn: string, syn: string) => boolean) => {
     for (const f of FIELDS) {
       if (result[f.key]) continue
@@ -69,6 +132,8 @@ export interface ImportOptions {
   combine: boolean
   taxIncluded: 'yes' | 'no' | 'unknown'
   headerRow: number // 1-based row number holding the headers
+  /** automatically combine side-by-side product/rate column pairs when detected */
+  combineSideBySide?: boolean
 }
 
 export const DEFAULT_OPTIONS: ImportOptions = {
@@ -77,4 +142,5 @@ export const DEFAULT_OPTIONS: ImportOptions = {
   combine: false,
   taxIncluded: 'unknown',
   headerRow: 1,
+  combineSideBySide: true,
 }

@@ -39,13 +39,15 @@ const UNIT_MAP: Record<string, { unit: string; factor: number }> = {
 const FORMS: Record<string, string> = {
   tab: 'tablet', tabs: 'tablet', tablet: 'tablet', tablets: 'tablet',
   cap: 'capsule', caps: 'capsule', capsule: 'capsule', capsules: 'capsule',
-  syp: 'syrup', syrup: 'syrup', susp: 'suspension', suspension: 'suspension',
-  inj: 'injection', injection: 'injection', amp: 'injection', vial: 'injection',
+  syp: 'syrup', syrup: 'syrup', syrups: 'syrup',
+  susp: 'suspension', suspension: 'suspension',
+  inj: 'injection', injs: 'injection', injection: 'injection', injections: 'injection', amp: 'injection', vial: 'injection',
   cream: 'cream', crm: 'cream', oint: 'ointment', ointment: 'ointment', gel: 'gel', lotion: 'lotion',
-  drops: 'drops', drop: 'drops', sachet: 'sachet', spray: 'spray', powder: 'powder', shampoo: 'shampoo', soap: 'soap',
+  drops: 'drops', drop: 'drops', sachet: 'sachet', sachets: 'sachet', spray: 'spray', powder: 'powder',
+  shampoo: 'shampoo', soap: 'soap', inf: 'infusion', infusion: 'infusion', inh: 'inhaler', inhaler: 'inhaler',
 }
 
-const MEASURE_RE = /(\d+(?:[.,]\d+)?)\s*(mgs?|mcg|µg|ug|iu|%|gms?|grams?|gr|g|kgs?|mls?|ltr|litre|liter|l)(?![a-z])/gi
+const MEASURE_RE = /(?<![a-z0-9])(\d+(?:[.,]\d+)?)[\s-]*(mgs?|mcg|µg|ug|iu|%|gms?|grams?|gr|g|kgs?|mls?|ltr|litre|liter|l)(?![a-z])/gi
 
 // Order matters: most specific first. Group 1 (and 2 for NxM) hold the numbers.
 const PACK_RES: RegExp[] = [

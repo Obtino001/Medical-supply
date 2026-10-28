@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import { suggestMapping, DEFAULT_OPTIONS } from './columns'
 import { compareOffers, findOpportunities, latestPerProductShop } from './compare'
 import { buildExportRows, GENERIC_PROFILE, sanitizeCell, toCsv, toMatrix, toXlsxBuffer, type ExportContext } from './exporter'
-import { buildRows } from './importBuild'
+import { buildRows, detectHeaderRow, detectSideBySide } from './importBuild'
 import { buildCommitPayload, runMatching } from './importPlan'
 import { buildIndex, matchProduct, type CatalogProduct, type IncomingProduct } from './matching'
 import { parseCsvText, parseWorkbook, validateFile } from './parseFile'
@@ -133,13 +133,26 @@ describe('product matching', () => {
     const idx = buildIndex([catalogProduct('Foo 100mg')], [], [])
     expect(matchProduct(idx, SHOP, incoming('Foo 100g')).confidence).toBe('unmatched')
   })
-  it('title only, with no size anywhere, needs review', () => {
-    const idx = buildIndex([catalogProduct('Panadol')], [], [])
-    expect(matchProduct(idx, SHOP, incoming('Panadol')).confidence).toBe('needs_review')
+  it('matches by normalized product name even when no explicit size unit is needed (e.g. ACENAC GEL, ACEFYL 125 SYP NEW)', () => {
+    const p1 = catalogProduct('ACENAC GEL')
+    const p2 = catalogProduct('ACEFYL 125 SYP NEW')
+    const p3 = catalogProduct('ACABEL-4MG-TABS')
+    const p4 = catalogProduct('2SUM 500MG INJ')
+    const p5 = catalogProduct('ACTIM-5MG-TABS')
+    const idx = buildIndex([p1, p2, p3, p4, p5], [], [])
+    expect(matchProduct(idx, SHOP, incoming('  acenac - gel  ')).productId).toBe(p1.id)
+    expect(matchProduct(idx, SHOP, incoming('Acefyl  125   Syp New')).productId).toBe(p2.id)
+    expect(matchProduct(idx, SHOP, incoming('ACABEL 4MG TAB')).productId).toBe(p3.id)
+    expect(matchProduct(idx, SHOP, incoming('2sum 500 mg inj')).productId).toBe(p4.id)
+    expect(matchProduct(idx, SHOP, incoming('Actim 5mg Tabs')).productId).toBe(p5.id)
+    // Different bare numbers (125 vs 250) or different strengths (250mg vs 500mg) stay separate
+    expect(matchProduct(idx, SHOP, incoming('ACEFYL 250 SYP NEW')).confidence).toBe('unmatched')
+    expect(matchProduct(idx, SHOP, incoming('2SUM 250MG INJ')).confidence).toBe('unmatched')
   })
-  it('one side missing the size needs review', () => {
-    const idx = buildIndex([catalogProduct('Panadol 500mg')], [], [])
+  it('one side missing the size or formulation needs review', () => {
+    const idx = buildIndex([catalogProduct('Panadol 500mg'), catalogProduct('Acenac Gel')], [], [])
     expect(matchProduct(idx, SHOP, incoming('Panadol')).confidence).toBe('needs_review')
+    expect(matchProduct(idx, SHOP, incoming('Acenac')).confidence).toBe('needs_review')
   })
   it('same name and size but different manufacturer needs review', () => {
     const p = catalogProduct('Foo 100g', { manufacturer: 'Alpha Pharma' })
@@ -266,6 +279,68 @@ describe('import pipeline', () => {
   it('identity key distinguishes variants', () => {
     const k = (t: string) => { const p = parseTitle(t); return identityKey({ normalizedName: p.name, strengthValue: p.strengthValue, strengthUnit: p.strengthUnit, weightValue: p.weightValue, weightUnit: p.weightUnit, packSize: p.packSize, dosageForm: p.dosageForm, manufacturer: null }) }
     expect(k('Foo 100g')).toBe(k('FOO 100 gm')); expect(k('Foo 100g')).not.toBe(k('Foo 50g')); expect(k('Foo 100g')).not.toBe(k('Foo 100g Pack of 12'))
+  })
+  it('imports a simple two-column market price list (ITEM NAME + OFFER RATE) without optional columns', () => {
+    const csv = [
+      'ITEM NAME,OFFER RATE',
+      '2SUM 500MG INJ,145',
+      'ACABEL-4MG-TABS,210.50',
+      'ACEFYL 125 SYP NEW,95',
+      'ACENAC GEL,85',
+      'ACTIM-5MG-TABS,160',
+    ].join('\n')
+    const g = parseCsvText(csv)
+    const map = suggestMapping(g[0])
+    expect(map.title).toBe('ITEM NAME')
+    expect(map.price).toBe('OFFER RATE')
+    const { rows, stats } = buildRows(g, map, DEFAULT_OPTIONS)
+    expect(stats.valid).toBe(5)
+    expect(stats.invalid).toBe(0)
+    expect(rows.map((r) => [r.title, r.cost.effective])).toEqual([
+      ['2SUM 500MG INJ', 145],
+      ['ACABEL-4MG-TABS', 210.5],
+      ['ACEFYL 125 SYP NEW', 95],
+      ['ACENAC GEL', 85],
+      ['ACTIM-5MG-TABS', 160],
+    ])
+  })
+  it('detects and normalizes side-by-side ITEM NAME / OFFER RATE columns into one product-price list', () => {
+    const sideBySideCsv = [
+      'AL-MADINA MEDICOSE,DATE: 28-10-2026,,',
+      'ITEM NAME,OFFER RATE,ITEM NAME,OFFER RATE',
+      '2SUM 500MG INJ,145,ACENAC GEL,85',
+      'ACABEL-4MG-TABS,210,ACTIM-5MG-TABS,160',
+      'ACEFYL 125 SYP NEW,95,,',
+    ].join('\n')
+    const g = parseCsvText(sideBySideCsv)
+    const hr = detectHeaderRow(g)
+    expect(hr).toBe(2)
+    const sbs = detectSideBySide(g, hr)
+    expect(sbs.status).toBe('detected')
+    expect(sbs.groups).toHaveLength(2)
+
+    const map = suggestMapping(g[hr - 1])
+    const { rows, stats } = buildRows(g, map, { ...DEFAULT_OPTIONS, headerRow: hr })
+    expect(stats.valid).toBe(5)
+    expect(stats.invalid).toBe(0)
+    expect(rows.map((r) => r.title)).toEqual([
+      '2SUM 500MG INJ',
+      'ACABEL-4MG-TABS',
+      'ACEFYL 125 SYP NEW',
+      'ACENAC GEL',
+      'ACTIM-5MG-TABS',
+    ])
+    // Ensure unique row numbers for database constraint (import_job_id, row_number)
+    expect(new Set(rows.map((r) => r.rowNumber)).size).toBe(5)
+  })
+  it('flags ambiguous multi-column sheets when product/rate columns cannot be paired cleanly', () => {
+    const ambigCsv = [
+      'ITEM NAME,OFFER RATE,ITEM NAME,UNKNOWN COL',
+      '2SUM 500MG INJ,145,ACENAC GEL,85',
+    ].join('\n')
+    const g = parseCsvText(ambigCsv)
+    const sbs = detectSideBySide(g, 1)
+    expect(sbs.status).toBe('ambiguous')
   })
 })
 

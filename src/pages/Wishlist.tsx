@@ -142,7 +142,7 @@ export default function Wishlist() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <Link to={`/products/${e.product.id}`} className="text-lg font-bold hover:underline">{e.product.name}</Link>
-                    <div className="flex flex-wrap items-center gap-1.5"><Badge tone="blue">{variantLabel(e.product) || 'No size recorded: add exact variant'}</Badge>
+                    <div className="flex flex-wrap items-center gap-1.5">{variantLabel(e.product) && <Badge tone="blue">{variantLabel(e.product)}</Badge>}
                       {e.item.priority === 'high' ? <Badge tone="red">{PRI_LABEL.high}</Badge> : <Badge>{PRI_LABEL[e.item.priority]}</Badge>}
                       {e.item.status === 'needs_fresh_price' && <Badge tone="amber">Needs fresh price</Badge>}
                       {e.item.status === 'checked' && <Badge tone="green">Checked {fmtDate(e.item.last_checked_at)}</Badge>}

@@ -35,23 +35,24 @@ export const productView = (p: Product) => ({
 const norm = (v: string | number | null | undefined) => (v == null ? '' : String(v).trim().toLowerCase())
 
 export function AttrTable({ imported, existing }: { imported: IncomingView; existing: IncomingView | null }) {
-  const rows: [string, string | number | null, string | number | null | undefined, boolean][] = [
-    ['Title', imported.title, existing?.title, false],
-    ['Product code', imported.code, existing?.mfrCode, true],
-    ['Brand', imported.brand, existing?.brand, true],
-    ['Manufacturer', imported.manufacturer, existing?.manufacturer, true],
+  const allRows: [string, string | number | null, string | number | null | undefined, boolean][] = [
+    ['Product name', imported.title, existing?.title, false],
     ['Strength', imported.strength, existing?.strength, true],
+    ['Dosage form', imported.form, existing?.form, true],
     ['Grams / volume', imported.weight, existing?.weight, true],
     ['Pack size', imported.pack, existing?.pack, true],
-    ['Dosage form', imported.form, existing?.form, true],
+    ['Manufacturer', imported.manufacturer, existing?.manufacturer, true],
+    ['Brand', imported.brand, existing?.brand, true],
+    ['Product code', imported.code, existing?.mfrCode, true],
     ['Barcode', imported.barcode, existing?.barcode, true],
   ]
+  const rows = allRows.filter(([label, a, b]) => label === 'Product name' || !!norm(a) || !!norm(b))
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs uppercase text-slate-500">
-            <th className="py-1 pr-2">Attribute</th><th className="px-2">Imported</th><th className="px-2">Existing product</th>
+            <th className="py-1 pr-2">Field</th><th className="px-2">Imported</th><th className="px-2">Existing product</th>
           </tr>
         </thead>
         <tbody>
@@ -85,15 +86,18 @@ export function ProductPicker({ open, onClose, onPick, initialQuery = '', title 
   }, [products, q, shopMap])
   return (
     <Modal open={open} onClose={onClose} title={title} wide>
-      <Input autoFocus placeholder="Search name, brand, manufacturer, code…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <Input autoFocus placeholder="Search product name, brand, manufacturer…" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="mt-3 space-y-2">
         {results.length === 0 && <div className="p-4 text-center text-sm text-slate-600">No products found.</div>}
-        {results.map((p) => (
-          <button key={p.id} onClick={() => onPick(p)} className="block w-full rounded-lg border border-slate-200 p-3 text-left hover:border-emerald-600 hover:bg-emerald-50">
-            <div className="font-semibold">{p.name} <span className="text-xs text-slate-500">#{p.product_no}</span></div>
-            <div className="text-sm text-slate-600">{variantLabel(p) || 'no size info'}{p.brand ? ` · ${p.brand}` : ''}{p.manufacturer ? ` · ${p.manufacturer}` : ''}</div>
-          </button>
-        ))}
+        {results.map((p) => {
+          const meta = [variantLabel(p), p.brand, p.manufacturer].filter(Boolean).join(' · ')
+          return (
+            <button key={p.id} onClick={() => onPick(p)} className="block w-full rounded-lg border border-slate-200 p-3 text-left hover:border-emerald-600 hover:bg-emerald-50">
+              <div className="font-semibold">{p.name} <span className="text-xs text-slate-500">#{p.product_no}</span></div>
+              {meta && <div className="text-sm text-slate-600">{meta}</div>}
+            </button>
+          )
+        })}
         {results.length === 30 && <div className="text-xs text-slate-500">Showing first 30. Type more to narrow down.</div>}
       </div>
       <div className="mt-3 flex justify-end"><Button variant="secondary" onClick={onClose}>Cancel</Button></div>

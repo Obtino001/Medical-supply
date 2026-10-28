@@ -19,6 +19,8 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
     pack_size: product?.pack_size?.toString() ?? '', dosage_form: product?.dosage_form ?? '', barcode: product?.barcode ?? '',
     mfr_code: product?.mfr_code ?? '', notes: product?.notes ?? '',
   }))
+  const hasExtra = Boolean(product && (product.brand || product.manufacturer || product.active_ingredient || product.barcode || product.mfr_code))
+  const [showMore, setShowMore] = useState(hasExtra)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof f, v: string) => setF({ ...f, [k]: v })
@@ -59,7 +61,7 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
       onClose()
     } catch (e) {
       const m = (e as Error).message
-      setErr(/duplicate key/i.test(m) ? 'An identical product (same name, size, pack, form and manufacturer) already exists.' : m)
+      setErr(/duplicate key/i.test(m) ? 'An identical product already exists.' : m)
     } finally {
       setBusy(false)
     }
@@ -67,24 +69,38 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
 
   return (
     <Modal open={open} onClose={onClose} title={product ? 'Edit product' : 'New product'} wide>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Product name *" className="sm:col-span-2" hint="Sizes typed here (e.g. 100g, 500mg, 10's) fill empty fields below automatically."><Input value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
-        <Field label="Brand"><Input value={f.brand} onChange={(e) => set('brand', e.target.value)} /></Field>
-        <Field label="Manufacturer"><Input value={f.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} /></Field>
-        <Field label="Active ingredient"><Input value={f.active_ingredient} onChange={(e) => set('active_ingredient', e.target.value)} /></Field>
-        <Field label="Dosage form"><Input placeholder="tablet, syrup, cream…" value={f.dosage_form} onChange={(e) => set('dosage_form', e.target.value)} /></Field>
-        <div className="grid grid-cols-[1fr_6rem] gap-2">
-          <Field label="Strength"><Input inputMode="decimal" value={f.strength_value} onChange={(e) => set('strength_value', e.target.value)} /></Field>
-          <Field label="Unit"><Select value={f.strength_unit} onChange={(e) => set('strength_unit', e.target.value)}><option value=""></option><option>mg</option><option>mcg</option><option>iu</option><option>%</option></Select></Field>
+      <div className="space-y-3">
+        <Field label="Product name *" hint="e.g. 2SUM 500MG INJ, ACABEL-4MG-TABS, ACENAC GEL. Any strength or form in the name is detected automatically."><Input value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
+        <Field label="Notes (optional)"><Textarea value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowMore(!showMore)}
+            className="flex w-full items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            <span>Additional attributes (optional: brand, manufacturer, strength, pack, barcode…)</span>
+            <span>{showMore ? '▲ Hide' : '▼ Show'}</span>
+          </button>
+          {showMore && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Brand"><Input value={f.brand} onChange={(e) => set('brand', e.target.value)} /></Field>
+              <Field label="Manufacturer"><Input value={f.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} /></Field>
+              <Field label="Active ingredient"><Input value={f.active_ingredient} onChange={(e) => set('active_ingredient', e.target.value)} /></Field>
+              <Field label="Dosage form"><Input placeholder="tablet, syrup, cream…" value={f.dosage_form} onChange={(e) => set('dosage_form', e.target.value)} /></Field>
+              <div className="grid grid-cols-[1fr_6rem] gap-2">
+                <Field label="Strength"><Input inputMode="decimal" value={f.strength_value} onChange={(e) => set('strength_value', e.target.value)} /></Field>
+                <Field label="Unit"><Select value={f.strength_unit} onChange={(e) => set('strength_unit', e.target.value)}><option value=""></option><option>mg</option><option>mcg</option><option>iu</option><option>%</option></Select></Field>
+              </div>
+              <div className="grid grid-cols-[1fr_6rem] gap-2">
+                <Field label="Grams / volume"><Input inputMode="decimal" value={f.weight_value} onChange={(e) => set('weight_value', e.target.value)} /></Field>
+                <Field label="Unit"><Select value={f.weight_unit} onChange={(e) => set('weight_unit', e.target.value)}><option>g</option><option>ml</option></Select></Field>
+              </div>
+              <Field label="Pack size (units per pack)"><Input inputMode="numeric" value={f.pack_size} onChange={(e) => set('pack_size', e.target.value)} /></Field>
+              <Field label="Barcode"><Input value={f.barcode} onChange={(e) => set('barcode', e.target.value)} /></Field>
+              <Field label="Manufacturer product code"><Input value={f.mfr_code} onChange={(e) => set('mfr_code', e.target.value)} /></Field>
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-[1fr_6rem] gap-2">
-          <Field label="Grams / volume"><Input inputMode="decimal" value={f.weight_value} onChange={(e) => set('weight_value', e.target.value)} /></Field>
-          <Field label="Unit"><Select value={f.weight_unit} onChange={(e) => set('weight_unit', e.target.value)}><option>g</option><option>ml</option></Select></Field>
-        </div>
-        <Field label="Pack size (units per pack)"><Input inputMode="numeric" value={f.pack_size} onChange={(e) => set('pack_size', e.target.value)} /></Field>
-        <Field label="Barcode"><Input value={f.barcode} onChange={(e) => set('barcode', e.target.value)} /></Field>
-        <Field label="Manufacturer product code"><Input value={f.mfr_code} onChange={(e) => set('mfr_code', e.target.value)} /></Field>
-        <Field label="Notes" className="sm:col-span-2"><Textarea value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
       </div>
       {err && <div className="mt-3"><ErrorBox>{err}</ErrorBox></div>}
       <div className="mt-4 flex justify-end gap-2">

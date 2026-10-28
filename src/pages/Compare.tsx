@@ -5,7 +5,7 @@ export default function Compare() {
   return (
     <div>
       <PageHeader title="Compare prices" />
-      <p className="mb-3 text-sm text-slate-600">Offers are compared only between the same variant (same grams, strength and pack size). Different variants are separate products and are never ranked against each other.</p>
+      <p className="mb-3 text-sm text-slate-600">Compare shop offer rates, discounts/schemes, and effective purchase prices across the shared workspace. The lowest valid effective price is highlighted in green.</p>
       <ProductBrowser mode="compare" />
     </div>
   )

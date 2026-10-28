@@ -13,7 +13,7 @@ interface View {
   excludeStale: boolean; freshness: number | null
 }
 const DEFAULT_VIEW: View = {
-  q: '', sort: 'name_asc', group: 'title', brand: '', manufacturer: '', strength: '', weight: '', pack: '', shop: '',
+  q: '', sort: 'name_asc', group: 'none', brand: '', manufacturer: '', strength: '', weight: '', pack: '', shop: '',
   bestOnly: false, multiple: false, review: false, available: false, wishlistOnly: false, excludeStale: false, freshness: null,
 }
 const PAGE = 30
@@ -103,7 +103,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   return (
     <div>
       <div className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-        <Input type="search" placeholder="Search name, ID, barcode, brand, manufacturer, strength, shop…" value={qInput} onChange={(e) => setQInput(e.target.value)} aria-label="Search products" />
+        <Input type="search" placeholder="Search product name, shop, strength…" value={qInput} onChange={(e) => setQInput(e.target.value)} aria-label="Search products" />
         <Select value={v.sort} onChange={(e) => set({ sort: e.target.value as SortKey })} aria-label="Sort">
           {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </Select>
@@ -185,6 +185,7 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
   const p = r.product
   const best = r.cmp.offers.find((o) => o.eligible)
   const offers = bestOnly ? r.cmp.offers.filter((o) => o.isBest) : r.cmp.offers
+  const brandMfr = [p.brand, p.manufacturer].filter(Boolean).join(' · ')
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex items-start gap-3">
@@ -195,17 +196,20 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
             <span className="text-xs text-slate-500">#{p.product_no}</span>
             {r.variant && <Badge tone="blue">{r.variant}</Badge>}
           </div>
-          <div className="text-sm text-slate-600">{[p.brand, p.manufacturer].filter(Boolean).join(' · ') || 'No brand / manufacturer recorded'}</div>
+          {brandMfr && <div className="text-sm text-slate-600">{brandMfr}</div>}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
             {best ? (
               <>
                 <span className={best.isBest ? 'rounded-md bg-emerald-600 px-2 py-0.5 font-extrabold text-white' : 'font-bold'}>{rs(best.cents! / 100)}</span>
                 {best.isBest ? <Badge tone="solid">{best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge> : <Badge>Only one valid offer</Badge>}
                 <span>at <b>{shopMap.get(best.rec.shop_id)?.name}</b></span>
+                <span className="text-slate-600">
+                  (Rate {rs(best.rec.base_price)}{best.rec.scheme_text ? ` · ${best.rec.scheme_text}` : ''})
+                </span>
                 <span className="text-slate-500">{fmtDate(best.rec.observed_on)}</span>
                 {!best.fresh && <Badge tone="amber">Outdated</Badge>}
               </>
-            ) : r.records.length ? <Badge tone="amber">No valid offer ({r.records.length} not rankable)</Badge> : <span className="text-slate-500">No price records yet</span>}
+            ) : r.records.length ? <Badge tone="amber">Needs review ({r.records.length} not rankable)</Badge> : <span className="text-slate-500">No price records yet</span>}
             {r.cmp.nextBest && <span className="text-slate-600">saves {rs(r.cmp.nextBest.saving)} ({r.cmp.nextBest.savingPct.toFixed(1)}%) vs next best</span>}
             <span className="text-slate-500">{r.records.length} offer{r.records.length === 1 ? '' : 's'}</span>
           </div>

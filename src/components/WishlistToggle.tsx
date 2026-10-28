@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { addToWishlist, removeFromWishlist } from '../lib/actions'
 import { useData } from '../lib/data'
+import { IconStar } from './icons'
 import { Button, useConfirm, useToast } from './ui'
 
 export function WishlistToggle({ productId, small = true }: { productId: string; small?: boolean }) {
@@ -32,8 +33,16 @@ export function WishlistToggle({ productId, small = true }: { productId: string;
   }
   void userId
   return (
-    <Button variant={item ? 'primary' : 'secondary'} small={small} disabled={busy} onClick={run} aria-pressed={!!item} title={item ? 'On the shared wishlist' : 'Add to shared wishlist'}>
-      {item ? '★ Wishlisted' : '☆ Wishlist'}
+    <Button
+      variant={item ? 'primary' : 'secondary'}
+      small={small}
+      disabled={busy}
+      onClick={run}
+      aria-pressed={!!item}
+      title={item ? 'On the shared wishlist' : 'Add to shared wishlist'}
+    >
+      <IconStar size={14} filled={!!item} className={item ? 'text-amber-300' : 'text-slate-400'} />
+      <span>{item ? 'Wishlisted' : 'Wishlist'}</span>
     </Button>
   )
 }

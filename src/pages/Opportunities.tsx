@@ -54,7 +54,7 @@ export default function Opportunities() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <Link to={`/products/${o.product.id}`} className="font-bold hover:underline">{o.product.name}</Link> <span className="text-xs text-slate-500">#{o.product.product_no}</span>
-                    <div><Badge tone="blue">{variantLabel(o.product) || 'no size'}</Badge></div>
+                    {variantLabel(o.product) && <div><Badge tone="blue">{variantLabel(o.product)}</Badge></div>}
                   </div>
                   <div className="text-right"><div className="text-xl font-extrabold text-emerald-800">{rs(o.saving)} <span className="text-base">({o.savingPct.toFixed(1)}%)</span></div><div className="text-xs text-slate-600">saved vs next-best</div></div>
                 </div>

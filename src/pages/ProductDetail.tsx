@@ -84,7 +84,7 @@ export default function ProductDetail() {
       </PageHeader>
       <Card>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="blue">{variantLabel(product) || 'No size info'}</Badge>
+          {variantLabel(product) && <Badge tone="blue">{variantLabel(product)}</Badge>}
           {product.archived && <Badge tone="amber">Archived</Badge>}
           <span className="text-sm text-slate-500">Product #{product.product_no} · updated {fmtDate(product.updated_at)}</span>
         </div>

@@ -35,16 +35,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true
+    let currentUserId: string | null = null
     supabase.auth.getSession().then(async ({ data }) => {
       if (!alive) return
+      currentUserId = data.session?.user.id ?? null
       setSession(data.session)
       await loadMembership(data.session)
       if (alive) setLoading(false)
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      const nextUserId = s?.user.id ?? null
+      const userChanged = nextUserId !== currentUserId
+      currentUserId = nextUserId
       setSession(s)
+      if (userChanged) setLoading(true)
       // defer: calling supabase inside this callback can deadlock
-      setTimeout(() => { void loadMembership(s) }, 0)
+      setTimeout(async () => {
+        await loadMembership(s)
+        if (alive && userChanged) setLoading(false)
+      }, 0)
     })
     return () => { alive = false; sub.subscription.unsubscribe() }
   }, [loadMembership])

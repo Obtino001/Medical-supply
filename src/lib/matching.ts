@@ -1,5 +1,6 @@
 // Product matching: decides whether an incoming supplier row is an existing canonical product.
-// Rules: never match on title alone; strength / weight / pack conflicts always keep products separate;
+// Rules: primary method is normalized product name + agreeing strength / formulation / quantity;
+// strength / weight / pack / formulation conflicts always keep products separate;
 // anything ambiguous is returned as "needs_review" and never merged silently.
 
 import { normalizeText } from './productParse'
@@ -201,6 +202,11 @@ function uniq(ids: string[]): string[] {
   return [...new Set(ids)]
 }
 
+/** Extract standalone numeric tokens (e.g. "125" in "acefyl 125 new") so different bare strengths never fuzzy-merge. */
+function numericTokens(toks: string[]): string[] {
+  return toks.filter((t) => /^\d+(?:[.,]\d+)?$/.test(t))
+}
+
 const CONFLICT_LABELS: Record<string, string> = {
   strength: 'strength', weight: 'grams / volume', pack: 'pack size', form: 'dosage form', mfr: 'manufacturer',
 }
@@ -254,7 +260,7 @@ export function matchProduct(idx: MatchIndex, shopId: string, inc: IncomingProdu
     return { confidence: 'exact', productId: ids[0], reason: `${label} matches`, candidates: [] }
   }
 
-  // 3. Attribute comparison against products with the identical normalized name
+  // 3. Normalized product name + attribute comparison (primary market matching method)
   const high: MatchCandidate[] = []
   const review: MatchCandidate[] = []
   const conflicting: MatchCandidate[] = []
@@ -267,14 +273,11 @@ export function matchProduct(idx: MatchIndex, shopId: string, inc: IncomingProdu
       conflicting.push({ productId: p.id, reason: `Same name and size but ${idConflicts.join(' and ')} differ`, conflicts: idConflicts })
       continue
     }
-    const unknownMeasure = c.strength === 'unknown' || c.weight === 'unknown' || c.pack === 'unknown'
-    const agreedMeasure = c.strength === 'agree' || c.weight === 'agree'
-    const strong = agreedMeasure || (idx.policy.allowPackOnlyWhenManufacturerAgrees && c.pack === 'agree' && c.mfr === 'agree')
+    const unknownMeasure = c.strength === 'unknown' || c.weight === 'unknown' || c.pack === 'unknown' || c.form === 'unknown'
     if (c.mfr === 'conflict') review.push({ productId: p.id, reason: 'Same name but different manufacturer', conflicts: ['manufacturer'] })
-    else if (unknownMeasure) review.push({ productId: p.id, reason: 'Same name; strength / weight / pack missing on one side' })
-    else if (!strong) review.push({ productId: p.id, reason: 'Same name only; nothing else to confirm it' })
+    else if (unknownMeasure) review.push({ productId: p.id, reason: 'Same name; strength / weight / pack / form missing on one side' })
     else if (idx.policy.requireManufacturerAgreement && c.mfr !== 'agree') review.push({ productId: p.id, reason: 'Policy requires a manufacturer match' })
-    else high.push({ productId: p.id, reason: 'Same name; strength / weight / pack agree' })
+    else high.push({ productId: p.id, reason: 'Same normalized product name' })
   }
   if (high.length === 1 && review.length === 0 && conflicting.length === 0) {
     return { confidence: 'high', productId: high[0].productId, reason: high[0].reason, candidates: [] }
@@ -290,8 +293,9 @@ export function matchProduct(idx: MatchIndex, shopId: string, inc: IncomingProdu
     }
   }
 
-  // 4. Fuzzy name: only ever a suggestion
+  // 4. Fuzzy name: only ever a suggestion (never auto-merged)
   const incTokens = tokens(inc.normalizedName)
+  const incNums = numericTokens(incTokens)
   const pool = new Map<string, CatalogProduct>()
   for (const t of new Set(incTokens)) {
     if (t.length < 3) continue
@@ -303,7 +307,11 @@ export function matchProduct(idx: MatchIndex, shopId: string, inc: IncomingProdu
   const fuzzy: { c: MatchCandidate; score: number }[] = []
   for (const p of pool.values()) {
     if (p.normalized_name === inc.normalizedName || isRejected(p.id)) continue
-    const score = jaccard(incTokens, tokens(p.normalized_name))
+    const pTokens = tokens(p.normalized_name)
+    const pNums = numericTokens(pTokens)
+    // If both names contain bare numbers (e.g. "acefyl 125" vs "acefyl 250") and they differ, keep them separate
+    if (incNums.length > 0 && pNums.length > 0 && incNums.join(',') !== pNums.join(',')) continue
+    const score = jaccard(incTokens, pTokens)
     if (score < 0.6) continue
     const c = compareAttributes(inc, p)
     if (c.strength === 'conflict' || c.weight === 'conflict' || c.pack === 'conflict' || c.form === 'conflict') continue
