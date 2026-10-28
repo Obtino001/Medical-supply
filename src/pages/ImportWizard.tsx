@@ -332,7 +332,7 @@ export default function ImportWizard() {
                 <option value="">Select a shop…</option>
                 {activeShops.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name}{s.city ? ` — ${s.city}` : ''}{s.market_area ? ` (${s.market_area})` : ''}
+                    {s.name}{s.city ? ` — ${s.city}` : ''}
                   </option>
                 ))}
               </Select>

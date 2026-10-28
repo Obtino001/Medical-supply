@@ -78,13 +78,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
-        title="Market Overview"
+        title="Market overview"
         subtitle="Compare wholesale medicine rates, track supplier surveys, and share findings across partners."
       />
 
-      {/* Global Search Bar & Quick Actions */}
+      {/* Global Search Bar & Primary Actions */}
       <Card className="!p-3.5 sm:!p-4">
         <form onSubmit={search} className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <div className="relative flex-1">
@@ -95,14 +95,14 @@ export default function Dashboard() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               aria-label="Quick search"
-              className="min-h-10 w-full rounded-md border border-[#DADCE0] bg-[#F8F9FA] py-2 pr-9 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/80 hover:border-[#5F6368] focus:border-[#1A73E8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
+              className="min-h-11 sm:min-h-10 w-full rounded-lg border border-[#E1E5EA] bg-[#F8FAFC] py-2 pr-9 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/80 hover:border-[#5F6368]/60 focus:border-[#1A73E8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
             />
             {q && (
               <button
                 type="button"
                 onClick={() => setQ('')}
                 aria-label="Clear search"
-                className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded p-1 text-[#5F6368] hover:bg-[#F8F9FA] hover:text-[#202124]"
+                className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#5F6368] hover:bg-[#E1E5EA]/50 hover:text-[#202124]"
               >
                 <IconClose size={14} />
               </button>
@@ -110,45 +110,46 @@ export default function Dashboard() {
           </div>
           <Button type="submit" className="shrink-0 sm:px-5">
             <IconSearch size={16} />
-            <span>Search Prices</span>
+            <span>Search prices</span>
           </Button>
         </form>
 
-        {/* Quick Actions */}
-        <div className="mt-3.5 border-t border-[#DADCE0] pt-3">
-          <div className="mb-2 text-[11px] font-medium tracking-wider text-[#5F6368] uppercase">Quick Actions</div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        {/* Primary & Secondary Quick Actions */}
+        <div className="mt-3.5 border-t border-[#E1E5EA] pt-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Link to="/import">
               <Button className="w-full justify-center" small>
                 <IconUpload size={15} />
-                <span className="truncate">Import / Survey</span>
+                <span className="truncate">Import price list</span>
               </Button>
             </Link>
             <Link to="/shops">
               <Button variant="secondary" className="w-full justify-center text-[#1A73E8]" small>
                 <IconPlus size={15} className="text-[#1A73E8]" />
-                <span className="truncate">Add Shop</span>
+                <span className="truncate">Add shop</span>
               </Button>
             </Link>
             <Link to="/compare">
               <Button variant="secondary" className="w-full justify-center" small>
                 <IconScale size={15} className="text-[#1A73E8]" />
-                <span className="truncate">Compare Prices</span>
-              </Button>
-            </Link>
-            <Link to="/review">
-              <Button variant="secondary" className="w-full justify-center" small>
-                <IconGitCompare size={15} className="text-[#1A73E8]" />
-                <span className="truncate">Review Matches</span>
-                {review.length > 0 && (
-                  <span className="ml-0.5 rounded-full bg-[#F9AB00] px-1.5 py-0.2 text-[10px] font-medium text-[#202124]">{review.length}</span>
-                )}
+                <span className="truncate">Compare prices</span>
               </Button>
             </Link>
             <Link to="/wishlist">
               <Button variant="secondary" className="w-full justify-center" small>
                 <IconStar size={15} className="text-[#1A73E8]" />
-                <span className="truncate">My Wishlist</span>
+                <span className="truncate">Open wishlist</span>
+              </Button>
+            </Link>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Link to="/review">
+              <Button variant="secondary" className="w-full justify-center" small>
+                <IconGitCompare size={15} className="text-[#1A73E8]" />
+                <span className="truncate">Review matches</span>
+                {review.length > 0 && (
+                  <span className="ml-0.5 rounded-full bg-[#F9AB00] px-1.5 py-0.2 text-[10px] font-medium text-[#202124]">{review.length}</span>
+                )}
               </Button>
             </Link>
             <Link to="/opportunities">
@@ -160,7 +161,7 @@ export default function Dashboard() {
             <Link to="/export">
               <Button variant="secondary" className="w-full justify-center" small>
                 <IconDownload size={15} className="text-[#1A73E8]" />
-                <span className="truncate">Export Results</span>
+                <span className="truncate">Export results</span>
               </Button>
             </Link>
             <Link to="/surveys">
@@ -177,13 +178,13 @@ export default function Dashboard() {
       <section aria-label="Workspace statistics">
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           <Stat label="Shops" value={shops.filter((s) => s.status === 'active').length} to="/shops" icon={<IconStore size={16} />} />
-          <Stat label="Imported Price Lists" value={counts?.lists ?? '…'} to="/imports" icon={<IconFileSpreadsheet size={16} />} />
-          <Stat label="Unique Products" value={products.filter((p) => !p.archived).length} to="/products" icon={<IconPackage size={16} />} />
-          <Stat label="Price Records" value={counts?.records ?? '…'} to="/compare" icon={<IconScale size={16} />} />
-          <Stat label="Products Available at 2+ Shops" value={multi} to="/compare" icon={<IconScale size={16} />} />
-          <Stat label="Newly Lower Prices" value={newLowCount} to="/opportunities" tone={newLowCount > 0 ? 'green' : undefined} icon={<IconTrendingDown size={16} />} />
-          <Stat label="Need Manual Matching" value={review.length} to="/review" tone={review.length ? 'amber' : undefined} icon={<IconGitCompare size={16} />} />
-          <Stat label="Wishlist Products" value={wishlist.length} to="/wishlist" icon={<IconStar size={16} />} />
+          <Stat label="Imported price lists" value={counts?.lists ?? '…'} to="/imports" icon={<IconFileSpreadsheet size={16} />} />
+          <Stat label="Unique products" value={products.filter((p) => !p.archived).length} to="/products" icon={<IconPackage size={16} />} />
+          <Stat label="Price records" value={counts?.records ?? '…'} to="/compare" icon={<IconScale size={16} />} />
+          <Stat label="Available at 2+ shops" value={multi} to="/compare" icon={<IconScale size={16} />} />
+          <Stat label="Newly lower prices" value={newLowCount} to="/opportunities" tone={newLowCount > 0 ? 'green' : undefined} icon={<IconTrendingDown size={16} />} />
+          <Stat label="Need manual matching" value={review.length} to="/review" tone={review.length ? 'amber' : undefined} icon={<IconGitCompare size={16} />} />
+          <Stat label="Wishlist products" value={wishlist.length} to="/wishlist" icon={<IconStar size={16} />} />
         </div>
       </section>
 
@@ -191,7 +192,7 @@ export default function Dashboard() {
       <section>
         <div className="mb-2.5 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-medium text-[#202124]">Best Purchase Opportunities</h2>
+            <h2 className="text-base font-medium text-[#202124]">Best purchase opportunities</h2>
             <p className="text-xs text-[#5F6368]">Top verified price savings across multiple suppliers</p>
           </div>
           <Link to="/opportunities" className="inline-flex items-center gap-1 text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline sm:text-sm">
@@ -219,7 +220,7 @@ export default function Dashboard() {
               const vl = variantLabel(o.product)
               return (
                 <Link key={o.product.id} to={`/products/${o.product.id}`} className="block">
-                  <Card className="h-full !p-3.5 transition-colors hover:border-[#1A73E8] hover:bg-[#F8F9FA]">
+                  <Card className="h-full !p-3.5 transition-colors hover:border-[#1A73E8] hover:bg-[#F8FAFC]">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-[#202124]">{o.product.name}</div>
@@ -227,7 +228,7 @@ export default function Dashboard() {
                       </div>
                       <Badge tone="solid">Save {o.savingPct.toFixed(1)}%</Badge>
                     </div>
-                    <div className="mt-2.5 flex items-baseline justify-between border-t border-[#DADCE0] pt-2 text-xs text-[#5F6368]">
+                    <div className="mt-2.5 flex items-baseline justify-between border-t border-[#E1E5EA] pt-2 text-xs text-[#5F6368]">
                       <span className="truncate">
                         Best: <b className="font-medium text-[#202124]">{shopMap.get(o.best.rec.shop_id)?.name}</b>
                       </span>
@@ -248,14 +249,14 @@ export default function Dashboard() {
         <div className="space-y-5">
           <section>
             <div className="mb-2.5 flex items-center justify-between">
-              <h2 className="text-base font-medium text-[#202124]">Recent Imports</h2>
+              <h2 className="text-base font-medium text-[#202124]">Recent imports</h2>
               <Link to="/imports" className="text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">History</Link>
             </div>
             <Card className="!p-0 overflow-hidden">
               {jobs.length === 0 ? (
                 <div className="p-5 text-center text-sm text-[#5F6368]">No price lists imported yet.</div>
               ) : (
-                <ul className="divide-y divide-[#DADCE0]">
+                <ul className="divide-y divide-[#E1E5EA]">
                   {jobs.map((j) => (
                     <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                       <div className="min-w-0">
@@ -274,14 +275,14 @@ export default function Dashboard() {
 
           <section>
             <div className="mb-2.5 flex items-center justify-between">
-              <h2 className="text-base font-medium text-[#202124]">Recent Surveys</h2>
+              <h2 className="text-base font-medium text-[#202124]">Recent surveys</h2>
               <Link to="/surveys" className="text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">All surveys</Link>
             </div>
             <Card className="!p-0 overflow-hidden">
               {surveys.length === 0 ? (
                 <div className="p-5 text-center text-sm text-[#5F6368]">No market surveys recorded yet.</div>
               ) : (
-                <ul className="divide-y divide-[#DADCE0]">
+                <ul className="divide-y divide-[#E1E5EA]">
                   {surveys.slice(0, 5).map((s) => (
                     <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                       <div className="min-w-0">
@@ -299,14 +300,14 @@ export default function Dashboard() {
 
         <section>
           <div className="mb-2.5 flex items-center justify-between">
-            <h2 className="text-base font-medium text-[#202124]">Recent Workspace Activity</h2>
+            <h2 className="text-base font-medium text-[#202124]">Recent workspace activity</h2>
             <span className="text-xs text-[#5F6368]">Both partners</span>
           </div>
           <Card className="!p-0 overflow-hidden">
             {audit.length === 0 ? (
               <div className="p-5 text-center text-sm text-[#5F6368]">No recent workspace activity yet.</div>
             ) : (
-              <ul className="divide-y divide-[#DADCE0]">
+              <ul className="divide-y divide-[#E1E5EA]">
                 {audit.map((a) => (
                   <li key={a.id} className="flex items-start justify-between gap-3 px-4 py-2.5 text-xs sm:text-sm">
                     <div className="min-w-0 flex-1 text-[#5F6368]">

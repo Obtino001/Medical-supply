@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconPlus } from '../components/icons'
+import { IconClose, IconFilter, IconPlus, IconSearch } from '../components/icons'
 import { OfferCard } from '../components/Offers'
 import { ProductPicker } from '../components/Match'
-import { Badge, Button, Card, Empty, Field, Input, PageHeader, Pagination, Select, Stat, Textarea, fmtDate, rs, useConfirm, useLocalState, useToast } from '../components/ui'
+import { Badge, Button, Card, Empty, Field, Modal, PageHeader, Pagination, Select, Stat, Textarea, cx, fmtDate, rs, useConfirm, useLocalState, useToast } from '../components/ui'
 import { addToWishlist, removeFromWishlist, updateWishlist } from '../lib/actions'
 import { compareOffers, findOpportunities, ageInDays, type CompareResult } from '../lib/compare'
 import { useData } from '../lib/data'
@@ -27,13 +27,16 @@ interface Entry {
   reviewCount: number
 }
 
+const DEFAULT_F = { q: '', priority: '', brand: '', manufacturer: '', weight: '', strength: '', pack: '', shop: '', avail: '', match: '' }
+
 export default function Wishlist() {
   const { wishlist, productMap, products, current, history, review, settings, shopMap, shops, reload, memberName } = useData()
   const toast = useToast()
   const confirm = useConfirm()
   const [sort, setSort] = useLocalState<SortKey>('wl:sort', 'priority')
   const [tile, setTile] = useState<Tile>('')
-  const [f, setF] = useState({ q: '', priority: '', brand: '', manufacturer: '', weight: '', strength: '', pack: '', shop: '', avail: '', match: '' })
+  const [f, setF] = useState(DEFAULT_F)
+  const [showFilters, setShowFilters] = useState(false)
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(0)
@@ -96,14 +99,16 @@ export default function Wishlist() {
 
   const uniq = (g: (p: Product) => string | null) => [...new Set(entries.map((e) => g(e.product)).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
   const tiles: { key: Tile; label: string; n: number }[] = [
-    { key: '', label: 'All wishlist products', n: entries.length },
+    { key: '', label: 'All wishlist', n: entries.length },
     { key: 'high', label: 'High priority', n: entries.filter((e) => e.item.priority === 'high').length },
-    { key: 'multiple', label: 'Multiple supplier offers', n: entries.filter((e) => e.cmp.eligibleCount >= 2).length },
-    { key: 'newlow', label: 'Newly lower price', n: entries.filter((e) => e.newLow).length },
-    { key: 'stale', label: 'Not checked recently', n: entries.filter((e) => e.stale).length },
-    { key: 'missing', label: 'Missing / outdated price', n: entries.filter((e) => e.cmp.eligibleCount === 0).length },
-    { key: 'review', label: 'Needs match review', n: entries.filter((e) => e.reviewCount > 0).length },
+    { key: 'multiple', label: '2+ shop offers', n: entries.filter((e) => e.cmp.eligibleCount >= 2).length },
+    { key: 'newlow', label: 'New lower price', n: entries.filter((e) => e.newLow).length },
+    { key: 'stale', label: 'Needs check', n: entries.filter((e) => e.stale).length },
+    { key: 'missing', label: 'Missing price', n: entries.filter((e) => e.cmp.eligibleCount === 0).length },
+    { key: 'review', label: 'Needs review', n: entries.filter((e) => e.reviewCount > 0).length },
   ]
+
+  const activeFilterCount = [f.priority, f.brand, f.manufacturer, f.weight, f.strength, f.pack, f.shop, f.avail, f.match].filter(Boolean).length
 
   const act = async (fn: () => Promise<void>, ok?: string) => {
     try { await fn(); await reload(); if (ok) toast('ok', ok) } catch (e) { toast('err', (e as Error).message); await reload() }
@@ -112,40 +117,142 @@ export default function Wishlist() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="My Wishlist"
-        subtitle="Shared priority products: both partners see and edit the same list. Only the exact variant is compared; other sizes are shown separately as alternatives."
+        title="My wishlist"
+        subtitle="Track priority medicines, best supplier prices, and market survey freshness."
       >
         <Button onClick={() => setAdding(true)}>
           <IconPlus size={15} />
           <span>Add product</span>
         </Button>
       </PageHeader>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {tiles.map((t) => (
           <button
             key={t.label}
+            type="button"
             onClick={() => { setTile(t.key); setPage(0) }}
-            className={`rounded-lg text-left transition-all ${tile === t.key ? 'ring-2 ring-[#1A73E8]' : 'hover:opacity-95'}`}
+            className={cx(
+              'rounded-xl text-left transition-all',
+              tile === t.key ? 'ring-2 ring-[#1A73E8]' : 'hover:opacity-95',
+            )}
           >
             <Stat label={t.label} value={t.n} tone={tile === t.key ? 'blue' : undefined} />
           </button>
         ))}
       </div>
-      <div className="mb-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Input type="search" placeholder="Search wishlist…" value={f.q} onChange={(e) => { setF({ ...f, q: e.target.value }); setPage(0) }} />
-        <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort wishlist">
-          <option value="priority">Sort: Priority</option><option value="title">Sort: Title A–Z</option><option value="lowest">Sort: Lowest effective price</option><option value="savings">Sort: Largest savings</option>
-          <option value="recent">Sort: Most recent survey</option><option value="oldest">Sort: Oldest price check</option><option value="offers">Sort: Most supplier offers</option>
-        </Select>
-        {([['priority', 'Priority', ['high', 'medium', 'low']], ['brand', 'Brand', uniq((p) => p.brand)], ['manufacturer', 'Manufacturer', uniq((p) => p.manufacturer)], ['weight', 'Grams', uniq((p) => (p.weight_value != null ? `${p.weight_value}${p.weight_unit}` : null))], ['strength', 'Strength', uniq((p) => (p.strength_value != null ? `${p.strength_value}${p.strength_unit}` : null))], ['pack', 'Pack size', uniq((p) => (p.pack_size != null ? String(p.pack_size) : null))]] as const).map(([k, label, opts]) => (
-          <Select key={k} value={f[k]} onChange={(e) => { setF({ ...f, [k]: e.target.value }); setPage(0) }} aria-label={label}><option value="">{label}: all</option>{opts.map((o) => <option key={o}>{o}</option>)}</Select>
-        ))}
-        <Select value={f.shop} onChange={(e) => setF({ ...f, shop: e.target.value })} aria-label="Shop"><option value="">Shop: all</option>{shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>
-        <Select value={f.avail} onChange={(e) => setF({ ...f, avail: e.target.value })} aria-label="Price availability"><option value="">Price: any</option><option value="yes">Has valid price</option><option value="no">No valid price</option></Select>
-        <Select value={f.match} onChange={(e) => setF({ ...f, match: e.target.value })} aria-label="Match status"><option value="">Match: any</option><option value="exact">Exact</option><option value="high">High confidence</option><option value="manual">Confirmed</option><option value="conflicting">Conflicting</option></Select>
-      </div>
 
-      {shown.length === 0 ? <Empty title={entries.length ? 'No wishlist products match' : 'Your wishlist is empty'}>Add fast-moving products with the ☆ Wishlist button anywhere, or use “Add product”.</Empty> : (
+      {/* Compact Search & Filter Bar */}
+      <Card className="!p-3 sm:!p-4">
+        <div className="grid gap-2.5 sm:grid-cols-[1fr_auto_auto]">
+          <div className="relative">
+            <IconSearch size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#5F6368]" />
+            <input
+              type="search"
+              placeholder="Search wishlist medicines…"
+              value={f.q}
+              onChange={(e) => { setF({ ...f, q: e.target.value }); setPage(0) }}
+              aria-label="Search wishlist"
+              className="min-h-11 sm:min-h-10 w-full rounded-lg border border-[#E1E5EA] bg-[#F8FAFC] py-2 pr-9 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/75 hover:border-[#5F6368]/60 focus:border-[#1A73E8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
+            />
+            {f.q && (
+              <button
+                type="button"
+                onClick={() => { setF({ ...f, q: '' }); setPage(0) }}
+                aria-label="Clear search"
+                className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#5F6368] hover:bg-[#E1E5EA]/50 hover:text-[#202124]"
+              >
+                <IconClose size={15} />
+              </button>
+            )}
+          </div>
+          <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort wishlist">
+            <option value="priority">Sort: Priority</option>
+            <option value="title">Sort: Title A–Z</option>
+            <option value="lowest">Sort: Lowest effective price</option>
+            <option value="savings">Sort: Largest savings</option>
+            <option value="recent">Sort: Most recent survey</option>
+            <option value="oldest">Sort: Oldest price check</option>
+            <option value="offers">Sort: Most supplier offers</option>
+          </Select>
+          <Button variant="secondary" onClick={() => setShowFilters(true)}>
+            <IconFilter size={15} className="text-[#1A73E8]" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1A73E8] px-1.5 text-[11px] font-semibold text-white tabular-nums">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Wishlist Filters Bottom Sheet / Dialog */}
+      <Modal open={showFilters} onClose={() => setShowFilters(false)} title="Filter wishlist">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {([
+              ['priority', 'Priority', ['high', 'medium', 'low']],
+              ['brand', 'Brand', uniq((p) => p.brand)],
+              ['manufacturer', 'Manufacturer', uniq((p) => p.manufacturer)],
+              ['weight', 'Grams / volume', uniq((p) => (p.weight_value != null ? `${p.weight_value}${p.weight_unit}` : null))],
+              ['strength', 'Strength', uniq((p) => (p.strength_value != null ? `${p.strength_value}${p.strength_unit}` : null))],
+              ['pack', 'Pack size', uniq((p) => (p.pack_size != null ? String(p.pack_size) : null))],
+            ] as const).map(([k, label, opts]) => (
+              <Field key={k} label={label}>
+                <Select value={f[k]} onChange={(e) => { setF({ ...f, [k]: e.target.value }); setPage(0) }}>
+                  <option value="">All</option>
+                  {opts.map((o) => <option key={o}>{o}</option>)}
+                </Select>
+              </Field>
+            ))}
+            <Field label="Shop">
+              <Select value={f.shop} onChange={(e) => setF({ ...f, shop: e.target.value })}>
+                <option value="">All shops</option>
+                {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Price availability">
+              <Select value={f.avail} onChange={(e) => setF({ ...f, avail: e.target.value })}>
+                <option value="">Any</option>
+                <option value="yes">Has valid price</option>
+                <option value="no">No valid price</option>
+              </Select>
+            </Field>
+            <Field label="Match status">
+              <Select value={f.match} onChange={(e) => setF({ ...f, match: e.target.value })}>
+                <option value="">Any</option>
+                <option value="exact">Exact</option>
+                <option value="high">High confidence</option>
+                <option value="manual">Confirmed</option>
+                <option value="conflicting">Conflicting</option>
+              </Select>
+            </Field>
+          </div>
+          <div className="flex items-center justify-between gap-2 border-t border-[#E1E5EA] pt-3">
+            <Button variant="ghost" onClick={() => { setF(DEFAULT_F); setTile(''); setPage(0) }}>
+              Reset all
+            </Button>
+            <Button onClick={() => setShowFilters(false)}>
+              Show {shown.length} item{shown.length === 1 ? '' : 's'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {shown.length === 0 ? (
+        <Empty title={entries.length ? 'No wishlist products match' : 'Your wishlist is empty'}>
+          <p>Add fast-moving medicines with the ☆ Wishlist button anywhere, or tap “Add product”.</p>
+          {!entries.length && (
+            <div className="mt-4">
+              <Button onClick={() => setAdding(true)}>
+                <IconPlus size={15} />
+                <span>Add product</span>
+              </Button>
+            </div>
+          )}
+        </Empty>
+      ) : (
         <div className="space-y-3">
           {shown.slice(page * per, page * per + per).map((e) => {
             const best = e.cmp.offers.find((o) => o.eligible)
@@ -156,47 +263,109 @@ export default function Wishlist() {
               <Card key={e.item.id}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <Link to={`/products/${e.product.id}`} className="text-lg font-medium text-[#202124] hover:text-[#1A73E8] hover:underline">{e.product.name}</Link>
-                    <div className="flex flex-wrap items-center gap-1.5">{variantLabel(e.product) && <Badge tone="blue">{variantLabel(e.product)}</Badge>}
+                    <Link to={`/products/${e.product.id}`} className="text-base font-medium text-[#202124] hover:text-[#1A73E8] hover:underline sm:text-lg">
+                      {e.product.name}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {variantLabel(e.product) && <Badge tone="blue">{variantLabel(e.product)}</Badge>}
                       {e.item.priority === 'high' ? <Badge tone="red">{PRI_LABEL.high}</Badge> : <Badge>{PRI_LABEL[e.item.priority]}</Badge>}
                       {e.item.status === 'needs_fresh_price' && <Badge tone="amber">Needs fresh price</Badge>}
                       {e.item.status === 'checked' && <Badge tone="blue">Checked {fmtDate(e.item.last_checked_at)}</Badge>}
                       {e.reviewCount > 0 && <Badge tone="amber">Match review pending</Badge>}
-                      {e.newLow && <Badge tone="green">New lower price</Badge>}</div>
-                    <div className="text-xs text-[#5F6368]">Added by {memberName(e.item.created_by)} on {fmtDate(e.item.created_at)} · last survey {fmtDate(e.lastSurvey)} · last price update {fmtDate(e.lastUpdate)}</div>
+                      {e.newLow && <Badge tone="green">New lower price</Badge>}
+                    </div>
+                    <div className="mt-1 text-xs text-[#5F6368]">
+                      Added by {memberName(e.item.created_by)} · last survey <span className="font-medium text-[#202124] tabular-nums">{fmtDate(e.lastSurvey)}</span>
+                    </div>
+                    {e.item.notes && !isOpen && (
+                      <div className="mt-1 text-xs text-[#5F6368]">Note: <span className="text-[#202124]">{e.item.notes}</span></div>
+                    )}
                   </div>
                   <div className="text-right">
-                    {best ? (<>
-                      <div className={`rounded px-2 py-1 text-xl font-bold tabular-nums ${best.isBest ? 'bg-[#188038] text-white' : 'text-[#202124]'}`}>{rs(best.cents! / 100)}</div>
-                      <div className="text-sm">{best.isBest && <Badge tone="solid">{best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>} <b>{shopMap.get(best.rec.shop_id)?.name}</b></div>
-                      <div className="text-xs text-[#5F6368]">{fmtDate(best.rec.observed_on)}{!best.fresh && ' · possibly outdated'}</div>
-                      {e.cmp.nextBest && <div className="text-xs text-[#5F6368]">Next best {rs(e.cmp.nextBest.cents / 100)} · difference {rs(e.cmp.nextBest.saving)}</div>}
-                    </>) : schemeOnlyOffer ? (<>
-                      <div><Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge></div>
-                      <div className="mt-0.5 text-sm"><b>{shopMap.get(schemeOnlyOffer.shop_id)?.name}</b></div>
-                      <div className="text-xs text-[#5F6368]">{fmtDate(schemeOnlyOffer.observed_on)}</div>
-                    </>) : <Badge tone="amber">No valid price</Badge>}
+                    {best ? (
+                      <>
+                        <div className={cx('inline-block rounded-md px-2 py-0.5 text-lg font-semibold tabular-nums sm:text-xl', best.isBest ? 'bg-[#188038] text-white' : 'text-[#202124]')}>
+                          {rs(best.cents! / 100)}
+                        </div>
+                        <div className="mt-1 text-xs sm:text-sm">
+                          {best.isBest && <Badge tone="solid">{best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>}{' '}
+                          <b className="font-medium text-[#202124]">{shopMap.get(best.rec.shop_id)?.name}</b>
+                        </div>
+                        <div className="text-xs text-[#5F6368] tabular-nums">
+                          {fmtDate(best.rec.observed_on)}{!best.fresh && ' · outdated'}
+                        </div>
+                        {e.cmp.nextBest && (
+                          <div className="text-xs font-medium text-[#188038] tabular-nums">
+                            Saves {rs(e.cmp.nextBest.saving)} vs next best
+                          </div>
+                        )}
+                      </>
+                    ) : schemeOnlyOffer ? (
+                      <>
+                        <div><Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge></div>
+                        <div className="mt-0.5 text-sm"><b className="font-medium text-[#202124]">{shopMap.get(schemeOnlyOffer.shop_id)?.name}</b></div>
+                        <div className="text-xs text-[#5F6368] tabular-nums">{fmtDate(schemeOnlyOffer.observed_on)}</div>
+                      </>
+                    ) : (
+                      <Badge tone="amber">No valid price</Badge>
+                    )}
                   </div>
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Select className="!w-auto !min-h-9 text-sm" value={e.item.priority} onChange={(ev) => void act(() => updateWishlist(e.item, { priority: ev.target.value as WishlistItem['priority'] }))} aria-label="Priority">
-                    <option value="high">High priority</option><option value="medium">Medium priority</option><option value="low">Low priority</option>
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#E1E5EA] pt-2.5">
+                  <Select
+                    className="!w-auto !min-h-9 text-xs sm:text-sm"
+                    value={e.item.priority}
+                    onChange={(ev) => void act(() => updateWishlist(e.item, { priority: ev.target.value as WishlistItem['priority'] }))}
+                    aria-label="Priority"
+                  >
+                    <option value="high">High priority</option>
+                    <option value="medium">Medium priority</option>
+                    <option value="low">Low priority</option>
                   </Select>
-                  <Button small variant="secondary" onClick={() => act(() => updateWishlist(e.item, { status: 'checked', last_checked_at: new Date().toISOString() }), 'Marked as checked')}>Mark checked</Button>
-                  <Button small variant="secondary" onClick={() => act(() => updateWishlist(e.item, { status: 'needs_fresh_price' }), 'Marked: needs a fresh price')}>Needs fresh price</Button>
-                  <Button small variant="ghost" onClick={() => { const s = new Set(open); if (isOpen) s.delete(e.item.id); else s.add(e.item.id); setOpen(s) }}>{isOpen ? 'Hide offers' : `Compare ${e.records.length} offer${e.records.length === 1 ? '' : 's'}`}</Button>
-                  <Link to={`/products/${e.product.id}`}><Button small variant="ghost">Price history</Button></Link>
-                  <Button small variant="danger" onClick={async () => { if (await confirm({ title: 'Remove from wishlist?', body: 'The product and all its price history stay. Both partners lose this wishlist entry.', confirmLabel: 'Remove', danger: true })) await act(() => removeFromWishlist(e.item.id), 'Removed from wishlist') }}>Remove</Button>
+                  <Button small variant="secondary" onClick={() => act(() => updateWishlist(e.item, { status: 'checked', last_checked_at: new Date().toISOString() }), 'Marked as checked')}>
+                    Mark checked
+                  </Button>
+                  <Button small variant="secondary" onClick={() => act(() => updateWishlist(e.item, { status: 'needs_fresh_price' }), 'Marked: needs a fresh price')}>
+                    Needs fresh price
+                  </Button>
+                  <Button small variant="ghost" onClick={() => { const s = new Set(open); if (isOpen) s.delete(e.item.id); else s.add(e.item.id); setOpen(s) }}>
+                    {isOpen ? 'Hide offers & notes' : `Compare (${e.records.length}) & notes`}
+                  </Button>
+                  <Link to={`/products/${e.product.id}`}><Button small variant="ghost">History</Button></Link>
+                  <Button
+                    small
+                    variant="danger"
+                    onClick={async () => {
+                      if (await confirm({ title: 'Remove from wishlist?', body: 'The product and all its price history stay. Both partners lose this wishlist entry.', confirmLabel: 'Remove', danger: true }))
+                        await act(() => removeFromWishlist(e.item.id), 'Removed from wishlist')
+                    }}
+                  >
+                    Remove
+                  </Button>
                 </div>
                 {isOpen && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-2.5 border-t border-[#E1E5EA] pt-3">
                     <Notes item={e.item} onSave={(n) => act(() => updateWishlist(e.item, { notes: n }), 'Note saved')} />
-                    {e.cmp.offers.length === 0 ? <div className="text-sm text-slate-600">No price records for this exact variant yet.</div> : e.cmp.offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} />)}
+                    {e.cmp.offers.length === 0 ? (
+                      <div className="text-sm text-[#5F6368]">No price records for this exact variant yet.</div>
+                    ) : (
+                      e.cmp.offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} />)
+                    )}
                     {alt.length > 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-300 p-2 text-sm">
-                        <b>Other variants (not comparable, shown for reference only):</b>
-                        {alt.map((p) => { const rs2 = current.filter((r) => r.product_id === p.id && r.scheme_status === 'ok' && r.effective_cost != null); const m = rs2.length ? Math.min(...rs2.map((r) => r.effective_cost!)) : null
-                          return <div key={p.id}><Link className="underline" to={`/products/${p.id}`}>{variantLabel(p) || p.name}</Link>: {m != null ? `from ${rs(m)}` : 'no price'}</div> })}
+                      <div className="rounded-xl border border-dashed border-[#E1E5EA] bg-[#F8FAFC] p-3 text-xs text-[#5F6368]">
+                        <b className="font-medium text-[#202124]">Other variants (shown for reference only):</b>
+                        {alt.map((p) => {
+                          const rs2 = current.filter((r) => r.product_id === p.id && r.scheme_status === 'ok' && r.effective_cost != null)
+                          const m = rs2.length ? Math.min(...rs2.map((r) => r.effective_cost!)) : null
+                          return (
+                            <div key={p.id} className="mt-0.5">
+                              <Link className="font-medium text-[#1A73E8] underline" to={`/products/${p.id}`}>
+                                {variantLabel(p) || p.name}
+                              </Link>
+                              : {m != null ? `from ${rs(m)}` : 'no price'}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -207,7 +376,17 @@ export default function Wishlist() {
         </div>
       )}
       <Pagination page={page} pages={Math.ceil(shown.length / per)} onPage={setPage} />
-      {adding && <ProductPicker open onClose={() => setAdding(false)} title="Add a product to the wishlist" onPick={(p) => { setAdding(false); void act(() => addToWishlist(p.id), 'Added to shared wishlist') }} />}
+      {adding && (
+        <ProductPicker
+          open
+          onClose={() => setAdding(false)}
+          title="Add a product to the wishlist"
+          onPick={(p) => {
+            setAdding(false)
+            void act(() => addToWishlist(p.id), 'Added to shared wishlist')
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -215,9 +394,11 @@ export default function Wishlist() {
 function Notes({ item, onSave }: { item: WishlistItem; onSave: (n: string | null) => void }) {
   const [v, setV] = useState<string | null>(null)
   return (
-    <Field label="Wishlist note (shared)">
-      <Textarea value={v ?? item.notes ?? ''} onChange={(e) => setV(e.target.value)} />
-      <Button small className="mt-2" disabled={v === null} onClick={() => { onSave(v?.trim() || null); setV(null) }}>Save note</Button>
+    <Field label="Wishlist note (shared with partner)">
+      <Textarea value={v ?? item.notes ?? ''} onChange={(e) => setV(e.target.value)} placeholder="Add market notes, preferred supplier, or target rate…" />
+      <Button small className="mt-2" disabled={v === null} onClick={() => { onSave(v?.trim() || null); setV(null) }}>
+        Save note
+      </Button>
     </Field>
   )
 }
