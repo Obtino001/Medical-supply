@@ -231,6 +231,7 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
   const { shopMap } = useData()
   const p = r.product
   const best = r.cmp.offers.find((o) => o.eligible)
+  const schemeOnlyOffer = !best ? r.records.find((x) => x.scheme_status === 'ok' && x.scheme_text) : undefined
   const offers = bestOnly ? r.cmp.offers.filter((o) => o.isBest) : r.cmp.offers
   const brandMfr = [p.brand, p.manufacturer].filter(Boolean).join(' · ')
   return (
@@ -278,6 +279,14 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
                   </span>
                   <span className="text-xs text-[#5F6368] tabular-nums">· {fmtDate(best.rec.observed_on)}</span>
                   {!best.fresh && <Badge tone="amber">Outdated</Badge>}
+                </>
+              ) : schemeOnlyOffer ? (
+                <>
+                  <Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge>
+                  <span className="text-[#5F6368]">
+                    at <b className="font-medium text-[#202124]">{shopMap.get(schemeOnlyOffer.shop_id)?.name}</b>
+                  </span>
+                  <span className="text-xs text-[#5F6368] tabular-nums">· {fmtDate(schemeOnlyOffer.observed_on)}</span>
                 </>
               ) : r.records.length ? (
                 <Badge tone="amber">Needs review ({r.records.length} not rankable)</Badge>
