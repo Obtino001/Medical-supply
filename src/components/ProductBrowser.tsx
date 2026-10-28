@@ -103,17 +103,17 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
 
   return (
     <div className="space-y-3">
-      <Card className="!p-3 sm:!p-4">
+      <Card className="!p-3.5 sm:!p-4">
         <div className="grid gap-2.5 sm:grid-cols-[1fr_auto_auto]">
           <div className="relative">
-            <IconSearch size={17} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-slate-400" />
+            <IconSearch size={17} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#5F6368]" />
             <input
               type="search"
               placeholder="Search product name, shop, strength, or code…"
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
               aria-label="Search products"
-              className="min-h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-10 text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-700/20"
+              className="min-h-10 w-full rounded-md border border-[#DADCE0] bg-white py-2 pr-3 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/75 hover:border-[#5F6368] focus:border-[#1A73E8] focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
             />
           </div>
           <Select value={v.sort} onChange={(e) => set({ sort: e.target.value as SortKey })} aria-label="Sort">
@@ -126,15 +126,15 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
 
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <Button variant="secondary" small onClick={() => setShowFilters(!showFilters)}>
-            <IconFilter size={14} />
+            <IconFilter size={14} className="text-[#1A73E8]" />
             <span>{showFilters ? 'Hide filters' : 'Filters'}</span>
           </Button>
-          <label className={cx('flex min-h-8.5 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors sm:text-sm', v.bestOnly ? 'border-teal-600 bg-teal-50/80 text-teal-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50')}>
-            <input type="checkbox" className="accent-teal-700" checked={v.bestOnly} onChange={(e) => set({ bestOnly: e.target.checked })} />
+          <label className={cx('flex min-h-8.5 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors sm:text-sm', v.bestOnly ? 'border-[#1A73E8] bg-[#E8F0FE] text-[#1A73E8]' : 'border-[#DADCE0] bg-white text-[#202124] hover:bg-[#F8F9FA]')}>
+            <input type="checkbox" checked={v.bestOnly} onChange={(e) => set({ bestOnly: e.target.checked })} />
             Best-price results only
           </label>
-          <label className={cx('flex min-h-8.5 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors sm:text-sm', v.wishlistOnly ? 'border-teal-600 bg-teal-50/80 text-teal-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50')}>
-            <input type="checkbox" className="accent-teal-700" checked={v.wishlistOnly} onChange={(e) => set({ wishlistOnly: e.target.checked })} />
+          <label className={cx('flex min-h-8.5 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors sm:text-sm', v.wishlistOnly ? 'border-[#1A73E8] bg-[#E8F0FE] text-[#1A73E8]' : 'border-[#DADCE0] bg-white text-[#202124] hover:bg-[#F8F9FA]')}>
+            <input type="checkbox" checked={v.wishlistOnly} onChange={(e) => set({ wishlistOnly: e.target.checked })} />
             Wishlist only
           </label>
           {saved.length > 0 && (
@@ -148,7 +148,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
         </div>
 
         {showFilters && (
-          <div className="mt-3 grid grid-cols-2 gap-2.5 border-t border-slate-100 pt-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2.5 border-t border-[#DADCE0] pt-3 sm:grid-cols-3 lg:grid-cols-4">
             {(['brand', 'manufacturer', 'strength', 'weight', 'pack'] as const).map((k) => (
               <Field key={k} label={{ brand: 'Brand', manufacturer: 'Manufacturer', strength: 'Strength', weight: 'Grams / volume', pack: 'Pack size' }[k]}>
                 <Select value={v[k]} onChange={(e) => set({ [k]: e.target.value })}>
@@ -168,36 +168,36 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 {[7, 15, 30, 60, 90].map((d) => <option key={d} value={d}>{d} days</option>)}
               </Select>
             </Field>
-            <div className="col-span-2 flex flex-col justify-end gap-1.5 text-xs text-slate-700 sm:col-span-3 sm:text-sm lg:col-span-1">
+            <div className="col-span-2 flex flex-col justify-end gap-1.5 text-xs text-[#202124] sm:col-span-3 sm:text-sm lg:col-span-1">
               {([['excludeStale', 'Exclude outdated quotes'], ['multiple', 'Multiple offers'], ['available', 'Has a valid price'], ['review', 'Needs review']] as const).map(([k, label]) => (
-                <label key={k} className="flex items-center gap-2"><input type="checkbox" className="accent-teal-700" checked={v[k]} onChange={(e) => set({ [k]: e.target.checked })} />{label}</label>
+                <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={v[k]} onChange={(e) => set({ [k]: e.target.checked })} />{label}</label>
               ))}
             </div>
           </div>
         )}
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs font-medium text-slate-500 sm:text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs font-medium text-[#5F6368] sm:text-sm">
         <span className="tabular-nums">Showing {filtered.length} of {rows.length} products{selected.size > 0 && ` · ${selected.size} selected for export`}</span>
         {selected.size > 0 && (
           <span className="flex items-center gap-3">
-            <Link to="/export" className="font-semibold text-teal-800 hover:underline">Export selected →</Link>
-            <button type="button" className="text-slate-600 hover:underline" onClick={() => setSelected(new Set())}>Clear selection</button>
+            <Link to="/export" className="font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">Export selected →</Link>
+            <button type="button" className="text-[#5F6368] hover:text-[#202124] hover:underline" onClick={() => setSelected(new Set())}>Clear selection</button>
           </span>
         )}
       </div>
 
       {items.length === 0 ? (
         <Empty title={rows.length === 0 ? 'No products in workspace yet' : 'No products match these filters'}>
-          {rows.length === 0 ? <>Import a supplier price list to populate products and compare rates. <Link to="/import" className="font-semibold text-teal-800 underline">Import price list</Link></> : 'Try clearing or resetting your active search and filter criteria.'}
+          {rows.length === 0 ? <>Import a supplier price list to populate products and compare rates. <Link to="/import" className="font-medium text-[#1A73E8] underline">Import price list</Link></> : 'Try clearing or resetting your active search and filter criteria.'}
         </Empty>
       ) : (
         <div className="space-y-2">
           {pageItems.map((it, i) =>
             it.type === 'group' ? (
-              <div key={'g' + i + it.label} className="sticky top-14 z-10 mt-3 flex items-center justify-between rounded-lg bg-slate-800 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-white uppercase">
+              <div key={'g' + i + it.label} className="sticky top-14 z-10 mt-3 flex items-center justify-between rounded-md border border-[#DADCE0] bg-[#F8F9FA] px-3.5 py-1.5 text-xs font-medium tracking-wide text-[#202124] uppercase">
                 <span>{it.label}</span>
-                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium tabular-nums">{it.count}</span>
+                <span className="rounded-full bg-[#E8F0FE] px-2 py-0.5 text-[11px] font-medium text-[#1A73E8] tabular-nums">{it.count}</span>
               </div>
             ) : (
               <Row
@@ -231,33 +231,33 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
   const offers = bestOnly ? r.cmp.offers.filter((o) => o.isBest) : r.cmp.offers
   const brandMfr = [p.brand, p.manufacturer].filter(Boolean).join(' · ')
   return (
-    <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:border-slate-300">
+    <div className="rounded-lg border border-[#DADCE0] bg-white p-3.5 transition-colors hover:border-[#1A73E8]/70">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <input
             type="checkbox"
-            className="mt-1 h-4.5 w-4.5 shrink-0 rounded border-slate-300 accent-teal-700"
+            className="mt-1 h-4.5 w-4.5 shrink-0 rounded border-[#DADCE0]"
             checked={selected}
             onChange={onSelect}
             aria-label={`Select ${p.name} for export`}
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Link to={`/products/${p.id}`} className="text-[15px] font-semibold text-slate-900 hover:text-teal-800 hover:underline">
+              <Link to={`/products/${p.id}`} className="text-[15px] font-medium text-[#202124] hover:text-[#1A73E8] hover:underline">
                 {p.name}
               </Link>
-              <span className="text-xs font-medium text-slate-400 tabular-nums">#{p.product_no}</span>
+              <span className="text-xs text-[#5F6368] tabular-nums">#{p.product_no}</span>
               {r.variant && <Badge tone="blue">{r.variant}</Badge>}
             </div>
-            {brandMfr && <div className="mt-0.5 text-xs text-slate-500">{brandMfr}</div>}
+            {brandMfr && <div className="mt-0.5 text-xs text-[#5F6368]">{brandMfr}</div>}
 
             <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs sm:text-sm">
               {best ? (
                 <>
                   <span
                     className={cx(
-                      'inline-flex items-center rounded-md px-2 py-0.5 text-sm font-bold tabular-nums',
-                      best.isBest ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-900',
+                      'inline-flex items-center rounded px-2 py-0.5 text-sm font-semibold tabular-nums',
+                      best.isBest ? 'bg-[#188038] text-white' : 'bg-[#F8F9FA] text-[#202124] border border-[#DADCE0]',
                     )}
                   >
                     {rs(best.cents! / 100)}
@@ -267,22 +267,22 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
                   ) : (
                     <Badge>1 valid offer</Badge>
                   )}
-                  <span className="text-slate-700">
-                    at <b className="font-semibold text-slate-900">{shopMap.get(best.rec.shop_id)?.name}</b>
+                  <span className="text-[#5F6368]">
+                    at <b className="font-medium text-[#202124]">{shopMap.get(best.rec.shop_id)?.name}</b>
                   </span>
-                  <span className="text-slate-500 tabular-nums">
+                  <span className="text-[#5F6368] tabular-nums">
                     Rate {rs(best.rec.base_price)}{best.rec.scheme_text ? ` · ${best.rec.scheme_text}` : ''}
                   </span>
-                  <span className="text-xs text-slate-400 tabular-nums">· {fmtDate(best.rec.observed_on)}</span>
+                  <span className="text-xs text-[#5F6368] tabular-nums">· {fmtDate(best.rec.observed_on)}</span>
                   {!best.fresh && <Badge tone="amber">Outdated</Badge>}
                 </>
               ) : r.records.length ? (
                 <Badge tone="amber">Needs review ({r.records.length} not rankable)</Badge>
               ) : (
-                <span className="text-xs text-slate-400">No price records yet</span>
+                <span className="text-xs text-[#5F6368]">No price records yet</span>
               )}
               {r.cmp.nextBest && (
-                <span className="font-medium text-emerald-700 tabular-nums">
+                <span className="font-medium text-[#188038] tabular-nums">
                   · saves {rs(r.cmp.nextBest.saving)} ({r.cmp.nextBest.savingPct.toFixed(1)}%) vs next best
                 </span>
               )}
@@ -302,7 +302,7 @@ function Row({ r, mode, selected, onSelect, open, onToggle, bestOnly }: { r: Pro
       </div>
 
       {open && (
-        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+        <div className="mt-3 space-y-2 border-t border-[#DADCE0] pt-3">
           {offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} />)}
         </div>
       )}

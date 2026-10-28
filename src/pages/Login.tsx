@@ -23,8 +23,8 @@ export default function Login() {
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center px-4 py-10">
       <div className="mb-6 flex flex-col items-center text-center">
         <IconBrandMark size={40} />
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">Wholesale Price Intelligence</h1>
-        <p className="mt-1 text-sm text-slate-600">Medical wholesale market price comparison &amp; supplier survey system</p>
+        <h1 className="mt-3 text-2xl font-medium tracking-tight text-[#202124]">Wholesale Price Intelligence</h1>
+        <p className="mt-1 text-sm text-[#5F6368]">Medical wholesale market price comparison &amp; supplier survey system</p>
       </div>
 
       <Card className="p-6">
@@ -55,8 +55,8 @@ export default function Login() {
           </Button>
         </form>
 
-        <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
-          <IconUsers size={16} className="mt-0.5 shrink-0 text-teal-700" />
+        <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-[#DADCE0] bg-[#F8F9FA] p-3 text-xs text-[#5F6368]">
+          <IconUsers size={16} className="mt-0.5 shrink-0 text-[#1A73E8]" />
           <span>Sign in with your personal partner account. Both partners share the same shops, products, price lists, and wishlist in real time.</span>
         </div>
       </Card>

@@ -94,21 +94,21 @@ function Shell() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-slate-50/80 md:flex-row">
+    <div className="flex min-h-full flex-col bg-[#F8F9FA] md:flex-row">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200/90 bg-white md:sticky md:top-0 md:flex md:h-screen">
-        <div className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3.5">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-[#DADCE0] bg-white md:sticky md:top-0 md:flex md:h-screen">
+        <div className="flex items-center gap-2.5 border-b border-[#DADCE0] px-4 py-3.5">
           <IconBrandMark size={28} />
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold tracking-tight text-slate-900">Price Intelligence</div>
-            <div className="truncate text-[11px] font-medium text-slate-500">Wholesale Market System</div>
+            <div className="truncate text-[15px] font-medium tracking-tight text-[#202124]">Price Intelligence</div>
+            <div className="truncate text-[11px] text-[#5F6368]">Wholesale Market System</div>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-4 overflow-y-auto px-2.5 py-3" aria-label="Main navigation">
+        <nav className="flex-1 divide-y divide-[#DADCE0]/60 overflow-y-auto px-2.5 py-2" aria-label="Main navigation">
           {GROUPS.map((group) => (
-            <div key={group}>
-              <div className="mb-1 px-2.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">{group}</div>
+            <div key={group} className="py-2.5 first:pt-1 last:pb-1">
+              <div className="mb-1 px-3 text-[11px] font-medium tracking-wider text-[#5F6368] uppercase">{group}</div>
               <div className="space-y-0.5">
                 {NAV.filter((n) => n.group === group).map((n) => {
                   const Icon = n.icon
@@ -119,27 +119,27 @@ function Shell() {
                       end={n.end}
                       className={({ isActive }) =>
                         cx(
-                          'group flex items-center justify-between rounded-lg px-2.5 py-2 text-sm font-medium transition-colors duration-150',
+                          'group flex items-center justify-between rounded-full px-3 py-2 text-sm font-medium transition-colors duration-150',
                           isActive
-                            ? 'bg-teal-50/90 text-teal-900 font-semibold'
-                            : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
+                            ? 'bg-[#E8F0FE] text-[#1A73E8]'
+                            : 'text-[#202124] hover:bg-[#F8F9FA] hover:text-[#202124]',
                         )
                       }
                     >
                       {({ isActive }) => (
                         <>
-                          <span className="flex items-center gap-2.5 truncate">
+                          <span className="flex items-center gap-3 truncate">
                             <Icon
-                              size={17}
+                              size={18}
                               className={cx(
                                 'shrink-0 transition-colors',
-                                isActive ? 'text-teal-700' : 'text-slate-400 group-hover:text-slate-600',
+                                isActive ? 'text-[#1A73E8]' : 'text-[#5F6368] group-hover:text-[#1A73E8]',
                               )}
                             />
                             <span className="truncate">{n.label}</span>
                           </span>
                           {n.to === '/review' && review.length > 0 && (
-                            <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white tabular-nums">
+                            <span className="ml-2 rounded-full bg-[#F9AB00] px-2 py-0.5 text-[11px] font-medium text-[#202124] tabular-nums">
                               {review.length}
                             </span>
                           )}
@@ -153,12 +153,12 @@ function Shell() {
           ))}
         </nav>
 
-        <div className="border-t border-slate-100 p-3">
-          <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
-            <IconUsers size={15} className="shrink-0 text-teal-700" />
+        <div className="border-t border-[#DADCE0] p-3">
+          <div className="flex items-center gap-2.5 rounded-lg bg-[#F8F9FA] px-3 py-2 text-xs text-[#5F6368]">
+            <IconUsers size={16} className="shrink-0 text-[#1A73E8]" />
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium text-slate-800">{email}</div>
-              <div className="capitalize text-[11px] text-slate-500">Shared workspace · {role}</div>
+              <div className="truncate font-medium text-[#202124]">{email}</div>
+              <div className="capitalize text-[11px] text-[#5F6368]">Shared workspace · {role}</div>
             </div>
           </div>
         </div>
@@ -166,13 +166,13 @@ function Shell() {
 
       {/* Main Content Area */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-4 backdrop-blur-xs sm:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-[#DADCE0] bg-white px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
               onClick={() => setMore(true)}
               aria-label="Open navigation menu"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 md:hidden"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#DADCE0] text-[#5F6368] hover:bg-[#F8F9FA] md:hidden"
             >
               <IconMenu size={18} />
             </button>
@@ -180,21 +180,21 @@ function Shell() {
               <IconBrandMark size={24} />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900 sm:text-base">{activeNav.label}</div>
+              <div className="truncate text-sm font-medium text-[#202124] sm:text-base">{activeNav.label}</div>
             </div>
-            <span className="hidden items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50/70 px-2.5 py-0.5 text-xs font-medium text-teal-800 lg:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-teal-600" />
+            <span className="hidden items-center gap-1.5 rounded-full bg-[#E8F0FE] px-2.5 py-0.5 text-xs font-medium text-[#1A73E8] lg:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#1A73E8]" />
               Shared Workspace
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="hidden items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs text-slate-600 sm:flex">
-              <span className="max-w-44 truncate font-medium text-slate-700">{email}</span>
-              <Badge tone={role === 'admin' ? 'green' : 'slate'}>{role}</Badge>
+            <div className="hidden items-center gap-1.5 rounded-md border border-[#DADCE0] bg-[#F8F9FA] px-2.5 py-1 text-xs text-[#5F6368] sm:flex">
+              <span className="max-w-44 truncate font-medium text-[#202124]">{email}</span>
+              <Badge tone={role === 'admin' ? 'blue' : 'slate'}>{role}</Badge>
             </div>
             <Button variant="secondary" small onClick={() => void doReload()} disabled={refreshing} title="Sync partner changes">
-              <IconRefresh size={15} className={cx(refreshing && 'animate-spin')} />
+              <IconRefresh size={15} className={cx('text-[#1A73E8]', refreshing && 'animate-spin')} />
               <span className="hidden sm:inline">Refresh</span>
             </Button>
             <Button variant="ghost" small onClick={() => void signOut()} title="Sign out">
@@ -206,8 +206,8 @@ function Shell() {
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-3.5 pb-24 pt-4 sm:px-6 md:pb-10 md:pt-6" key={loc.pathname.split('/')[1]}>
           {error && (
-            <div role="alert" className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-900">
-              <IconAlert size={18} className="mt-0.5 shrink-0 text-red-600" />
+            <div role="alert" className="mb-4 flex items-start gap-2.5 rounded-lg border border-[#FAD2CF] bg-[#FCE8E6] p-3.5 text-sm text-[#D93025]">
+              <IconAlert size={18} className="mt-0.5 shrink-0 text-[#D93025]" />
               <div>Could not load shared workspace data: {error}. Please check your internet connection and click Refresh.</div>
             </div>
           )}
@@ -218,7 +218,7 @@ function Shell() {
       {/* Mobile Bottom Navigation */}
       <nav
         aria-label="Mobile quick navigation"
-        className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-slate-200 bg-white/95 backdrop-blur-xs md:hidden"
+        className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[#DADCE0] bg-white md:hidden"
       >
         {BOTTOM.map((n) => {
           const Icon = n.icon
@@ -231,13 +231,13 @@ function Shell() {
               className={({ isActive }) =>
                 cx(
                   'flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors',
-                  isActive ? 'text-teal-800 font-semibold' : 'text-slate-500 hover:text-slate-800',
+                  isActive ? 'text-[#1A73E8]' : 'text-[#5F6368] hover:text-[#202124]',
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <Icon size={18} className={isActive ? 'text-teal-700' : 'text-slate-400'} />
+                  <Icon size={18} className={isActive ? 'text-[#1A73E8]' : 'text-[#5F6368]'} />
                   <span>{n.label}</span>
                 </>
               )}
@@ -248,38 +248,38 @@ function Shell() {
           type="button"
           onClick={() => setMore(true)}
           className={cx(
-            'relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-slate-500 hover:text-slate-800',
-            more && 'text-teal-800 font-semibold',
+            'relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#5F6368] hover:text-[#202124]',
+            more && 'text-[#1A73E8]',
           )}
         >
-          <IconMenu size={18} className="text-slate-400" />
+          <IconMenu size={18} className={more ? 'text-[#1A73E8]' : 'text-[#5F6368]'} />
           <span>Menu</span>
           {review.length > 0 && (
-            <span className="absolute top-1.5 right-4 h-2 w-2 rounded-full bg-amber-500" />
+            <span className="absolute top-1.5 right-4 h-2 w-2 rounded-full bg-[#F9AB00]" />
           )}
         </button>
       </nav>
 
       {/* Mobile Navigation Drawer */}
       {more && (
-        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-[1px] md:hidden" onClick={() => setMore(false)}>
+        <div className="fixed inset-0 z-50 bg-[#202124]/45 md:hidden" onClick={() => setMore(false)}>
           <div
-            className="safe-bottom absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-slate-200 bg-white p-4 shadow-2xl"
+            className="safe-bottom absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-xl border-t border-[#DADCE0] bg-white p-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="mb-3 flex items-center justify-between border-b border-[#DADCE0] pb-3">
               <div className="flex items-center gap-2.5">
                 <IconBrandMark size={24} />
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Wholesale Price Intelligence</div>
-                  <div className="text-xs text-slate-500">{email} ({role})</div>
+                  <div className="text-sm font-medium text-[#202124]">Wholesale Price Intelligence</div>
+                  <div className="text-xs text-[#5F6368]">{email} ({role})</div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setMore(false)}
                 aria-label="Close menu"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#5F6368] hover:bg-[#F8F9FA]"
               >
                 <IconClose size={18} />
               </button>
@@ -296,19 +296,19 @@ function Shell() {
                     onClick={() => setMore(false)}
                     className={({ isActive }) =>
                       cx(
-                        'flex min-h-11 items-center justify-between rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                        'flex min-h-11 items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
                         isActive
-                          ? 'border-teal-300 bg-teal-50 text-teal-900 font-semibold'
-                          : 'border-slate-200/80 bg-slate-50/70 text-slate-700 hover:bg-slate-100',
+                          ? 'border-[#1A73E8] bg-[#E8F0FE] text-[#1A73E8]'
+                          : 'border-[#DADCE0] bg-[#F8F9FA] text-[#202124] hover:bg-[#E8F0FE]/40',
                       )
                     }
                   >
                     <span className="flex items-center gap-2 truncate">
-                      <Icon size={16} className="shrink-0 text-teal-700" />
+                      <Icon size={16} className="shrink-0 text-[#1A73E8]" />
                       <span className="truncate">{n.label}</span>
                     </span>
                     {n.to === '/review' && review.length > 0 && (
-                      <span className="ml-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      <span className="ml-1 rounded-full bg-[#F9AB00] px-1.5 py-0.5 text-[10px] font-medium text-[#202124]">
                         {review.length}
                       </span>
                     )}
@@ -330,9 +330,9 @@ function Guard() {
   if (noWorkspace) {
     return (
       <div className="mx-auto flex min-h-full max-w-md flex-col justify-center p-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-slate-900">No workspace access</h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        <div className="rounded-xl border border-[#DADCE0] bg-white p-6">
+          <h1 className="text-lg font-medium text-[#202124]">No workspace access</h1>
+          <p className="mt-2 text-sm leading-relaxed text-[#5F6368]">
             This account is not linked to the shared business workspace yet. Ask the workspace administrator to add your account in Supabase.
           </p>
           <Button className="mt-5 w-full" onClick={() => void signOut()}>Sign out</Button>
@@ -350,11 +350,11 @@ function Guard() {
 function SetupNeeded() {
   return (
     <div className="mx-auto flex min-h-full max-w-lg flex-col justify-center p-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-semibold text-slate-900">Configuration needed</h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          Set <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">VITE_SUPABASE_URL</code> and{' '}
-          <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">VITE_SUPABASE_ANON_KEY</code> in your <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">.env</code> file, then restart the server.
+      <div className="rounded-xl border border-[#DADCE0] bg-white p-6">
+        <h1 className="text-lg font-medium text-[#202124]">Configuration needed</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[#5F6368]">
+          Set <code className="rounded bg-[#F8F9FA] px-1.5 py-0.5 text-xs">VITE_SUPABASE_URL</code> and{' '}
+          <code className="rounded bg-[#F8F9FA] px-1.5 py-0.5 text-xs">VITE_SUPABASE_ANON_KEY</code> in your <code className="rounded bg-[#F8F9FA] px-1.5 py-0.5 text-xs">.env</code> file, then restart the server.
         </p>
       </div>
     </div>

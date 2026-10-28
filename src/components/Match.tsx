@@ -92,9 +92,9 @@ export function ProductPicker({ open, onClose, onPick, initialQuery = '', title 
         {results.map((p) => {
           const meta = [variantLabel(p), p.brand, p.manufacturer].filter(Boolean).join(' · ')
           return (
-            <button key={p.id} onClick={() => onPick(p)} className="block w-full rounded-lg border border-slate-200 p-3 text-left transition-colors hover:border-teal-600 hover:bg-teal-50/60">
-              <div className="font-semibold text-slate-900">{p.name} <span className="text-xs text-slate-500">#{p.product_no}</span></div>
-              {meta && <div className="text-xs text-slate-600">{meta}</div>}
+            <button key={p.id} onClick={() => onPick(p)} className="block w-full rounded-lg border border-[#DADCE0] p-3 text-left transition-colors hover:border-[#1A73E8] hover:bg-[#E8F0FE]/60">
+              <div className="font-medium text-[#202124]">{p.name} <span className="text-xs text-[#5F6368]">#{p.product_no}</span></div>
+              {meta && <div className="text-xs text-[#5F6368]">{meta}</div>}
             </button>
           )
         })}
