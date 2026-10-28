@@ -220,8 +220,8 @@ export const IconFileSpreadsheet = (p: IconProps) => (
 
 export const IconBrandMark = ({ size = 28 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect width="32" height="32" rx="8" fill="#0F766E" />
-    <path d="M9 16.5L13.5 21L23 11.5" stroke="#99F6E4" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round" />
+    <rect width="32" height="32" rx="8" fill="#1A73E8" />
+    <path d="M9 16.5L13.5 21L23 11.5" stroke="#E8F0FE" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M9 11.5H15M9 21.5H11" stroke="#FFFFFF" strokeWidth="2.25" strokeLinecap="round" />
   </svg>
 )
