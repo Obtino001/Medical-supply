@@ -1,34 +1,51 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: light;
 
-  /* Google-Inspired Clean Mobile-First Design Tokens */
-  --font-sans: "Google Sans Flex", "Google Sans", Roboto, Arial, sans-serif;
+  /* Google-Inspired Typography */
+  --font-sans: "Google Sans Flex", "Google Sans", "Inter", Roboto, Arial, sans-serif;
 
-  /* Surfaces & Backgrounds */
+  /* Surfaces & Backgrounds — Light Mode */
+  --bg-app: #F8FAFC;
   --bg-main: #F8FAFC;
   --bg-secondary: #F8FAFC;
+  --bg-nav: #FFFFFF;
   --bg-surface: #FFFFFF;
   --bg-card: #FFFFFF;
-  --bg-blue-light: #E8F0FE;
+  --bg-elevated: #F1F5F9;
+  --bg-subtle: #F8FAFC;
+  --bg-input: #FFFFFF;
+  --bg-hover: #F1F5F9;
+  --bg-selected: #E8F0FE;
+  --bg-overlay: rgba(32, 33, 36, 0.48);
 
-  /* Text Hierarchy */
+  /* Text Hierarchy — Light Mode */
   --text-primary: #202124;
   --text-secondary: #5F6368;
+  --text-muted: #70757A;
 
-  /* Borders */
+  /* Borders & Dividers — Light Mode */
   --border-default: #E1E5EA;
+  --border-subtle: #E1E5EA;
+  --border-strong: #CBD5E1;
 
-  /* Brand & Action Colours */
+  /* Brand & Interactive Blue — Light Mode */
   --color-primary: #1A73E8;
   --color-primary-hover: #1557B0;
+  --color-primary-text: #FFFFFF;
   --color-primary-light: #E8F0FE;
+  --color-primary-border: #D2E3FC;
+  --focus-ring: rgba(26, 115, 232, 0.28);
 
-  /* Semantic Status & Best Price Colours */
+  /* Semantic Status & Best Price — Light Mode */
   --color-best: #188038;
   --color-best-bg: #E6F4EA;
   --color-best-border: #CEEAD6;
+  --color-best-solid: #188038;
+  --color-best-solid-text: #FFFFFF;
 
   --color-warning: #F9AB00;
   --color-warning-text: #B06000;
@@ -36,13 +53,73 @@
   --color-warning-border: #FDD663;
 
   --color-error: #D93025;
+  --color-error-text: #D93025;
   --color-error-bg: #FCE8E6;
   --color-error-border: #FAD2CF;
 
-  /* Radii & Subtle Elevation */
+  /* Shadows & Radii */
+  --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+  --shadow-lg: 0 12px 32px -4px rgba(16, 24, 40, 0.16);
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
+}
+
+html.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces & Backgrounds — Dark Mode */
+  --bg-app: #131314;
+  --bg-main: #131314;
+  --bg-secondary: #131314;
+  --bg-nav: #1E1F20;
+  --bg-surface: #1E1F20;
+  --bg-card: #1E1F20;
+  --bg-elevated: #282A2C;
+  --bg-subtle: #232527;
+  --bg-input: #282A2C;
+  --bg-hover: #282A2C;
+  --bg-selected: rgba(138, 180, 248, 0.16);
+  --bg-overlay: rgba(0, 0, 0, 0.68);
+
+  /* Text Hierarchy — Dark Mode */
+  --text-primary: #E3E3E3;
+  --text-secondary: #AEB4BC;
+  --text-muted: #8E959E;
+
+  /* Borders & Dividers — Dark Mode */
+  --border-default: #3C4043;
+  --border-subtle: #3C4043;
+  --border-strong: #5F6368;
+
+  /* Brand & Interactive Blue — Dark Mode */
+  --color-primary: #8AB4F8;
+  --color-primary-hover: #A8C7FA;
+  --color-primary-text: #131314;
+  --color-primary-light: rgba(138, 180, 248, 0.16);
+  --color-primary-border: rgba(138, 180, 248, 0.36);
+  --focus-ring: rgba(138, 180, 248, 0.35);
+
+  /* Semantic Status & Best Price — Dark Mode */
+  --color-best: #81C995;
+  --color-best-bg: rgba(129, 201, 149, 0.14);
+  --color-best-border: rgba(129, 201, 149, 0.36);
+  --color-best-solid: #1E8E3E;
+  --color-best-solid-text: #FFFFFF;
+
+  --color-warning: #F9AB00;
+  --color-warning-text: #FDD663;
+  --color-warning-bg: rgba(253, 214, 99, 0.14);
+  --color-warning-border: rgba(253, 214, 99, 0.35);
+
+  --color-error: #F28B82;
+  --color-error-text: #F28B82;
+  --color-error-bg: rgba(242, 139, 130, 0.14);
+  --color-error-border: rgba(242, 139, 130, 0.36);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 36px -4px rgba(0, 0, 0, 0.55);
 }
 
 html, body, #root {
@@ -51,7 +128,7 @@ html, body, #root {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--bg-main);
+  background-color: var(--bg-app);
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.5;
@@ -61,10 +138,16 @@ body {
   overflow-x: hidden;
 }
 
-/* Prevent mobile auto-zoom on focus while keeping desktop controls crisp */
+/* Native form controls and dropdown options */
 input, select, textarea {
   font-family: inherit;
   font-size: 16px;
+  color: var(--text-primary);
+}
+
+select option {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 @media (min-width: 640px) {
@@ -75,7 +158,7 @@ input, select, textarea {
 
 input[type="checkbox"],
 input[type="radio"] {
-  accent-color: #1A73E8;
+  accent-color: var(--color-primary);
 }
 
 .tabular-nums {
@@ -84,6 +167,25 @@ input[type="radio"] {
 
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Subtle custom scrollbars for both themes */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {

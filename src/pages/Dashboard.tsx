@@ -88,21 +88,21 @@ export default function Dashboard() {
       <Card className="!p-3.5 sm:!p-4">
         <form onSubmit={search} className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <IconSearch size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#5F6368]" />
+            <IconSearch size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
               type="search"
               placeholder="Search medicines, strengths, shops, or product codes…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               aria-label="Quick search"
-              className="min-h-11 sm:min-h-10 w-full rounded-lg border border-[#E1E5EA] bg-[#F8FAFC] py-2 pr-9 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/80 hover:border-[#5F6368]/60 focus:border-[#1A73E8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
+              className="min-h-11 sm:min-h-9.5 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] py-2 pr-9 pl-10 text-[var(--text-primary)] transition-colors placeholder:text-[var(--text-secondary)]/80 hover:border-[var(--border-strong)] focus:border-[var(--color-primary)] focus:bg-[var(--bg-input)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
             />
             {q && (
               <button
                 type="button"
                 onClick={() => setQ('')}
                 aria-label="Clear search"
-                className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#5F6368] hover:bg-[#E1E5EA]/50 hover:text-[#202124]"
+                className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               >
                 <IconClose size={14} />
               </button>
@@ -115,7 +115,7 @@ export default function Dashboard() {
         </form>
 
         {/* Primary & Secondary Quick Actions */}
-        <div className="mt-3.5 border-t border-[#E1E5EA] pt-3">
+        <div className="mt-3.5 border-t border-[var(--border-default)] pt-3">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Link to="/import">
               <Button className="w-full justify-center" small>
@@ -124,20 +124,20 @@ export default function Dashboard() {
               </Button>
             </Link>
             <Link to="/shops">
-              <Button variant="secondary" className="w-full justify-center text-[#1A73E8]" small>
-                <IconPlus size={15} className="text-[#1A73E8]" />
+              <Button variant="secondary" className="w-full justify-center text-[var(--color-primary)]" small>
+                <IconPlus size={15} className="text-[var(--color-primary)]" />
                 <span className="truncate">Add shop</span>
               </Button>
             </Link>
             <Link to="/compare">
               <Button variant="secondary" className="w-full justify-center" small>
-                <IconScale size={15} className="text-[#1A73E8]" />
+                <IconScale size={15} className="text-[var(--color-primary)]" />
                 <span className="truncate">Compare prices</span>
               </Button>
             </Link>
             <Link to="/wishlist">
               <Button variant="secondary" className="w-full justify-center" small>
-                <IconStar size={15} className="text-[#1A73E8]" />
+                <IconStar size={15} className="text-[var(--color-primary)]" />
                 <span className="truncate">Open wishlist</span>
               </Button>
             </Link>
@@ -145,28 +145,28 @@ export default function Dashboard() {
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Link to="/review">
               <Button variant="secondary" className="w-full justify-center" small>
-                <IconGitCompare size={15} className="text-[#1A73E8]" />
+                <IconGitCompare size={15} className="text-[var(--color-primary)]" />
                 <span className="truncate">Review matches</span>
                 {review.length > 0 && (
-                  <span className="ml-0.5 rounded-full bg-[#F9AB00] px-1.5 py-0.2 text-[10px] font-medium text-[#202124]">{review.length}</span>
+                  <span className="ml-0.5 rounded-full bg-[var(--color-warning)] px-1.5 py-0.2 text-[10px] font-semibold text-[#202124]">{review.length}</span>
                 )}
               </Button>
             </Link>
             <Link to="/opportunities">
               <Button variant="secondary" className="w-full justify-center" small>
-                <IconTrendingDown size={15} className="text-[#1A73E8]" />
+                <IconTrendingDown size={15} className="text-[var(--color-primary)]" />
                 <span className="truncate">Opportunities</span>
               </Button>
             </Link>
             <Link to="/export">
               <Button variant="secondary" className="w-full justify-center" small>
-                <IconDownload size={15} className="text-[#1A73E8]" />
+                <IconDownload size={15} className="text-[var(--color-primary)]" />
                 <span className="truncate">Export results</span>
               </Button>
             </Link>
             <Link to="/surveys">
               <Button variant="secondary" className="w-full justify-center" small>
-                <IconCalendar size={15} className="text-[#1A73E8]" />
+                <IconCalendar size={15} className="text-[var(--color-primary)]" />
                 <span className="truncate">Surveys</span>
               </Button>
             </Link>
@@ -192,10 +192,10 @@ export default function Dashboard() {
       <section>
         <div className="mb-2.5 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-medium text-[#202124]">Best purchase opportunities</h2>
-            <p className="text-xs text-[#5F6368]">Top verified price savings across multiple suppliers</p>
+            <h2 className="text-base font-medium text-[var(--text-primary)]">Best purchase opportunities</h2>
+            <p className="text-xs text-[var(--text-secondary)]">Top verified price savings across multiple suppliers</p>
           </div>
-          <Link to="/opportunities" className="inline-flex items-center gap-1 text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline sm:text-sm">
+          <Link to="/opportunities" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline sm:text-sm">
             <span>View all</span>
             <IconChevronRight size={15} />
           </Link>
@@ -204,12 +204,12 @@ export default function Dashboard() {
         {top.length === 0 ? (
           <Card className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <div className="text-sm font-medium text-[#202124]">No multi-shop opportunities yet</div>
-              <p className="text-xs text-[#5F6368]">Opportunities appear automatically once at least two shops offer the same medicine.</p>
+              <div className="text-sm font-medium text-[var(--text-primary)]">No multi-shop opportunities yet</div>
+              <p className="text-xs text-[var(--text-secondary)]">Opportunities appear automatically once at least two shops offer the same medicine.</p>
             </div>
             <Link to="/import">
               <Button variant="secondary" small>
-                <IconUpload size={14} className="text-[#1A73E8]" />
+                <IconUpload size={14} className="text-[var(--color-primary)]" />
                 <span>Import price list</span>
               </Button>
             </Link>
@@ -220,20 +220,20 @@ export default function Dashboard() {
               const vl = variantLabel(o.product)
               return (
                 <Link key={o.product.id} to={`/products/${o.product.id}`} className="block">
-                  <Card className="h-full !p-3.5 transition-colors hover:border-[#1A73E8] hover:bg-[#F8FAFC]">
+                  <Card className="h-full !p-3.5 transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--bg-hover)]">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-[#202124]">{o.product.name}</div>
+                        <div className="truncate text-sm font-medium text-[var(--text-primary)]">{o.product.name}</div>
                         {vl && <div className="mt-0.5"><Badge tone="blue">{vl}</Badge></div>}
                       </div>
                       <Badge tone="solid">Save {o.savingPct.toFixed(1)}%</Badge>
                     </div>
-                    <div className="mt-2.5 flex items-baseline justify-between border-t border-[#E1E5EA] pt-2 text-xs text-[#5F6368]">
+                    <div className="mt-2.5 flex items-baseline justify-between border-t border-[var(--border-default)] pt-2 text-xs text-[var(--text-secondary)]">
                       <span className="truncate">
-                        Best: <b className="font-medium text-[#202124]">{shopMap.get(o.best.rec.shop_id)?.name}</b>
+                        Best: <b className="font-medium text-[var(--text-primary)]">{shopMap.get(o.best.rec.shop_id)?.name}</b>
                       </span>
-                      <span className="font-semibold text-[#188038] tabular-nums">
-                        {rs(o.best.cents! / 100)} <span className="font-normal text-[#5F6368]">(-{rs(o.saving)})</span>
+                      <span className="font-semibold text-[var(--color-best)] tabular-nums">
+                        {rs(o.best.cents! / 100)} <span className="font-normal text-[var(--text-secondary)]">(-{rs(o.saving)})</span>
                       </span>
                     </div>
                   </Card>
@@ -249,19 +249,19 @@ export default function Dashboard() {
         <div className="space-y-5">
           <section>
             <div className="mb-2.5 flex items-center justify-between">
-              <h2 className="text-base font-medium text-[#202124]">Recent imports</h2>
-              <Link to="/imports" className="text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">History</Link>
+              <h2 className="text-base font-medium text-[var(--text-primary)]">Recent imports</h2>
+              <Link to="/imports" className="text-xs font-medium text-[var(--color-primary)] hover:underline">History</Link>
             </div>
             <Card className="!p-0 overflow-hidden">
               {jobs.length === 0 ? (
-                <div className="p-5 text-center text-sm text-[#5F6368]">No price lists imported yet.</div>
+                <div className="p-5 text-center text-sm text-[var(--text-secondary)]">No price lists imported yet.</div>
               ) : (
-                <ul className="divide-y divide-[#E1E5EA]">
+                <ul className="divide-y divide-[var(--border-default)]">
                   {jobs.map((j) => (
                     <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                       <div className="min-w-0">
-                        <div className="truncate font-medium text-[#202124]">{j.filename}</div>
-                        <div className="text-xs text-[#5F6368]">
+                        <div className="truncate font-medium text-[var(--text-primary)]">{j.filename}</div>
+                        <div className="text-xs text-[var(--text-secondary)]">
                           {shopMap.get(j.shop_id)?.name ?? 'Shop'} · {fmtDate(j.created_at)} · by {memberName(j.created_by)}
                         </div>
                       </div>
@@ -275,21 +275,21 @@ export default function Dashboard() {
 
           <section>
             <div className="mb-2.5 flex items-center justify-between">
-              <h2 className="text-base font-medium text-[#202124]">Recent surveys</h2>
-              <Link to="/surveys" className="text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline">All surveys</Link>
+              <h2 className="text-base font-medium text-[var(--text-primary)]">Recent surveys</h2>
+              <Link to="/surveys" className="text-xs font-medium text-[var(--color-primary)] hover:underline">All surveys</Link>
             </div>
             <Card className="!p-0 overflow-hidden">
               {surveys.length === 0 ? (
-                <div className="p-5 text-center text-sm text-[#5F6368]">No market surveys recorded yet.</div>
+                <div className="p-5 text-center text-sm text-[var(--text-secondary)]">No market surveys recorded yet.</div>
               ) : (
-                <ul className="divide-y divide-[#E1E5EA]">
+                <ul className="divide-y divide-[var(--border-default)]">
                   {surveys.slice(0, 5).map((s) => (
                     <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                       <div className="min-w-0">
-                        <span className="font-medium text-[#202124]">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span>
-                        <span className="ml-2 text-xs text-[#5F6368]">Survey #{s.survey_no}</span>
+                        <span className="font-medium text-[var(--text-primary)]">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span>
+                        <span className="ml-2 text-xs text-[var(--text-secondary)]">Survey #{s.survey_no}</span>
                       </div>
-                      <span className="text-xs font-medium text-[#5F6368] tabular-nums">{fmtDate(s.survey_date)}</span>
+                      <span className="text-xs font-medium text-[var(--text-secondary)] tabular-nums">{fmtDate(s.survey_date)}</span>
                     </li>
                   ))}
                 </ul>
@@ -300,18 +300,18 @@ export default function Dashboard() {
 
         <section>
           <div className="mb-2.5 flex items-center justify-between">
-            <h2 className="text-base font-medium text-[#202124]">Recent workspace activity</h2>
-            <span className="text-xs text-[#5F6368]">Both partners</span>
+            <h2 className="text-base font-medium text-[var(--text-primary)]">Recent workspace activity</h2>
+            <span className="text-xs text-[var(--text-secondary)]">Both partners</span>
           </div>
           <Card className="!p-0 overflow-hidden">
             {audit.length === 0 ? (
-              <div className="p-5 text-center text-sm text-[#5F6368]">No recent workspace activity yet.</div>
+              <div className="p-5 text-center text-sm text-[var(--text-secondary)]">No recent workspace activity yet.</div>
             ) : (
-              <ul className="divide-y divide-[#E1E5EA]">
+              <ul className="divide-y divide-[var(--border-default)]">
                 {audit.map((a) => (
                   <li key={a.id} className="flex items-start justify-between gap-3 px-4 py-2.5 text-xs sm:text-sm">
-                    <div className="min-w-0 flex-1 text-[#5F6368]">
-                      <span className="font-medium text-[#202124]">{memberName(a.user_id)}</span>{' '}
+                    <div className="min-w-0 flex-1 text-[var(--text-secondary)]">
+                      <span className="font-medium text-[var(--text-primary)]">{memberName(a.user_id)}</span>{' '}
                       {a.action === 'insert'
                         ? 'added'
                         : a.action === 'update'
@@ -319,12 +319,12 @@ export default function Dashboard() {
                           : a.action === 'delete'
                             ? 'removed'
                             : a.action.replace('_', ' ')}{' '}
-                      <span className="text-[#5F6368]">{TABLE[a.table_name] ?? a.table_name}</span>
+                      <span className="text-[var(--text-secondary)]">{TABLE[a.table_name] ?? a.table_name}</span>
                       {a.detail?.label && (
-                        <span className="font-medium text-[#202124]"> “{String(a.detail.label).slice(0, 42)}”</span>
+                        <span className="font-medium text-[var(--text-primary)]"> “{String(a.detail.label).slice(0, 42)}”</span>
                       )}
                     </div>
-                    <span className="shrink-0 text-xs text-[#5F6368] tabular-nums">{fmtDate(a.created_at)}</span>
+                    <span className="shrink-0 text-xs text-[var(--text-secondary)] tabular-nums">{fmtDate(a.created_at)}</span>
                   </li>
                 ))}
               </ul>

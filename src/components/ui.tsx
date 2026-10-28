@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
-import { IconAlert, IconArrowLeft, IconArrowRight, IconCheck, IconClose } from './icons'
+import { useTheme, type ThemeMode } from '../lib/theme'
+import { IconAlert, IconArrowLeft, IconArrowRight, IconCheck, IconClose, IconMonitor, IconMoon, IconSun } from './icons'
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
@@ -18,13 +19,13 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 export function Button({ variant = 'primary', small, className, type = 'button', ...p }: BtnProps) {
   const v = {
     primary:
-      'bg-[#1A73E8] text-white hover:bg-[#1557B0] active:bg-[#1557B0] focus-visible:outline-[#1A73E8] disabled:bg-[#E1E5EA] disabled:text-[#5F6368]',
+      'bg-[var(--color-primary)] text-[var(--color-primary-text)] hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-hover)] focus-visible:outline-[var(--color-primary)] disabled:bg-[var(--border-default)] disabled:text-[var(--text-secondary)]',
     secondary:
-      'bg-white text-[#202124] border border-[#E1E5EA] hover:bg-[#F8FAFC] active:bg-[#E8F0FE]/60 focus-visible:outline-[#1A73E8] disabled:bg-[#F8FAFC] disabled:text-[#5F6368]/60 disabled:border-[#E1E5EA]',
+      'bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-default)] hover:bg-[var(--bg-hover)] active:bg-[var(--color-primary-light)] focus-visible:outline-[var(--color-primary)] disabled:bg-[var(--bg-subtle)] disabled:text-[var(--text-secondary)]/60 disabled:border-[var(--border-default)]',
     danger:
-      'bg-[#D93025] text-white hover:bg-[#B3261E] active:bg-[#B3261E] focus-visible:outline-[#D93025] disabled:bg-[#D93025]/40',
+      'bg-[var(--color-error)] text-[var(--color-primary-text)] hover:opacity-90 active:opacity-85 focus-visible:outline-[var(--color-error)] disabled:opacity-40',
     ghost:
-      'text-[#1A73E8] hover:bg-[#E8F0FE] active:bg-[#E8F0FE]/80 focus-visible:outline-[#1A73E8] disabled:text-[#5F6368]/60 disabled:hover:bg-transparent',
+      'text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] active:bg-[var(--color-primary-light)] focus-visible:outline-[var(--color-primary)] disabled:text-[var(--text-secondary)]/60 disabled:hover:bg-transparent',
   }[variant]
   return (
     <button
@@ -32,7 +33,7 @@ export function Button({ variant = 'primary', small, className, type = 'button',
       {...p}
       className={cx(
         'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors duration-150 select-none focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed',
-        small ? 'min-h-9 px-3 py-1.5 text-xs sm:text-sm' : 'min-h-11 sm:min-h-10 px-4 py-2 text-sm',
+        small ? 'min-h-8.5 px-2.5 py-1.5 text-xs sm:text-[13px]' : 'min-h-11 sm:min-h-9.5 px-3.5 py-2 text-sm',
         v,
         className,
       )}
@@ -41,30 +42,30 @@ export function Button({ variant = 'primary', small, className, type = 'button',
 }
 
 const inputCls =
-  'w-full min-h-11 sm:min-h-10 rounded-lg border border-[#E1E5EA] bg-white px-3.5 py-2 text-[#202124] transition-colors duration-150 placeholder:text-[#5F6368]/75 hover:border-[#5F6368]/60 focus:border-[#1A73E8] focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#5F6368]'
+  'w-full min-h-11 sm:min-h-9.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1.5 text-[var(--text-primary)] transition-colors duration-150 placeholder:text-[var(--text-secondary)]/75 hover:border-[var(--border-strong)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:bg-[var(--bg-subtle)] disabled:text-[var(--text-secondary)]'
 
 export function Field({ label, required, hint, children, className }: { label: ReactNode; required?: boolean; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block', className)}>
-      <span className="mb-1.5 block text-xs font-medium text-[#202124] sm:text-sm">
+      <span className="mb-1 block text-xs font-medium text-[var(--text-primary)] sm:text-[13px]">
         {label}
-        {required && <span className="ml-0.5 font-semibold text-[#D93025]" aria-hidden="true">*</span>}
+        {required && <span className="ml-0.5 font-semibold text-[var(--color-error-text)]" aria-hidden="true">*</span>}
       </span>
       {children}
-      {hint && <span className="mt-1 block text-xs leading-relaxed text-[#5F6368]">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs leading-relaxed text-[var(--text-secondary)]">{hint}</span>}
     </label>
   )
 }
 
 export const Input = (p: InputHTMLAttributes<HTMLInputElement>) => <input {...p} className={cx(inputCls, p.className)} />
 export const Select = (p: SelectHTMLAttributes<HTMLSelectElement>) => <select {...p} className={cx(inputCls, p.className)} />
-export const Textarea = (p: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cx(inputCls, 'min-h-20 py-2.5', p.className)} />
+export const Textarea = (p: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cx(inputCls, 'min-h-20 py-2', p.className)} />
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cx(
-        'rounded-xl border border-[#E1E5EA] bg-white p-4 sm:p-5',
+        'rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 sm:p-5',
         className,
       )}
     >
@@ -74,20 +75,20 @@ export function Card({ children, className }: { children: ReactNode; className?:
 }
 
 const tones = {
-  green: 'bg-[#E6F4EA] text-[#188038] border-[#CEEAD6]',
-  teal: 'bg-[#E8F0FE] text-[#1A73E8] border-[#D2E3FC]',
-  blue: 'bg-[#E8F0FE] text-[#1A73E8] border-[#D2E3FC]',
-  amber: 'bg-[#FEF7E0] text-[#B06000] border-[#FDD663]',
-  red: 'bg-[#FCE8E6] text-[#D93025] border-[#FAD2CF]',
-  slate: 'bg-[#F8FAFC] text-[#5F6368] border-[#E1E5EA]',
-  solid: 'bg-[#188038] text-white border-[#188038]',
+  green: 'bg-[var(--color-best-bg)] text-[var(--color-best)] border-[var(--color-best-border)]',
+  teal: 'bg-[var(--color-primary-light)] text-[var(--color-primary)] border-[var(--color-primary-border)]',
+  blue: 'bg-[var(--color-primary-light)] text-[var(--color-primary)] border-[var(--color-primary-border)]',
+  amber: 'bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border-[var(--color-warning-border)]',
+  red: 'bg-[var(--color-error-bg)] text-[var(--color-error-text)] border-[var(--color-error-border)]',
+  slate: 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]',
+  solid: 'bg-[var(--color-best-solid)] text-[var(--color-best-solid-text)] border-[var(--color-best-solid)]',
 }
 
 export function Badge({ tone = 'slate', children }: { tone?: keyof typeof tones; children: ReactNode }) {
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap leading-tight',
         tones[tone],
       )}
     >
@@ -98,26 +99,36 @@ export function Badge({ tone = 'slate', children }: { tone?: keyof typeof tones;
 
 export function Spinner({ label = 'Loading…' }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-3 p-10 text-sm font-medium text-[#5F6368]" role="status">
-      <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#1A73E8] border-t-transparent" />
-      {label}
+    <div className="flex flex-col gap-3 py-6" role="status" aria-label={label}>
+      <div className="flex items-center justify-center gap-2.5 text-sm font-medium text-[var(--text-secondary)]">
+        <span className="h-4.5 w-4.5 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
+        <span>{label}</span>
+      </div>
+      <div className="mx-auto w-full max-w-3xl space-y-2 opacity-65">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center justify-between gap-4 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3.5 py-3">
+            <div className="h-3.5 w-44 animate-pulse rounded bg-[var(--bg-elevated)]" />
+            <div className="h-3.5 w-24 animate-pulse rounded bg-[var(--bg-elevated)]" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-[#E1E5EA] bg-white px-5 py-8 text-center">
-      <div className="text-base font-medium text-[#202124]">{title}</div>
-      {children && <div className="mx-auto mt-1.5 max-w-md text-sm text-[#5F6368]">{children}</div>}
+    <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-surface)] px-5 py-8 text-center">
+      <div className="text-base font-medium text-[var(--text-primary)]">{title}</div>
+      {children && <div className="mx-auto mt-1.5 max-w-md text-sm text-[var(--text-secondary)]">{children}</div>}
     </div>
   )
 }
 
 export function ErrorBox({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-[#FAD2CF] bg-[#FCE8E6] p-3.5 text-sm text-[#D93025]">
-      <IconAlert size={18} className="mt-0.5 shrink-0 text-[#D93025]" />
+    <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-[var(--color-error-border)] bg-[var(--color-error-bg)] p-3.5 text-sm text-[var(--color-error-text)]">
+      <IconAlert size={18} className="mt-0.5 shrink-0 text-[var(--color-error-text)]" />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
@@ -125,10 +136,10 @@ export function ErrorBox({ children }: { children: ReactNode }) {
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div className="mb-3.5 flex flex-wrap items-start justify-between gap-2.5">
       <div>
-        <h1 className="text-2xl font-medium tracking-tight text-[#202124] sm:text-[26px]">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-[#5F6368]">{subtitle}</p>}
+        <h1 className="text-[21px] font-medium tracking-tight text-[var(--text-primary)] sm:text-[25px]">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-xs text-[var(--text-secondary)] sm:text-[13px]">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
@@ -145,7 +156,7 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[#202124]/45 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--bg-overlay)] p-0 sm:items-center sm:p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -153,18 +164,18 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
         aria-modal="true"
         aria-label={title}
         className={cx(
-          'safe-bottom max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-[#E1E5EA] bg-white p-4 shadow-xl sm:rounded-xl sm:p-6',
+          'safe-bottom max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-lg)] sm:rounded-xl sm:p-5',
           wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
         )}
       >
-        <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-[#E1E5EA] sm:hidden" />
-        <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#E1E5EA] pb-3">
-          <h2 className="text-base font-medium text-[#202124] sm:text-lg">{title}</h2>
+        <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-[var(--border-default)] sm:hidden" />
+        <div className="mb-3.5 flex items-center justify-between gap-3 border-b border-[var(--border-default)] pb-2.5">
+          <h2 className="text-base font-medium text-[var(--text-primary)] sm:text-lg">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#5F6368] transition-colors hover:bg-[#F8FAFC] hover:text-[#202124]"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
             <IconClose size={18} />
           </button>
@@ -172,6 +183,66 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
         {children}
       </div>
     </div>
+  )
+}
+
+/** Segmented 3-way Theme Selector (Light / Dark / System) */
+export function ThemeSelector({ compact = false }: { compact?: boolean }) {
+  const { mode, setMode } = useTheme()
+  const opts: { key: ThemeMode; label: string; icon: typeof IconSun }[] = [
+    { key: 'light', label: 'Light', icon: IconSun },
+    { key: 'dark', label: 'Dark', icon: IconMoon },
+    { key: 'system', label: 'System', icon: IconMonitor },
+  ]
+  return (
+    <div
+      role="group"
+      aria-label="Appearance theme"
+      className="inline-flex items-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] p-0.5"
+    >
+      {opts.map((o) => {
+        const Icon = o.icon
+        const active = mode === o.key
+        return (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => setMode(o.key)}
+            aria-pressed={active}
+            title={`${o.label} theme`}
+            className={cx(
+              'inline-flex items-center gap-1.5 rounded-md font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]',
+              compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-xs sm:text-[13px]',
+              active
+                ? 'bg-[var(--bg-surface)] text-[var(--color-primary)] shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+            )}
+          >
+            <Icon size={14} />
+            <span>{o.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Header single-tap theme cycle button */
+export function ThemeToggleButton() {
+  const { mode, resolved, cycleMode } = useTheme()
+  const label = mode === 'system' ? `System (${resolved})` : mode === 'dark' ? 'Dark' : 'Light'
+  const Icon = mode === 'system' ? IconMonitor : resolved === 'dark' ? IconMoon : IconSun
+  return (
+    <Button
+      variant="secondary"
+      small
+      onClick={cycleMode}
+      title={`Appearance: ${label}. Click to switch Light / Dark / System.`}
+      aria-label={`Appearance: ${label}`}
+    >
+      <Icon size={15} className="text-[var(--color-primary)]" />
+      <span className="hidden lg:inline capitalize">{mode}</span>
+    </Button>
   )
 }
 
@@ -206,9 +277,9 @@ export function UiProvider({ children }: { children: ReactNode }) {
               key={t.id}
               role="status"
               className={cx(
-                'pointer-events-auto flex max-w-md items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium shadow-md',
+                'pointer-events-auto flex max-w-md items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium shadow-[var(--shadow-lg)]',
                 t.kind === 'ok'
-                  ? 'border-[#188038] bg-[#188038] text-white'
+                  ? 'border-[var(--color-best-solid)] bg-[var(--color-best-solid)] text-white'
                   : 'border-[#D93025] bg-[#D93025] text-white',
               )}
             >
@@ -218,7 +289,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
           ))}
         </div>
         <Modal open={!!confirm} onClose={() => close(false)} title={confirm?.title ?? ''}>
-          <div className="text-sm leading-relaxed text-[#5F6368]">{confirm?.body}</div>
+          <div className="text-sm leading-relaxed text-[var(--text-secondary)]">{confirm?.body}</div>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => close(false)}>Cancel</Button>
             <Button variant={confirm?.danger ? 'danger' : 'primary'} onClick={() => close(true)}>{confirm?.confirmLabel ?? 'Confirm'}</Button>
@@ -232,12 +303,12 @@ export function UiProvider({ children }: { children: ReactNode }) {
 export function Pagination({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
   if (pages <= 1) return null
   return (
-    <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-[#E1E5EA] bg-white px-3 py-2">
+    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2">
       <Button variant="secondary" small disabled={page <= 0} onClick={() => onPage(page - 1)}>
         <IconArrowLeft size={15} />
         <span>Previous</span>
       </Button>
-      <span className="text-xs font-medium text-[#5F6368] sm:text-sm tabular-nums">Page {page + 1} of {pages}</span>
+      <span className="text-xs font-medium text-[var(--text-secondary)] sm:text-[13px] tabular-nums">Page {page + 1} of {pages}</span>
       <Button variant="secondary" small disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>
         <span>Next</span>
         <IconArrowRight size={15} />
@@ -261,28 +332,28 @@ export function Stat({
 }) {
   const toneCls =
     tone === 'amber'
-      ? 'border-[#FDD663] bg-[#FEF7E0]/60'
+      ? 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]'
       : tone === 'green'
-        ? 'border-[#CEEAD6] bg-[#E6F4EA]/50'
+        ? 'border-[var(--color-best-border)] bg-[var(--color-best-bg)]'
         : tone === 'teal' || tone === 'blue'
-          ? 'border-[#1A73E8] bg-[#E8F0FE]/60'
-          : 'border-[#E1E5EA] bg-white'
+          ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
+          : 'border-[var(--border-default)] bg-[var(--bg-surface)]'
   const inner = (
     <div
       className={cx(
-        'flex h-full flex-col justify-between rounded-xl border p-3.5 transition-colors duration-150',
+        'flex h-full flex-col justify-between rounded-xl border p-3 transition-colors duration-150',
         toneCls,
-        to && 'hover:border-[#1A73E8] hover:bg-[#F8FAFC]',
+        to && 'hover:border-[var(--color-primary)] hover:bg-[var(--bg-hover)]',
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-[#5F6368]">{label}</span>
+        <span className="text-xs font-medium text-[var(--text-secondary)]">{label}</span>
         {icon && (
           <span
             className={cx(
-              'text-[#1A73E8]',
-              tone === 'amber' && 'text-[#B06000]',
-              tone === 'green' && 'text-[#188038]',
+              'text-[var(--color-primary)]',
+              tone === 'amber' && 'text-[var(--color-warning-text)]',
+              tone === 'green' && 'text-[var(--color-best)]',
             )}
           >
             {icon}
@@ -291,8 +362,8 @@ export function Stat({
       </div>
       <div
         className={cx(
-          'mt-1.5 text-2xl font-medium tracking-tight tabular-nums',
-          tone === 'amber' ? 'text-[#B06000]' : tone === 'green' ? 'text-[#188038]' : 'text-[#202124]',
+          'mt-1 text-xl sm:text-2xl font-medium tracking-tight tabular-nums',
+          tone === 'amber' ? 'text-[var(--color-warning-text)]' : tone === 'green' ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]',
         )}
       >
         {value}

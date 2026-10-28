@@ -120,7 +120,7 @@ export default function Wishlist() {
         title="My wishlist"
         subtitle="Track priority medicines, best supplier prices, and market survey freshness."
       >
-        <Button onClick={() => setAdding(true)}>
+        <Button small onClick={() => setAdding(true)}>
           <IconPlus size={15} />
           <span>Add product</span>
         </Button>
@@ -134,7 +134,7 @@ export default function Wishlist() {
             onClick={() => { setTile(t.key); setPage(0) }}
             className={cx(
               'rounded-xl text-left transition-all',
-              tile === t.key ? 'ring-2 ring-[#1A73E8]' : 'hover:opacity-95',
+              tile === t.key ? 'ring-2 ring-[var(--color-primary)]' : 'hover:opacity-95',
             )}
           >
             <Stat label={t.label} value={t.n} tone={tile === t.key ? 'blue' : undefined} />
@@ -143,30 +143,35 @@ export default function Wishlist() {
       </div>
 
       {/* Compact Search & Filter Bar */}
-      <Card className="!p-3 sm:!p-4">
-        <div className="grid gap-2.5 sm:grid-cols-[1fr_auto_auto]">
+      <Card className="!p-2.5 sm:!p-3">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
           <div className="relative">
-            <IconSearch size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#5F6368]" />
+            <IconSearch size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
               type="search"
               placeholder="Search wishlist medicines…"
               value={f.q}
               onChange={(e) => { setF({ ...f, q: e.target.value }); setPage(0) }}
               aria-label="Search wishlist"
-              className="min-h-11 sm:min-h-10 w-full rounded-lg border border-[#E1E5EA] bg-[#F8FAFC] py-2 pr-9 pl-10 text-[#202124] transition-colors placeholder:text-[#5F6368]/75 hover:border-[#5F6368]/60 focus:border-[#1A73E8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20"
+              className="min-h-10 sm:min-h-8.5 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] py-1.5 pr-8 pl-9 text-sm text-[var(--text-primary)] transition-colors placeholder:text-[var(--text-secondary)]/75 hover:border-[var(--border-strong)] focus:border-[var(--color-primary)] focus:bg-[var(--bg-input)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
             />
             {f.q && (
               <button
                 type="button"
                 onClick={() => { setF({ ...f, q: '' }); setPage(0) }}
                 aria-label="Clear search"
-                className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#5F6368] hover:bg-[#E1E5EA]/50 hover:text-[#202124]"
+                className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               >
-                <IconClose size={15} />
+                <IconClose size={14} />
               </button>
             )}
           </div>
-          <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort wishlist">
+          <Select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            aria-label="Sort wishlist"
+            className="!min-h-9 sm:!min-h-8.5 sm:!w-48 !py-1 !px-2.5 text-xs sm:text-[13px]"
+          >
             <option value="priority">Sort: Priority</option>
             <option value="title">Sort: Title A–Z</option>
             <option value="lowest">Sort: Lowest effective price</option>
@@ -175,11 +180,11 @@ export default function Wishlist() {
             <option value="oldest">Sort: Oldest price check</option>
             <option value="offers">Sort: Most supplier offers</option>
           </Select>
-          <Button variant="secondary" onClick={() => setShowFilters(true)}>
-            <IconFilter size={15} className="text-[#1A73E8]" />
+          <Button variant="secondary" small onClick={() => setShowFilters(true)}>
+            <IconFilter size={14} className="text-[var(--color-primary)]" />
             <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1A73E8] px-1.5 text-[11px] font-semibold text-white tabular-nums">
+              <span className="ml-0.5 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-[10px] font-semibold text-[var(--color-primary-text)] tabular-nums">
                 {activeFilterCount}
               </span>
             )}
@@ -229,7 +234,7 @@ export default function Wishlist() {
               </Select>
             </Field>
           </div>
-          <div className="flex items-center justify-between gap-2 border-t border-[#E1E5EA] pt-3">
+          <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] pt-3">
             <Button variant="ghost" onClick={() => { setF(DEFAULT_F); setTile(''); setPage(0) }}>
               Reset all
             </Button>
@@ -253,17 +258,17 @@ export default function Wishlist() {
           )}
         </Empty>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {shown.slice(page * per, page * per + per).map((e) => {
             const best = e.cmp.offers.find((o) => o.eligible)
             const schemeOnlyOffer = !best ? e.records.find((r) => r.scheme_status === 'ok' && r.scheme_text) : undefined
             const alt = products.filter((p) => p.id !== e.product.id && p.normalized_name === e.product.normalized_name && !p.archived)
             const isOpen = open.has(e.item.id)
             return (
-              <Card key={e.item.id}>
+              <Card key={e.item.id} className="!p-3.5 sm:!p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <Link to={`/products/${e.product.id}`} className="text-base font-medium text-[#202124] hover:text-[#1A73E8] hover:underline sm:text-lg">
+                    <Link to={`/products/${e.product.id}`} className="text-[15px] font-medium text-[var(--text-primary)] hover:text-[var(--color-primary)] hover:underline sm:text-base">
                       {e.product.name}
                     </Link>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -274,28 +279,28 @@ export default function Wishlist() {
                       {e.reviewCount > 0 && <Badge tone="amber">Match review pending</Badge>}
                       {e.newLow && <Badge tone="green">New lower price</Badge>}
                     </div>
-                    <div className="mt-1 text-xs text-[#5F6368]">
-                      Added by {memberName(e.item.created_by)} · last survey <span className="font-medium text-[#202124] tabular-nums">{fmtDate(e.lastSurvey)}</span>
+                    <div className="mt-1 text-xs text-[var(--text-secondary)]">
+                      Added by {memberName(e.item.created_by)} · last survey <span className="font-medium text-[var(--text-primary)] tabular-nums">{fmtDate(e.lastSurvey)}</span>
                     </div>
                     {e.item.notes && !isOpen && (
-                      <div className="mt-1 text-xs text-[#5F6368]">Note: <span className="text-[#202124]">{e.item.notes}</span></div>
+                      <div className="mt-1 text-xs text-[var(--text-secondary)]">Note: <span className="text-[var(--text-primary)]">{e.item.notes}</span></div>
                     )}
                   </div>
                   <div className="text-right">
                     {best ? (
                       <>
-                        <div className={cx('inline-block rounded-md px-2 py-0.5 text-lg font-semibold tabular-nums sm:text-xl', best.isBest ? 'bg-[#188038] text-white' : 'text-[#202124]')}>
+                        <div className={cx('inline-block rounded-md px-2 py-0.5 text-base font-semibold tabular-nums sm:text-lg', best.isBest ? 'bg-[var(--color-best-solid)] text-[var(--color-best-solid-text)]' : 'text-[var(--text-primary)]')}>
                           {rs(best.cents! / 100)}
                         </div>
                         <div className="mt-1 text-xs sm:text-sm">
                           {best.isBest && <Badge tone="solid">{best.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>}{' '}
-                          <b className="font-medium text-[#202124]">{shopMap.get(best.rec.shop_id)?.name}</b>
+                          <b className="font-medium text-[var(--text-primary)]">{shopMap.get(best.rec.shop_id)?.name}</b>
                         </div>
-                        <div className="text-xs text-[#5F6368] tabular-nums">
+                        <div className="text-xs text-[var(--text-secondary)] tabular-nums">
                           {fmtDate(best.rec.observed_on)}{!best.fresh && ' · outdated'}
                         </div>
                         {e.cmp.nextBest && (
-                          <div className="text-xs font-medium text-[#188038] tabular-nums">
+                          <div className="text-xs font-medium text-[var(--color-best)] tabular-nums">
                             Saves {rs(e.cmp.nextBest.saving)} vs next best
                           </div>
                         )}
@@ -303,17 +308,17 @@ export default function Wishlist() {
                     ) : schemeOnlyOffer ? (
                       <>
                         <div><Badge tone="blue">{schemeOnlyOffer.scheme_text}</Badge></div>
-                        <div className="mt-0.5 text-sm"><b className="font-medium text-[#202124]">{shopMap.get(schemeOnlyOffer.shop_id)?.name}</b></div>
-                        <div className="text-xs text-[#5F6368] tabular-nums">{fmtDate(schemeOnlyOffer.observed_on)}</div>
+                        <div className="mt-0.5 text-sm"><b className="font-medium text-[var(--text-primary)]">{shopMap.get(schemeOnlyOffer.shop_id)?.name}</b></div>
+                        <div className="text-xs text-[var(--text-secondary)] tabular-nums">{fmtDate(schemeOnlyOffer.observed_on)}</div>
                       </>
                     ) : (
                       <Badge tone="amber">No valid price</Badge>
                     )}
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#E1E5EA] pt-2.5">
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-[var(--border-default)] pt-2.5">
                   <Select
-                    className="!w-auto !min-h-9 text-xs sm:text-sm"
+                    className="!w-auto !min-h-8.5 !py-1 !px-2.5 text-xs"
                     value={e.item.priority}
                     onChange={(ev) => void act(() => updateWishlist(e.item, { priority: ev.target.value as WishlistItem['priority'] }))}
                     aria-label="Priority"
@@ -344,22 +349,22 @@ export default function Wishlist() {
                   </Button>
                 </div>
                 {isOpen && (
-                  <div className="mt-3 space-y-2.5 border-t border-[#E1E5EA] pt-3">
+                  <div className="mt-3 space-y-2.5 border-t border-[var(--border-default)] pt-3">
                     <Notes item={e.item} onSave={(n) => act(() => updateWishlist(e.item, { notes: n }), 'Note saved')} />
                     {e.cmp.offers.length === 0 ? (
-                      <div className="text-sm text-[#5F6368]">No price records for this exact variant yet.</div>
+                      <div className="text-sm text-[var(--text-secondary)]">No price records for this exact variant yet.</div>
                     ) : (
                       e.cmp.offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} />)
                     )}
                     {alt.length > 0 && (
-                      <div className="rounded-xl border border-dashed border-[#E1E5EA] bg-[#F8FAFC] p-3 text-xs text-[#5F6368]">
-                        <b className="font-medium text-[#202124]">Other variants (shown for reference only):</b>
+                      <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] p-3 text-xs text-[var(--text-secondary)]">
+                        <b className="font-medium text-[var(--text-primary)]">Other variants (shown for reference only):</b>
                         {alt.map((p) => {
                           const rs2 = current.filter((r) => r.product_id === p.id && r.scheme_status === 'ok' && r.effective_cost != null)
                           const m = rs2.length ? Math.min(...rs2.map((r) => r.effective_cost!)) : null
                           return (
                             <div key={p.id} className="mt-0.5">
-                              <Link className="font-medium text-[#1A73E8] underline" to={`/products/${p.id}`}>
+                              <Link className="font-medium text-[var(--color-primary)] underline" to={`/products/${p.id}`}>
                                 {variantLabel(p) || p.name}
                               </Link>
                               : {m != null ? `from ${rs(m)}` : 'no price'}

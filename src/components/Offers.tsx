@@ -37,89 +37,89 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
   return (
     <div
       className={cx(
-        'rounded-xl border p-3.5 transition-colors',
+        'rounded-xl border p-3 transition-colors',
         best
-          ? 'border-[#188038] bg-[#E6F4EA]/50'
+          ? 'border-[var(--color-best-border)] bg-[var(--color-best-bg)]'
           : o.eligible || isSchemeOnly
-            ? 'border-[#E1E5EA] bg-[#F8FAFC]'
-            : 'border-[#E1E5EA] bg-[#F8FAFC] opacity-85',
+            ? 'border-[var(--border-default)] bg-[var(--bg-surface)]'
+            : 'border-[var(--border-default)] bg-[var(--bg-surface)] opacity-85',
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-[#202124] sm:text-base">{shop?.name ?? 'Unknown shop'}</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-sm font-medium text-[var(--text-primary)]">{shop?.name ?? 'Unknown shop'}</span>
             {best && <Badge tone="solid">{o.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'}</Badge>}
           </div>
-          <div className="mt-0.5 text-xs text-[#5F6368]">
-            Survey date: <span className="font-medium text-[#202124] tabular-nums">{fmtDate(r.observed_on)}</span>
+          <div className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            Survey date: <span className="font-medium text-[var(--text-primary)] tabular-nums">{fmtDate(r.observed_on)}</span>
             {shop?.city ? ` · ${shop.city}` : ''}
           </div>
         </div>
         <div className="text-right">
           {o.eligible ? (
             <>
-              <div className={cx('text-lg font-semibold tabular-nums sm:text-xl', best ? 'text-[#188038]' : 'text-[#202124]')}>
+              <div className={cx('text-base font-semibold tabular-nums sm:text-lg', best ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]')}>
                 {rs(o.cents! / 100)}
               </div>
-              <div className="text-[11px] text-[#5F6368]">effective purchase price</div>
+              <div className="text-[11px] text-[var(--text-secondary)]">effective purchase price</div>
             </>
           ) : isSchemeOnly ? (
             <>
-              <div className="text-base font-semibold text-[#1A73E8] sm:text-lg">{r.scheme_text}</div>
-              <div className="text-[11px] text-[#5F6368]">trade price / discount offer</div>
+              <div className="text-sm font-semibold text-[var(--color-primary)] sm:text-base">{r.scheme_text}</div>
+              <div className="text-[11px] text-[var(--text-secondary)]">trade price / discount offer</div>
             </>
           ) : (
             <>
-              <div className="text-lg font-semibold text-[#202124] tabular-nums sm:text-xl">—</div>
-              <div className="text-[11px] text-[#5F6368]">effective purchase price</div>
+              <div className="text-base font-semibold text-[var(--text-primary)] tabular-nums sm:text-lg">—</div>
+              <div className="text-[11px] text-[var(--text-secondary)]">effective purchase price</div>
             </>
           )}
         </div>
       </div>
 
-      <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-lg border border-[#E1E5EA] bg-white px-3 py-2 text-xs sm:grid-cols-4 sm:text-sm">
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs sm:grid-cols-4">
         <div>
-          <span className="block text-[11px] text-[#5F6368]">Original offer rate</span>
-          <b className="font-medium text-[#202124] tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</b>
+          <span className="block text-[11px] text-[var(--text-secondary)]">Original offer rate</span>
+          <b className="font-medium text-[var(--text-primary)] tabular-nums">{r.base_price != null ? rs(r.base_price) : r.scheme_text || '—'}</b>
         </div>
         <div>
-          <span className="block text-[11px] text-[#5F6368]">Discount / scheme</span>
-          <b className="font-medium text-[#202124]">{r.scheme_text || 'None'}</b>
+          <span className="block text-[11px] text-[var(--text-secondary)]">Discount / scheme</span>
+          <b className="font-medium text-[var(--text-primary)]">{r.scheme_text || 'None'}</b>
         </div>
         {r.pack_size != null && (
           <div>
-            <span className="block text-[11px] text-[#5F6368]">Pack size</span>
-            <b className="font-medium text-[#202124] tabular-nums">{r.pack_size}</b>
+            <span className="block text-[11px] text-[var(--text-secondary)]">Pack size</span>
+            <b className="font-medium text-[var(--text-primary)] tabular-nums">{r.pack_size}</b>
           </div>
         )}
         {o.perUnit && (
           <div>
-            <span className="block text-[11px] text-[#5F6368]">{o.perUnit.label}</span>
-            <b className="font-medium text-[#202124] tabular-nums">{rs(o.perUnit.value, 3)}</b>
+            <span className="block text-[11px] text-[var(--text-secondary)]">{o.perUnit.label}</span>
+            <b className="font-medium text-[var(--text-primary)] tabular-nums">{rs(o.perUnit.value, 3)}</b>
           </div>
         )}
         {r.mrp != null && (
           <div>
-            <span className="block text-[11px] text-[#5F6368]">MRP</span>
-            <b className="font-medium text-[#202124] tabular-nums">{rs(r.mrp)}</b>
+            <span className="block text-[11px] text-[var(--text-secondary)]">MRP</span>
+            <b className="font-medium text-[var(--text-primary)] tabular-nums">{rs(r.mrp)}</b>
           </div>
         )}
         {r.availability && (
           <div>
-            <span className="block text-[11px] text-[#5F6368]">Stock</span>
-            <b className="font-medium text-[#202124]">{r.availability}</b>
+            <span className="block text-[11px] text-[var(--text-secondary)]">Stock</span>
+            <b className="font-medium text-[var(--text-primary)]">{r.availability}</b>
           </div>
         )}
         {o.aboveBest != null && o.aboveBest > 0 && (
           <div className="col-span-2">
-            <span className="block text-[11px] text-[#5F6368]">Difference vs best</span>
-            <b className="font-medium text-[#202124] tabular-nums">+{rs(o.aboveBest)}</b>
+            <span className="block text-[11px] text-[var(--text-secondary)]">Difference vs best</span>
+            <b className="font-medium text-[var(--text-primary)] tabular-nums">+{rs(o.aboveBest)}</b>
           </div>
         )}
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <FreshBadge ageDays={o.ageDays} fresh={o.fresh} />
         <MatchBadge status={r.match_status} />
         {isSchemeOnly ? (
@@ -130,22 +130,22 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
         {r.scheme_status === 'review' && <Badge tone="amber">Calculation needs review</Badge>}
       </div>
 
-      <div className="mt-1.5 text-xs text-[#5F6368]">
-        Shop's item name: <span className="font-medium text-[#202124]">“{r.original_title}”</span>
+      <div className="mt-1.5 text-xs text-[var(--text-secondary)]">
+        Shop's item name: <span className="font-medium text-[var(--text-primary)]">“{r.original_title}”</span>
         {r.original_code ? ` · code ${r.original_code}` : ''}
         {r.notes ? ` · note: ${r.notes}` : ''}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-3">
+      <div className="mt-1.5 flex flex-wrap items-center gap-3">
         {r.calc_notes && (
-          <button type="button" className="text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:underline" onClick={() => setOpen(!open)}>
+          <button type="button" className="text-xs font-medium text-[var(--color-primary)] hover:underline" onClick={() => setOpen(!open)}>
             {open ? 'Hide calculation steps' : 'Show calculation steps'}
           </button>
         )}
         {extra}
       </div>
       {open && r.calc_notes && (
-        <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[#E1E5EA] bg-white p-2.5 text-xs text-[#5F6368]">
+        <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] p-2.5 text-xs text-[var(--text-secondary)]">
           {r.calc_notes}
         </pre>
       )}

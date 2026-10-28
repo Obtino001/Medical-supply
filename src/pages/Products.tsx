@@ -12,12 +12,12 @@ export default function Products() {
   const nav = useNavigate()
   const toast = useToast()
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <PageHeader
         title="Product master"
-        subtitle="Normalized catalog of medical products, strengths, and dosage forms across all shops."
+        subtitle="Normalized catalog of medical products, strengths, and supplier offers."
       >
-        <Button onClick={() => setCreating(true)}>
+        <Button small onClick={() => setCreating(true)}>
           <IconPlus size={15} />
           <span>New product</span>
         </Button>
