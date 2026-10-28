@@ -1,11 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+const rawUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim()
+const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim()
+
+if (rawKey && (rawKey.startsWith('sb_secret_') || /service_role/i.test(rawKey))) {
+  throw new Error('Security error: never use a Supabase secret or service_role key in frontend VITE_* variables.')
+}
+
+const isPlaceholder = (val: string | undefined) =>
+  !val || val.includes('YOUR-PROJECT-REF') || val.includes('YOUR-ANON-PUBLIC-KEY') || val.includes('YOUR_PUBLISHABLE_KEY')
+
+const url = !isPlaceholder(rawUrl) ? rawUrl : undefined
+const key = !isPlaceholder(rawKey) ? rawKey : undefined
 
 export const configured = Boolean(url && key)
 
-// Only the public anon key is ever used here; all access is limited by row-level security.
+// Only the public publishable / anon key is ever used here; all access is limited by row-level security.
 export const supabase = createClient(url ?? 'http://localhost:54321', key ?? 'missing-anon-key', {
   auth: { persistSession: true, autoRefreshToken: true },
 })
