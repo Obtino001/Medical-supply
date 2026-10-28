@@ -18,21 +18,21 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 export function Button({ variant = 'primary', small, className, type = 'button', ...p }: BtnProps) {
   const v = {
     primary:
-      'bg-[#1A73E8] text-white hover:bg-[#1557B0] active:bg-[#1557B0] focus-visible:outline-[#1A73E8] disabled:bg-[#1A73E8]/40 disabled:text-white/80',
+      'bg-[#1A73E8] text-white hover:bg-[#1557B0] active:bg-[#1557B0] focus-visible:outline-[#1A73E8] disabled:bg-[#E1E5EA] disabled:text-[#5F6368]',
     secondary:
-      'bg-white text-[#202124] border border-[#DADCE0] hover:bg-[#F8F9FA] active:bg-[#E8F0FE]/60 focus-visible:outline-[#1A73E8] disabled:bg-[#F8F9FA] disabled:text-[#5F6368] disabled:border-[#DADCE0]',
+      'bg-white text-[#202124] border border-[#E1E5EA] hover:bg-[#F8FAFC] active:bg-[#E8F0FE]/60 focus-visible:outline-[#1A73E8] disabled:bg-[#F8FAFC] disabled:text-[#5F6368]/60 disabled:border-[#E1E5EA]',
     danger:
       'bg-[#D93025] text-white hover:bg-[#B3261E] active:bg-[#B3261E] focus-visible:outline-[#D93025] disabled:bg-[#D93025]/40',
     ghost:
-      'text-[#1A73E8] hover:bg-[#E8F0FE] active:bg-[#E8F0FE]/80 focus-visible:outline-[#1A73E8] disabled:text-[#5F6368] disabled:hover:bg-transparent',
+      'text-[#1A73E8] hover:bg-[#E8F0FE] active:bg-[#E8F0FE]/80 focus-visible:outline-[#1A73E8] disabled:text-[#5F6368]/60 disabled:hover:bg-transparent',
   }[variant]
   return (
     <button
       type={type}
       {...p}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors duration-150 select-none focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed',
-        small ? 'min-h-8.5 px-3 py-1.5 text-xs sm:text-sm' : 'min-h-10 px-4 py-2 text-sm',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors duration-150 select-none focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed',
+        small ? 'min-h-9 px-3 py-1.5 text-xs sm:text-sm' : 'min-h-11 sm:min-h-10 px-4 py-2 text-sm',
         v,
         className,
       )}
@@ -41,12 +41,15 @@ export function Button({ variant = 'primary', small, className, type = 'button',
 }
 
 const inputCls =
-  'w-full min-h-10 rounded-md border border-[#DADCE0] bg-white px-3 py-2 text-[#202124] transition-colors duration-150 placeholder:text-[#5F6368]/75 hover:border-[#5F6368] focus:border-[#1A73E8] focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20 disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#5F6368]'
+  'w-full min-h-11 sm:min-h-10 rounded-lg border border-[#E1E5EA] bg-white px-3.5 py-2 text-[#202124] transition-colors duration-150 placeholder:text-[#5F6368]/75 hover:border-[#5F6368]/60 focus:border-[#1A73E8] focus:outline-none focus:ring-2 focus:ring-[#1A73E8]/20 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#5F6368]'
 
-export function Field({ label, hint, children, className }: { label: string; hint?: string; children: ReactNode; className?: string }) {
+export function Field({ label, required, hint, children, className }: { label: ReactNode; required?: boolean; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block', className)}>
-      <span className="mb-1.5 block text-xs font-medium text-[#202124] sm:text-sm">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-[#202124] sm:text-sm">
+        {label}
+        {required && <span className="ml-0.5 font-semibold text-[#D93025]" aria-hidden="true">*</span>}
+      </span>
       {children}
       {hint && <span className="mt-1 block text-xs leading-relaxed text-[#5F6368]">{hint}</span>}
     </label>
@@ -61,7 +64,7 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return (
     <div
       className={cx(
-        'rounded-lg border border-[#DADCE0] bg-white p-4 sm:p-5',
+        'rounded-xl border border-[#E1E5EA] bg-white p-4 sm:p-5',
         className,
       )}
     >
@@ -76,7 +79,7 @@ const tones = {
   blue: 'bg-[#E8F0FE] text-[#1A73E8] border-[#D2E3FC]',
   amber: 'bg-[#FEF7E0] text-[#B06000] border-[#FDD663]',
   red: 'bg-[#FCE8E6] text-[#D93025] border-[#FAD2CF]',
-  slate: 'bg-[#F8F9FA] text-[#5F6368] border-[#DADCE0]',
+  slate: 'bg-[#F8FAFC] text-[#5F6368] border-[#E1E5EA]',
   solid: 'bg-[#188038] text-white border-[#188038]',
 }
 
@@ -84,7 +87,7 @@ export function Badge({ tone = 'slate', children }: { tone?: keyof typeof tones;
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap',
         tones[tone],
       )}
     >
@@ -104,7 +107,7 @@ export function Spinner({ label = 'Loading…' }: { label?: string }) {
 
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-[#DADCE0] bg-white px-6 py-10 text-center">
+    <div className="rounded-xl border border-dashed border-[#E1E5EA] bg-white px-5 py-8 text-center">
       <div className="text-base font-medium text-[#202124]">{title}</div>
       {children && <div className="mx-auto mt-1.5 max-w-md text-sm text-[#5F6368]">{children}</div>}
     </div>
@@ -113,7 +116,7 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 
 export function ErrorBox({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="flex items-start gap-2.5 rounded-md border border-[#FAD2CF] bg-[#FCE8E6] p-3.5 text-sm text-[#D93025]">
+    <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-[#FAD2CF] bg-[#FCE8E6] p-3.5 text-sm text-[#D93025]">
       <IconAlert size={18} className="mt-0.5 shrink-0 text-[#D93025]" />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -122,9 +125,9 @@ export function ErrorBox({ children }: { children: ReactNode }) {
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-xl font-medium tracking-tight text-[#202124] sm:text-2xl">{title}</h1>
+        <h1 className="text-2xl font-medium tracking-tight text-[#202124] sm:text-[26px]">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-[#5F6368]">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
@@ -150,17 +153,18 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
         aria-modal="true"
         aria-label={title}
         className={cx(
-          'max-h-[92vh] w-full overflow-y-auto rounded-t-xl border border-[#DADCE0] bg-white p-4 shadow-xl sm:rounded-xl sm:p-6',
+          'safe-bottom max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-[#E1E5EA] bg-white p-4 shadow-xl sm:rounded-xl sm:p-6',
           wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
         )}
       >
-        <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#DADCE0] pb-3">
+        <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-[#E1E5EA] sm:hidden" />
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#E1E5EA] pb-3">
           <h2 className="text-base font-medium text-[#202124] sm:text-lg">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#5F6368] transition-colors hover:bg-[#F8F9FA] hover:text-[#202124]"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#5F6368] transition-colors hover:bg-[#F8FAFC] hover:text-[#202124]"
           >
             <IconClose size={18} />
           </button>
@@ -202,7 +206,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
               key={t.id}
               role="status"
               className={cx(
-                'pointer-events-auto flex max-w-md items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium shadow-md',
+                'pointer-events-auto flex max-w-md items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium shadow-md',
                 t.kind === 'ok'
                   ? 'border-[#188038] bg-[#188038] text-white'
                   : 'border-[#D93025] bg-[#D93025] text-white',
@@ -228,7 +232,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
 export function Pagination({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
   if (pages <= 1) return null
   return (
-    <div className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-[#DADCE0] bg-white px-3 py-2">
+    <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-[#E1E5EA] bg-white px-3 py-2">
       <Button variant="secondary" small disabled={page <= 0} onClick={() => onPage(page - 1)}>
         <IconArrowLeft size={15} />
         <span>Previous</span>
@@ -262,13 +266,13 @@ export function Stat({
         ? 'border-[#CEEAD6] bg-[#E6F4EA]/50'
         : tone === 'teal' || tone === 'blue'
           ? 'border-[#1A73E8] bg-[#E8F0FE]/60'
-          : 'border-[#DADCE0] bg-white'
+          : 'border-[#E1E5EA] bg-white'
   const inner = (
     <div
       className={cx(
-        'flex h-full flex-col justify-between rounded-lg border p-3.5 transition-colors duration-150',
+        'flex h-full flex-col justify-between rounded-xl border p-3.5 transition-colors duration-150',
         toneCls,
-        to && 'hover:border-[#1A73E8] hover:bg-[#F8F9FA]',
+        to && 'hover:border-[#1A73E8] hover:bg-[#F8FAFC]',
       )}
     >
       <div className="flex items-center justify-between gap-2">

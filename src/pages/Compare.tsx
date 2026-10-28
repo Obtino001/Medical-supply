@@ -6,7 +6,7 @@ export default function Compare() {
     <div className="space-y-4">
       <PageHeader
         title="Compare prices"
-        subtitle="Compare shop offer rates, discounts/schemes, and effective purchase prices across the shared workspace. The lowest valid effective price is highlighted in green."
+        subtitle="Find the best supplier price for each medicine."
       />
       <ProductBrowser mode="compare" />
     </div>
