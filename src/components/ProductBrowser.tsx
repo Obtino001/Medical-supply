@@ -1,12 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { deleteProductsByIds } from '../lib/actions'
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
-import { IconArrowRight, IconChevronDown, IconClose, IconFilter, IconSearch, IconUpload } from './icons'
+import { IconArrowRight, IconChevronDown, IconClose, IconFilter, IconSearch, IconTrash, IconUpload } from './icons'
 import { OfferLeadBox, OfferRow } from './Offers'
 import { WishlistToggle } from './WishlistToggle'
-import { Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useDebounced, useLocalState, useToast } from './ui'
+import { Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useConfirm, useDebounced, useLocalState, useToast } from './ui'
 
 interface View {
   q: string
@@ -65,8 +66,9 @@ const DESKTOP_GRID =
   'md:grid-cols-[20px_minmax(190px,1.45fr)_minmax(270px,2.25fr)_212px] md:items-center md:gap-x-3.5'
 
 export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
-  const { products, current, shopMap, shops, settings, wishlistMap, selected, setSelected } = useData()
+  const { products, current, shopMap, shops, settings, wishlistMap, selected, setSelected, reload } = useData()
   const toast = useToast()
+  const confirm = useConfirm()
   const [params] = useSearchParams()
   const defaultView = useMemo(() => getDefaultView(mode), [mode])
   const [stored, setView] = useLocalState<View>(`view:${mode}:v2`, defaultView)
@@ -531,11 +533,37 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
             )}
           </div>
           {selected.size > 0 && (
-            <span className="flex items-center gap-3">
+            <span className="flex flex-wrap items-center gap-3">
               <Link to="/export" className="inline-flex items-center gap-1 font-medium text-[var(--color-primary)] hover:underline">
                 <span>Export selected ({selected.size})</span>
                 <IconArrowRight size={13} />
               </Link>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 font-medium text-[var(--color-error-text)] hover:underline"
+                onClick={async () => {
+                  const ids = [...selected]
+                  const ok = await confirm({
+                    title: `Delete ${ids.length} selected product${ids.length === 1 ? '' : 's'}?`,
+                    body: 'This will permanently delete the selected products and all of their price records across shops.',
+                    confirmLabel: `Delete (${ids.length})`,
+                    danger: true,
+                  })
+                  if (!ok) return
+                  try {
+                    const n = await deleteProductsByIds(ids)
+                    setSelected(new Set())
+                    await reload()
+                    toast('ok', `Deleted ${n} product${n === 1 ? '' : 's'}`)
+                  } catch (e) {
+                    toast('err', (e as Error).message)
+                    await reload()
+                  }
+                }}
+              >
+                <IconTrash size={13} />
+                <span>Delete selected ({selected.size})</span>
+              </button>
               <button
                 type="button"
                 className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"

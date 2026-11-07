@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconPlus } from '../components/icons'
-import { Button, Card, Empty, Modal, PageHeader, Pagination, Textarea, fmtDate, useToast } from '../components/ui'
+import { IconPlus, IconTrash } from '../components/icons'
+import { Button, Card, Empty, Modal, PageHeader, Pagination, Textarea, fmtDate, useConfirm, useToast } from '../components/ui'
+import { deleteSurveyWithItems } from '../lib/actions'
 import { useData } from '../lib/data'
 import { updateChecked } from '../lib/supabase'
 import type { Survey } from '../lib/types'
@@ -9,14 +10,37 @@ import type { Survey } from '../lib/types'
 export default function Surveys() {
   const { surveys, shopMap, memberName, reload } = useData()
   const toast = useToast()
+  const confirm = useConfirm()
   const [edit, setEdit] = useState<Survey | null>(null)
   const [note, setNote] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const per = 30
   const save = async () => {
     if (!edit) return
     try { await updateChecked('surveys', edit.id, (edit as Survey & { updated_at: string }).updated_at, { notes: note.trim() || null }); await reload(); setEdit(null); toast('ok', 'Survey note saved') }
     catch (e) { toast('err', (e as Error).message); await reload() }
+  }
+  const removeSurvey = async (s: Survey) => {
+    const shopName = shopMap.get(s.shop_id)?.name ?? 'Shop'
+    const ok = await confirm({
+      title: `Delete Survey #${s.survey_no} (${shopName})?`,
+      body: 'This will delete this survey, its imported price records, and any products that have no offers from other surveys/shops.',
+      confirmLabel: 'Delete survey & items',
+      danger: true,
+    })
+    if (!ok) return
+    setDeletingId(s.id)
+    try {
+      const res = await deleteSurveyWithItems(s.id)
+      await reload()
+      toast('ok', `Deleted Survey #${s.survey_no} (${res.deletedOffers} offers, ${res.deletedProducts} products removed)`)
+    } catch (e) {
+      toast('err', (e as Error).message)
+      await reload()
+    } finally {
+      setDeletingId(null)
+    }
   }
   return (
     <div className="space-y-4">
@@ -36,8 +60,14 @@ export default function Surveys() {
           {surveys.slice(page * per, page * per + per).map((s) => (
             <Card key={s.id} className="!p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm"><b className="font-medium text-[var(--text-primary)]">Survey #{s.survey_no}</b> · <span className="font-medium text-[var(--text-primary)]">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span> · <span className="text-[var(--text-secondary)]">{fmtDate(s.survey_date)}</span></div>
-                <Button variant="ghost" small onClick={() => { setEdit(s); setNote(s.notes ?? '') }}>Edit note</Button>
+                <div className="min-w-0 truncate text-sm"><b className="font-medium text-[var(--text-primary)]">Survey #{s.survey_no}</b> · <span className="font-medium text-[var(--text-primary)]">{shopMap.get(s.shop_id)?.name ?? 'Shop'}</span> · <span className="text-[var(--text-secondary)]">{fmtDate(s.survey_date)}</span></div>
+                <div className="flex items-center gap-1.5">
+                  <Button variant="ghost" small onClick={() => { setEdit(s); setNote(s.notes ?? '') }}>Edit note</Button>
+                  <Button variant="danger" small disabled={deletingId === s.id} onClick={() => void removeSurvey(s)}>
+                    <IconTrash size={14} />
+                    <span>{deletingId === s.id ? 'Deleting…' : 'Delete'}</span>
+                  </Button>
+                </div>
               </div>
               <div className="mt-0.5 text-xs text-[var(--text-secondary)]">Created by {memberName(s.created_by)} on {fmtDate(s.created_at)}</div>
               {s.notes && <div className="mt-1.5 text-sm text-[var(--text-primary)]">{s.notes}</div>}

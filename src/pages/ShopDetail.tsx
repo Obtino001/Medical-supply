@@ -1,17 +1,21 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { IconTrash } from '../components/icons'
 import { ShopForm } from '../components/ShopForm'
 import { Badge, Button, Card, Empty, PageHeader, Stat, fmtDate, rs, useConfirm, useToast } from '../components/ui'
+import { deleteShopWithItems } from '../lib/actions'
 import { compareOffers } from '../lib/compare'
 import { useData } from '../lib/data'
 import { updateChecked } from '../lib/supabase'
 
 export default function ShopDetail() {
   const { id } = useParams()
+  const nav = useNavigate()
   const { shopMap, surveys, current, productMap, settings, reload, history, products } = useData()
   const toast = useToast()
   const confirm = useConfirm()
   const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const shop = id ? shopMap.get(id) : undefined
 
   const mine = useMemo(() => current.filter((r) => r.shop_id === id), [current, id])
@@ -39,12 +43,38 @@ export default function ShopDetail() {
     try { await updateChecked('shops', shop.id, shop.updated_at, { status: archiving ? 'archived' : 'active' }); await reload(); toast('ok', archiving ? 'Shop archived' : 'Shop restored') }
     catch (e) { toast('err', (e as Error).message); await reload() }
   }
+
+  const handleDeleteShop = async () => {
+    const ok = await confirm({
+      title: `Delete "${shop.name}" and its items?`,
+      body: `This will permanently delete "${shop.name}", all of its price records (${mine.length} current offers), surveys, import history, and any products that only belong to this shop.`,
+      confirmLabel: 'Delete shop & items',
+      danger: true,
+    })
+    if (!ok) return
+    setDeleting(true)
+    try {
+      const res = await deleteShopWithItems(shop.id)
+      await reload()
+      toast('ok', `Deleted "${shop.name}" (${res.deletedOffers} offers, ${res.deletedProducts} products removed)`)
+      nav('/shops')
+    } catch (e) {
+      toast('err', (e as Error).message)
+      setDeleting(false)
+      await reload()
+    }
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader title={shop.name}>
-        <Link to={`/import?shop=${shop.id}`}><Button>Import price list</Button></Link>
-        <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
-        <Button variant="secondary" onClick={toggleArchive}>{shop.status === 'active' ? 'Archive' : 'Restore'}</Button>
+        <Link to={`/import?shop=${shop.id}`}><Button small>Import price list</Button></Link>
+        <Button variant="secondary" small onClick={() => setEditing(true)}>Edit</Button>
+        <Button variant="secondary" small onClick={toggleArchive}>{shop.status === 'active' ? 'Archive' : 'Restore'}</Button>
+        <Button variant="danger" small disabled={deleting} onClick={() => void handleDeleteShop()}>
+          <IconTrash size={14} />
+          <span>{deleting ? 'Deleting…' : 'Delete shop'}</span>
+        </Button>
       </PageHeader>
       <Card>
         <div className="text-sm text-[var(--text-secondary)]">

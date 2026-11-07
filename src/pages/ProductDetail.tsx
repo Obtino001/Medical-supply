@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { IconTrash } from '../components/icons'
 import { ProductPicker } from '../components/Match'
 import { OfferCard } from '../components/Offers'
 import { ProductForm } from '../components/ProductForm'
 import { WishlistToggle } from '../components/WishlistToggle'
 import { Badge, Button, Card, Empty, PageHeader, Spinner, Textarea, fmtDate, rs, useConfirm, useToast } from '../components/ui'
-import { confirmMatch } from '../lib/actions'
+import { confirmMatch, deleteProductsByIds } from '../lib/actions'
 import { compareOffers } from '../lib/compare'
 import { useData } from '../lib/data'
 import { variantLabel } from '../lib/productParse'
@@ -17,6 +18,7 @@ interface Ident { id: string; kind: string; value: string; shop_id: string | nul
 
 export default function ProductDetail() {
   const { id } = useParams()
+  const nav = useNavigate()
   const { productMap, products, current, shopMap, settings, reload, memberName } = useData()
   const toast = useToast()
   const confirm = useConfirm()
@@ -71,6 +73,24 @@ export default function ProductDetail() {
     } catch (e) { toast('err', (e as Error).message) }
   }
 
+  const removeProduct = async () => {
+    const ok = await confirm({
+      title: `Delete "${product.name}"?`,
+      body: 'This will permanently delete this product and all of its price records across shops.',
+      confirmLabel: 'Delete product',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deleteProductsByIds([product.id])
+      await reload()
+      toast('ok', 'Product deleted')
+      nav('/products')
+    } catch (e) {
+      toast('err', (e as Error).message)
+    }
+  }
+
   // history grouped by shop for the change table
   const byShop = new Map<string, PriceRecord[]>()
   for (const r of history) { const a = byShop.get(r.shop_id); if (a) a.push(r); else byShop.set(r.shop_id, [r]) }
@@ -79,8 +99,12 @@ export default function ProductDetail() {
     <div className="space-y-4">
       <PageHeader title={product.name}>
         <WishlistToggle productId={product.id} small={false} />
-        <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
-        <Button variant="secondary" onClick={archive}>{product.archived ? 'Restore' : 'Archive'}</Button>
+        <Button variant="secondary" small onClick={() => setEditing(true)}>Edit</Button>
+        <Button variant="secondary" small onClick={archive}>{product.archived ? 'Restore' : 'Archive'}</Button>
+        <Button variant="danger" small onClick={() => void removeProduct()}>
+          <IconTrash size={14} />
+          <span>Delete</span>
+        </Button>
       </PageHeader>
       <Card>
         <div className="flex flex-wrap items-center gap-2">
