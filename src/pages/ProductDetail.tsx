@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { IconTrash } from '../components/icons'
+import { EditOfferModal } from '../components/EditOfferModal'
+import { IconEdit, IconTrash } from '../components/icons'
 import { ProductPicker } from '../components/Match'
 import { OfferCard } from '../components/Offers'
 import { ProductForm } from '../components/ProductForm'
@@ -27,6 +28,8 @@ export default function ProductDetail() {
   const [aliases, setAliases] = useState<Alias[]>([])
   const [idents, setIdents] = useState<Ident[]>([])
   const [editing, setEditing] = useState(false)
+  const [editingOffer, setEditingOffer] = useState<PriceRecord | null>(null)
+  const [addingOffer, setAddingOffer] = useState(false)
   const [moving, setMoving] = useState<PriceRecord | null>(null)
   const [notes, setNotes] = useState<string | null>(null)
 
@@ -125,10 +128,16 @@ export default function ProductDetail() {
       </Card>
 
       <section>
-        <h2 className="mb-2 text-base font-medium text-[var(--text-primary)]">Current offers (latest per shop)</h2>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-medium text-[var(--text-primary)]">Current offers (latest per shop)</h2>
+          <Button variant="secondary" small onClick={() => setAddingOffer(true)}>
+            <IconEdit size={13} />
+            <span>Set / add manual offer</span>
+          </Button>
+        </div>
         {cmp.offers.length === 0 ? <Empty title="No price records yet" /> : (
           <div className="space-y-2">
-            {cmp.offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} extra={<Button variant="ghost" small onClick={() => setMoving(o.rec)}>Wrong product? Move…</Button>} />)}
+            {cmp.offers.map((o) => <OfferCard key={o.rec.id} o={o} shop={shopMap.get(o.rec.shop_id)} onSaved={load} extra={<Button variant="ghost" small onClick={() => setMoving(o.rec)}>Wrong product? Move…</Button>} />)}
           </div>
         )}
       </section>
@@ -142,7 +151,7 @@ export default function ProductDetail() {
                 <div className="mb-2 font-medium text-[var(--text-primary)]">{shopMap.get(shopId)?.name ?? 'Shop'}</div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="text-left text-xs uppercase text-[var(--text-secondary)]"><th className="pr-2">Survey date</th><th className="pr-2">Price</th><th className="pr-2">Scheme</th><th className="pr-2">Effective</th><th className="pr-2">Change</th><th>By</th></tr></thead>
+                    <thead><tr className="text-left text-xs uppercase text-[var(--text-secondary)]"><th className="pr-2">Survey date</th><th className="pr-2">Price</th><th className="pr-2">Scheme</th><th className="pr-2">Effective</th><th className="pr-2">Change</th><th className="pr-2">By</th><th className="text-right">Edit</th></tr></thead>
                     <tbody>
                       {recs.map((r, i) => {
                         const prev = recs[i + 1]
@@ -154,7 +163,17 @@ export default function ProductDetail() {
                             <td className="pr-2">{r.scheme_text || '—'}</td>
                             <td className="pr-2 font-medium whitespace-nowrap tabular-nums">{r.scheme_status === 'ok' ? (r.effective_cost != null ? rs(r.effective_cost) : r.scheme_text || '—') : <Badge tone="amber">{r.scheme_status}</Badge>}</td>
                             <td className={`pr-2 whitespace-nowrap tabular-nums ${ch == null ? '' : ch < 0 ? 'font-semibold text-[var(--color-best)]' : ch > 0 ? 'text-[var(--color-error-text)]' : ''}`}>{ch == null ? '—' : `${ch > 0 ? '+' : ''}${ch.toFixed(1)}%`}</td>
-                            <td>{memberName(r.created_by)}</td>
+                            <td className="pr-2">{memberName(r.created_by)}</td>
+                            <td className="py-1.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setEditingOffer(r)}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline"
+                              >
+                                <IconEdit size={12} />
+                                <span>Edit</span>
+                              </button>
+                            </td>
                           </tr>
                         )
                       })}
@@ -184,6 +203,8 @@ export default function ProductDetail() {
       </Card>
 
       {editing && <ProductForm open onClose={() => setEditing(false)} product={product} onSaved={async () => { await reload(); toast('ok', 'Product saved') }} />}
+      {editingOffer && <EditOfferModal open onClose={() => setEditingOffer(null)} record={editingOffer} product={product} onSaved={load} />}
+      {addingOffer && <EditOfferModal open onClose={() => setAddingOffer(false)} product={product} records={records} onSaved={load} />}
       {moving && <ProductPicker open onClose={() => setMoving(null)} onPick={(p) => p.id !== product.id && move(p.id)} initialQuery={moving.original_title} title="Move this price record to…" />}
     </div>
   )

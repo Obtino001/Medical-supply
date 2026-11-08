@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { OfferView } from '../lib/compare'
 import type { OfferRanking, RankBadge, RankedOffer } from '../lib/offerRank'
 import type { PriceRecord, Shop } from '../lib/types'
+import { EditOfferModal } from './EditOfferModal'
+import { IconEdit } from './icons'
 import { Badge, cx, fmtDate, rs } from './ui'
 
 const REASON: Record<string, string> = {
@@ -42,6 +44,7 @@ export function OfferRow({
   extra,
   entry,
   ranking,
+  onEdit,
 }: {
   o: OfferView
   rank?: number
@@ -51,12 +54,15 @@ export function OfferRow({
   /** Offer-rate terms and rank; with an 'offer' ranking the row shows the discount instead of a Rs price */
   entry?: RankedOffer
   ranking?: OfferRanking
+  onEdit?: (rec: PriceRecord) => void
 }) {
   const [showCalc, setShowCalc] = useState(false)
+  const [editing, setEditing] = useState(false)
   const r = o.rec
-  const offerMode = ranking?.method === 'offer' && entry != null
+  const offerMode = ranking?.method === 'offer' && entry != null && !o.eligible
   const win = Boolean(offerMode ? entry!.winner : (isWinner ?? o.isBest))
   const isSchemeOnly = o.isDiscountOnly && !offerMode
+  const isTpOffer = entry?.terms.kind === 'tp' || Boolean(r.source_attrs?.is_trade_price)
   const shownRank = offerMode ? (entry!.rank ?? undefined) : o.eligible ? rank : undefined
   const winLabel = offerMode ? ranking!.badge : o.isTied ? 'BEST PRICE (TIED)' : 'BEST PRICE'
 
@@ -93,10 +99,13 @@ export function OfferRow({
             {offerMode && !win && entry!.terms.kind === 'percent' && entry!.rank != null && ranking!.badge !== 'NEEDS REVIEW' && (
               <Badge tone="slate">{entry!.rank === 2 ? 'Second' : entry!.rank === 3 ? 'Third' : `#${entry!.rank}`}</Badge>
             )}
-            {offerMode && entry!.terms.kind !== 'percent' && entry!.terms.note && <Badge tone="amber">{entry!.terms.note}</Badge>}
+            {isTpOffer && <Badge tone="blue">Trade Price (0% disc.)</Badge>}
+            {offerMode && entry!.terms.kind !== 'percent' && entry!.terms.kind !== 'tp' && entry!.terms.note && (
+              <Badge tone="amber">{entry!.terms.note}</Badge>
+            )}
             {!o.fresh && <Badge tone="amber">Stale · {o.ageDays}d</Badge>}
             {o.reason === 'expired' && <Badge tone="red">Expired</Badge>}
-            {isSchemeOnly && <Badge tone="amber">Incomplete · base rate missing</Badge>}
+            {isSchemeOnly && !isTpOffer && <Badge tone="amber">Discount / scheme offer</Badge>}
             {!isSchemeOnly && !offerMode && !o.eligible && o.reason && o.reason !== 'expired' && (
               <Badge tone="amber">{REASON[o.reason]}</Badge>
             )}
@@ -187,6 +196,14 @@ export function OfferRow({
           {r.notes ? ` · ${r.notes}` : ''}
         </span>
         <span className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 font-medium text-[var(--color-primary)] hover:underline"
+            onClick={() => (onEdit ? onEdit(r) : setEditing(true))}
+          >
+            <IconEdit size={12} />
+            <span>Edit rate</span>
+          </button>
           {r.calc_notes && (
             <button
               type="button"
@@ -205,15 +222,28 @@ export function OfferRow({
           {r.calc_notes}
         </pre>
       )}
+      {editing && <EditOfferModal open onClose={() => setEditing(false)} record={r} />}
     </div>
   )
 }
 
-export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undefined; extra?: React.ReactNode }) {
+export function OfferCard({
+  o,
+  shop,
+  extra,
+  onSaved,
+}: {
+  o: OfferView
+  shop: Shop | undefined
+  extra?: React.ReactNode
+  onSaved?: () => void | Promise<void>
+}) {
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
   const r = o.rec
   const best = o.isBest
   const isSchemeOnly = o.isDiscountOnly
+  const isTpOffer = Boolean(r.source_attrs?.is_trade_price || /^tp\b/i.test(r.scheme_text ?? ''))
   return (
     <div
       className={cx(
@@ -302,8 +332,10 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <FreshBadge ageDays={o.ageDays} fresh={o.fresh} />
         <MatchBadge status={r.match_status} />
-        {isSchemeOnly ? (
-          <Badge tone="amber">Incomplete: base rate missing</Badge>
+        {isTpOffer ? (
+          <Badge tone="blue">Trade Price (0% discount)</Badge>
+        ) : isSchemeOnly ? (
+          <Badge tone="amber">Discount / scheme only (no Rs rate)</Badge>
         ) : (
           !o.eligible && o.reason && <Badge tone="amber">{REASON[o.reason]}</Badge>
         )}
@@ -317,6 +349,14 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline"
+          onClick={() => setEditing(true)}
+        >
+          <IconEdit size={13} />
+          <span>Edit rate / offer</span>
+        </button>
         {r.calc_notes && (
           <button type="button" className="text-xs font-medium text-[var(--color-primary)] hover:underline" onClick={() => setOpen(!open)}>
             {open ? 'Hide calculation steps' : 'Show calculation steps'}
@@ -329,6 +369,7 @@ export function OfferCard({ o, shop, extra }: { o: OfferView; shop: Shop | undef
           {r.calc_notes}
         </pre>
       )}
+      {editing && <EditOfferModal open onClose={() => setEditing(false)} record={r} onSaved={onSaved} />}
     </div>
   )
 }
@@ -350,17 +391,21 @@ const LEAD_TONE: Record<RankBadge, 'solid' | 'amber' | 'slate'> = {
 export function OfferLeadBox({ ranking, shopName }: { ranking: OfferRanking; shopName: (shopId: string) => string }) {
   const lead = ranking.lead
   if (!lead) return null
+  const isTpLead = lead.terms.kind === 'tp'
   const verified = ranking.badge === 'BEST OFFER' || ranking.badge === 'TIED OFFER'
-  const uncertain = ranking.badge === 'NEEDS REVIEW' || ranking.badge === 'INCOMPLETE'
+  const uncertain = (ranking.badge === 'NEEDS REVIEW' || ranking.badge === 'INCOMPLETE') && !isTpLead
   const names = verified ? ranking.winners.map((w) => shopName(w.view.rec.shop_id)) : [shopName(lead.view.rec.shop_id)]
   const second = ranking.ordered.find((o) => o.rank != null && !o.winner && o.view.offerEligible)
   const r = lead.view.rec
   const detail: string[] = []
   if (lead.terms.kind === 'percent' && lead.terms.cartonPct != null) detail.push(`Full carton ${lead.terms.cartonPct}%`)
   if (lead.terms.kind === 'percent' && lead.terms.minQty != null) detail.push(`Min qty ${lead.terms.minQty}`)
-  if (lead.terms.kind !== 'percent') detail.push(lead.terms.note ?? 'Scheme offer')
+  if (isTpLead) detail.push('Market Trade Price (0% discount)')
+  else if (lead.terms.kind !== 'percent') detail.push(lead.terms.note ?? 'Scheme offer')
   if (verified && second) detail.push(`Next: ${shopName(second.view.rec.shop_id)} ${second.terms.label}`)
-  const tone = verified ? 'var(--color-best-solid)' : uncertain ? 'var(--color-warning-text)' : 'var(--border-strong)'
+  const tone = verified ? 'var(--color-best-solid)' : uncertain ? 'var(--color-warning-text)' : isTpLead ? 'var(--color-primary)' : 'var(--border-strong)'
+  const badgeTone = isTpLead && ranking.badge === 'INCOMPLETE' ? 'blue' : LEAD_TONE[ranking.badge]
+  const badgeText = isTpLead && ranking.badge === 'INCOMPLETE' ? 'TRADE PRICE (TP)' : ranking.badge
   return (
     <div
       className={cx(
@@ -378,19 +423,20 @@ export function OfferLeadBox({ ranking, shopName }: { ranking: OfferRanking; sho
           <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]" title={names.join(', ')}>
             {names.join(' · ')}
           </span>
-          <span className="shrink-0"><Badge tone={LEAD_TONE[ranking.badge]}>{ranking.badge}</Badge></span>
+          <span className="shrink-0"><Badge tone={badgeTone}>{badgeText}</Badge></span>
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
           <span className="truncate" title={detail.join(' · ')}>{detail.length ? detail.join(' · ') : 'Discount offer'}</span>
           <span className="ml-auto shrink-0 tabular-nums">{fmtDate(r.observed_on)}</span>
         </div>
-        {ranking.warning && <div className="mt-0.5 text-[11px] font-medium text-[var(--color-warning-text)]">{ranking.warning}</div>}
+        {ranking.warning && !isTpLead && <div className="mt-0.5 text-[11px] font-medium text-[var(--color-warning-text)]">{ranking.warning}</div>}
       </div>
       <div className="flex shrink-0 flex-col items-end justify-center leading-none">
-        <span className={cx('text-lg font-bold tabular-nums sm:text-xl', verified ? 'text-[var(--color-best)]' : 'text-[var(--text-primary)]')}>
+        <span className={cx('text-lg font-bold tabular-nums sm:text-xl', verified ? 'text-[var(--color-best)]' : isTpLead ? 'text-[var(--color-primary)]' : 'text-[var(--text-primary)]')}>
           {lead.terms.kind === 'percent' ? `${lead.terms.pct}%` : lead.terms.kind === 'tp' ? 'TP' : '—'}
         </span>
         {lead.terms.kind === 'percent' && <span className="mt-0.5 text-[10px] tracking-wide text-[var(--text-secondary)] uppercase">discount</span>}
+        {isTpLead && <span className="mt-0.5 text-[10px] tracking-wide text-[var(--text-secondary)] uppercase">trade price</span>}
       </div>
     </div>
   )

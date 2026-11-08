@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
+import { buildManualOfferPatch } from './actions'
 import { suggestMapping, DEFAULT_OPTIONS } from './columns'
 import { compareOffers, findOpportunities, latestPerProductShop } from './compare'
 import { buildExportRows, GENERIC_PROFILE, sanitizeCell, toCsv, toMatrix, toXlsxBuffer, type ExportContext } from './exporter'
@@ -370,6 +371,74 @@ describe('import pipeline', () => {
     expect(rows[4].discountPct).toBe(8)
     expect(rows[4].schemeText).toBe('Full box (carton) 8% discount')
     expect(rows[5].cost.effective).toBe(145)
+  })
+  it('parses N 75 / NET 75 / 75 NET as fixed Net Rs 75 and handles 3-column-group PRODUCT | QTY | DES% sheets (like AR MEDICOSE)', () => {
+    const arMedicoseCsv = [
+      'AR MEDICOSE,,,,,,,,',
+      'NAVEED ARAIN,,,3151321490,,,,,',
+      'PRODUCT,QTY,DES%,PRODUCT,QTY,DES%,PRODUCT,QTY,DES%',
+      'MONIS 20MNG,,3%,GNEB 5MG,,1%,AVENTREX 1GM,,10%',
+      'INDROP D CAP 2LAKH,,3%,AUGMENTIN SYP,,2%,DOLOR SYP,,N 75',
+      'POLYFEX SKIN OINMENT,,TP,SCIPRIDE 25MG,,1,SANGOBION CAP,,TP',
+      'ENTOX P,,,,,,,,',
+    ].join('\n')
+    const g = parseCsvText(arMedicoseCsv)
+    const hr = detectHeaderRow(g)
+    expect(hr).toBe(3)
+    const sbs = detectSideBySide(g, hr)
+    expect(sbs.status).toBe('detected')
+    expect(sbs.groups).toHaveLength(3)
+
+    const map = suggestMapping(g[hr - 1])
+    expect(map.title).toBe('PRODUCT')
+    expect(map.price).toBe('DES%')
+
+    const { rows, stats } = buildRows(g, map, { ...DEFAULT_OPTIONS, headerRow: hr })
+    // 9 valid items + 1 missing price (ENTOX P)
+    expect(stats.valid).toBe(9)
+    expect(stats.missingPrice).toBe(1)
+
+    const dolor = rows.find((r) => r.title === 'DOLOR SYP')!
+    expect(dolor.price).toBe(75)
+    expect(dolor.priceIsNet).toBe(true)
+    expect(dolor.cost.effective).toBe(75)
+    expect(dolor.cost.status).toBe('ok')
+    expect(dolor.schemeText).toBe('Net Rs 75 (fixed rate)')
+
+    // Bare "1" in DES% column is 1% discount, NEVER Rate Rs 1.00 -> effective Rs 0.99
+    const scipride = rows.find((r) => r.title === 'SCIPRIDE 25MG')!
+    expect(scipride.price).toBeNull()
+    expect(scipride.discountPct).toBe(1)
+    expect(scipride.schemeText).toBe('1% discount')
+
+    // Manual row override turns ENTOX P from invalid (Missing price) into valid
+    const entoxRow = rows.find((r) => r.title === 'ENTOX P')!
+    expect(entoxRow.kind).toBe('invalid')
+    const overrides = new Map([[entoxRow.rowNumber, { offerRaw: 'N 85' }]])
+    const rebuilt = buildRows(g, map, { ...DEFAULT_OPTIONS, headerRow: hr }, overrides)
+    expect(rebuilt.stats.invalid).toBe(0)
+    expect(rebuilt.stats.valid).toBe(10)
+    const fixedEntox = rebuilt.rows.find((r) => r.title === 'ENTOX P')!
+    expect(fixedEntox.cost.effective).toBe(85)
+    expect(fixedEntox.priceIsNet).toBe(true)
+  })
+  it('supports manual offer editing after import via buildManualOfferPatch', () => {
+    const netPatch = buildManualOfferPatch({ offerExpr: 'N 75' })
+    expect(netPatch.base_price).toBe(75)
+    expect(netPatch.effective_cost).toBe(75)
+    expect(netPatch.price_is_net).toBe(true)
+    expect(netPatch.scheme_text).toBe('Net Rs 75 (fixed rate)')
+
+    const tpPatch = buildManualOfferPatch({ offerExpr: 'TP' })
+    expect(tpPatch.base_price).toBeNull()
+    expect(tpPatch.discount_pct).toBe(0)
+    expect(tpPatch.source_attrs.is_trade_price).toBe(true)
+    expect(tpPatch.scheme_text).toBe('TP (0% discount)')
+
+    const discWithTp = buildManualOfferPatch({ offerExpr: '15% COTON 8%', basePriceOverride: 200 })
+    expect(discWithTp.base_price).toBe(200)
+    expect(discWithTp.effective_cost).toBe(170)
+    expect(discWithTp.source_attrs.carton_discount_pct).toBe(8)
   })
 })
 

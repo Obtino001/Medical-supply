@@ -4,7 +4,8 @@ import { deleteProductsByIds } from '../lib/actions'
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
-import { IconArrowRight, IconChevronDown, IconClose, IconFilter, IconSearch, IconTrash, IconUpload } from './icons'
+import { EditOfferModal } from './EditOfferModal'
+import { IconArrowRight, IconChevronDown, IconClose, IconEdit, IconFilter, IconSearch, IconTrash, IconUpload } from './icons'
 import { OfferLeadBox, OfferRow } from './Offers'
 import { WishlistToggle } from './WishlistToggle'
 import { Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useConfirm, useDebounced, useLocalState, useToast } from './ui'
@@ -97,6 +98,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
 
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
+  const [editingRow, setEditingRow] = useState<ProductRow | null>(null)
   const [saved, setSaved] = useState<{ id: string; name: string; config: View }[]>([])
 
   useEffect(() => {
@@ -653,11 +655,22 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 onSelect={toggleSel}
                 open={open.has(it.row.product.id)}
                 onToggle={toggleOpen}
+                onEdit={setEditingRow}
                 bestOnly={v.bestOnly}
               />
             ),
           )}
         </div>
+      )}
+
+      {editingRow && (
+        <EditOfferModal
+          open
+          onClose={() => setEditingRow(null)}
+          product={editingRow.product}
+          record={editingRow.bestOffer?.rec ?? editingRow.ranking.lead?.view.rec ?? editingRow.records[0] ?? null}
+          records={editingRow.records}
+        />
       )}
 
       {/* Progressive Load More + Page Navigation */}
@@ -708,6 +721,7 @@ const Row = memo(function Row({
   onSelect,
   open,
   onToggle,
+  onEdit,
   bestOnly,
 }: {
   r: ProductRow
@@ -716,6 +730,7 @@ const Row = memo(function Row({
   onSelect: (id: string) => void
   open: boolean
   onToggle: (id: string) => void
+  onEdit: (row: ProductRow) => void
   bestOnly: boolean
 }) {
   const { shopMap } = useData()
@@ -846,8 +861,18 @@ const Row = memo(function Row({
           )}
         </div>
 
-        {/* Col 4 (Right): Actions (Wishlist + Expand Offers) */}
-        <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-1.5 md:w-[212px] md:shrink-0">
+        {/* Col 4 (Right): Actions (Edit + Wishlist + Expand Offers) */}
+        <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-1 sm:gap-1.5 md:w-[212px] md:shrink-0">
+          <button
+            type="button"
+            onClick={() => onEdit(r)}
+            title="Manually edit or set item price, Net rate (N), TP, or discount %"
+            aria-label={`Edit price or offer for ${p.name}`}
+            className="inline-flex h-8 w-8 sm:h-7.5 sm:w-auto sm:px-2 items-center justify-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--color-primary)]"
+          >
+            <IconEdit size={13} />
+            <span className="hidden sm:inline">Edit</span>
+          </button>
           <WishlistToggle productId={p.id} compact />
           {r.records.length > 0 ? (
             <button

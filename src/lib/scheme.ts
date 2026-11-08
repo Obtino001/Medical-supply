@@ -15,6 +15,10 @@ export interface SchemeComponents {
   plainDiscountPct?: number | null
   /** True when the offer is explicitly Trade Price (TP / 1TP / T.P = 0% discount) */
   isTradePrice?: boolean
+  /** True when the offer is explicitly a fixed Net Price (e.g. "N 75", "NET 75", "75 NET", "FIXED 75") */
+  isNetPrice?: boolean
+  /** Fixed net price in Rs when specified via "N 75" / "NET 75" */
+  netPrice?: number | null
   /** Human-readable normalized summary of the scheme/discount */
   summary?: string | null
   /** true when the text had pieces we could not interpret or that are ambiguous */
@@ -44,10 +48,38 @@ export interface CostResult {
 
 const NUM = String.raw`(\d+(?:[.,]\d+)?)`
 const CARTON_KW = String.raw`(?:full\s*box(?:es)?|master\s*carton|c[oa]tt?on|cart[ao]n|cr?tn|box|peti|case)`
-const TP_TOKEN = String.raw`(?:[1il!|]?\s*t\.?\s*p\.?|trade\s*price|net\s*t\.?\s*p\.?)`
+const TP_TOKEN = String.raw`(?:[1il!|]?\s*t(?:[./-]\s*)?p\.?|trade\s*price|market\s*t\.?\s*p\.?|net\s*t\.?\s*p\.?)`
+const NET_PREFIX_RE = new RegExp(
+  String.raw`^(?:n|net|fix|fixed|net\s*(?:rate|price)|fixed\s*(?:rate|price)|flat\s*(?:rate|price)?)\s*[:=./-]?\s*(?:rs\.?|pkr|₨)?\s*${NUM}\s*(?:rs\.?|pkr|₨|only|/-)?$`,
+  'i',
+)
+const NET_SUFFIX_RE = new RegExp(
+  String.raw`^(?:rs\.?|pkr|₨)?\s*${NUM}\s*(?:/-)?\s*(?:n|net|fix|fixed|net\s*(?:rate|price)|fixed\s*(?:rate|price)|flat\s*rate)$`,
+  'i',
+)
 
 function n(s: string): number {
   return parseFloat(s.replace(',', '.'))
+}
+
+/**
+ * Detect fixed net rate expressions such as "N 75", "N75", "N-75", "N.75", "NET 75", "75 NET", "FIXED 75".
+ * Returns the numeric Rupee price when matched, or null otherwise.
+ */
+export function parseNetPriceToken(raw: string | null | undefined): number | null {
+  const s = (raw ?? '').toString().trim().replace(/[↑↓←→↖↗↘↙⇧⇩]/g, ' ').trim()
+  if (!s || /%|\+/.test(s)) return null
+  const mPre = NET_PREFIX_RE.exec(s)
+  if (mPre) {
+    const val = n(mPre[1])
+    return val > 0 ? val : null
+  }
+  const mSuf = NET_SUFFIX_RE.exec(s)
+  if (mSuf) {
+    const val = n(mSuf[1])
+    return val > 0 ? val : null
+  }
+  return null
 }
 
 /**
@@ -76,8 +108,17 @@ export function parseSchemeText(text: string | null | undefined): SchemeComponen
   // Normalize unicode arrows and common symbols (e.g. "↑ 12%", "↓ 12%", "→")
   t = t.replace(/[↑↓←→↖↗↘↙⇧⇩]/g, ' ').trim()
 
-  // Check for standalone Trade Price token (e.g. "TP", "1TP", "T.P", "NET TP", "TRADE PRICE")
-  const tpOnlyRe = new RegExp(String.raw`^(?:on\s+|at\s+|full\s+|net\s+)?${TP_TOKEN}(?:\s*(?:net|rate|only|price))?$`, 'i')
+  // Check for Net Fixed Rate token (e.g. "N 75", "NET 75", "75 NET", "FIXED 75")
+  const netVal = parseNetPriceToken(t)
+  if (netVal !== null) {
+    out.isNetPrice = true
+    out.netPrice = netVal
+    out.summary = `Net Rs ${netVal} (fixed rate)`
+    return out
+  }
+
+  // Check for standalone Trade Price token (e.g. "TP", "1TP", "T.P", "T/P", "NET TP", "TRADE PRICE")
+  const tpOnlyRe = new RegExp(String.raw`^(?:on\s+|at\s+|full\s+|net\s+|market\s+)?${TP_TOKEN}(?:\s*(?:net|rate|only|price))?$`, 'i')
   if (tpOnlyRe.test(t)) {
     out.discountPct = 0
     out.isTradePrice = true
@@ -207,30 +248,67 @@ export function parseSchemeText(text: string | null | undefined): SchemeComponen
 export interface ParsedOfferCell {
   /** Numeric base price in Rs if the cell contains a Rupee rate, or null if the cell is a TP / % / carton offer */
   price: number | null
-  /** Parsed scheme/discount components when the Offer Rate cell contains TP, %, carton discount, or bonus */
+  /** True when the cell is an explicit fixed net rate (e.g. "N 75", "NET 75", "FIXED 75") */
+  isNetPrice?: boolean
+  /** Parsed scheme/discount components when the Offer Rate cell contains TP, %, carton discount, net rate, or bonus */
   scheme: SchemeComponents | null
 }
 
 /**
  * Parse a cell from the "Offer Rate / Price" column.
  * Supports:
- * 1. Standard numeric prices ("145", "1,250.50", "Rs. 480")
- * 2. Trade Price markers ("TP", "1TP", "T.P", "NET TP") -> 0% discount
- * 3. Percentage & Carton/Full-box discounts ("15% COTON 8%", "COTON 8%", "↑ 12%", "12%")
- * 4. Numeric base price followed by carton/scheme info ("240 COTON 8%", "240 COTON 220")
+ * 1. Fixed Net Price ("N 75", "NET 75", "N-75", "75 NET", "FIXED 75") -> fixed net Rupee price Rs 75
+ * 2. Standard numeric prices ("145", "1,250.50", "Rs. 480")
+ * 3. Trade Price markers ("TP", "1TP", "T.P", "T/P", "NET TP") -> 0% discount
+ * 4. Percentage & Carton/Full-box discounts ("15% COTON 8%", "COTON 8%", "↑ 12%", "12%")
+ * 5. Numeric base price followed by carton/scheme info ("240 COTON 8%", "240 COTON 220")
  */
-export function parseOfferRateCell(raw: string | null | undefined): ParsedOfferCell {
+export function parseOfferRateCell(
+  raw: string | null | undefined,
+  opts?: { preferDiscountPct?: boolean },
+): ParsedOfferCell {
   const s = (raw ?? '').trim()
   if (!s) return { price: null, scheme: null }
 
-  // If the cell does not contain %, +, TP, or carton/box keywords, try parsing as a plain Rupee number
+  // 1. Check for explicit Net Fixed Price (e.g. "N 75", "NET 75", "N-75", "75 NET")
+  const netVal = parseNetPriceToken(s)
+  if (netVal !== null) {
+    return {
+      price: netVal,
+      isNetPrice: true,
+      scheme: {
+        discountPct: null,
+        flatDiscount: null,
+        bonusBuy: null,
+        bonusFree: null,
+        cartonDiscountPct: null,
+        cartonRate: null,
+        isTradePrice: false,
+        isNetPrice: true,
+        netPrice: netVal,
+        summary: `Net Rs ${netVal} (fixed rate)`,
+        ambiguous: false,
+        notes: [],
+      },
+    }
+  }
+
+  // 2. If the cell does not contain %, +, TP, or carton/box keywords, try parsing as a plain number
   const hasSchemeTokens =
     /%|\+/.test(s) ||
     new RegExp(String.raw`(?:^|\s|[0-9])${TP_TOKEN}(?:\s|$)|^${TP_TOKEN}$|\b${CARTON_KW}\b`, 'i').test(s)
 
   if (!hasSchemeTokens) {
     const num = parseNumber(s)
-    return { price: num, scheme: null }
+    if (num !== null) {
+      // When the column is a discount column (e.g. header "DES%" or "DISC%") and the cell is a bare number 0..50 without Rs/PKR
+      if (opts?.preferDiscountPct && !/rs\.?|pkr|₨/i.test(s) && num >= 0 && num <= 50) {
+        const scheme = parseSchemeText(num === 0 ? 'TP' : `${num}%`)
+        return { price: null, scheme }
+      }
+      return { price: num, scheme: null }
+    }
+    return { price: null, scheme: null }
   }
 
   // Check if the cell starts with a plain Rupee price followed by carton/discount info (e.g. "240 COTON 8%" or "240 COTON 220")

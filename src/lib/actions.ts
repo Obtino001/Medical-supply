@@ -1,7 +1,8 @@
 // Mutations shared by several pages. All of them write to the shared database; RLS enforces who may do what.
 import { parseTitle, identityKey } from './productParse'
+import { calculateEffectiveCost, parseOfferRateCell, type CostResult } from './scheme'
 import { fetchAll, supabase, updateChecked } from './supabase'
-import type { Product, SourceAttrs, WishlistItem } from './types'
+import type { PriceRecord, Product, SourceAttrs, WishlistItem } from './types'
 
 const must = <T extends { error: { message: string } | null }>(r: T): T => {
   if (r.error) throw new Error(r.error.message)
@@ -161,4 +162,215 @@ export async function deleteImportJobWithItems(jobId: string): Promise<{ deleted
 
   const deletedProducts = await deleteOrphanedProducts(productIds)
   return { deletedOffers: recs.length, deletedProducts }
+}
+
+export interface ManualOfferInput {
+  /** Offer expression such as "N 75", "TP", "15%", "15% COTON 8%", "145", or custom scheme text */
+  offerExpr: string
+  /** Optional base/trade price in Rs when combining a base price with a discount/scheme */
+  basePriceOverride?: number | null
+  /** Force the supplied price to be treated as a fixed net price */
+  priceIsNet?: boolean
+  /** Optional updated supplier item title */
+  originalTitle?: string
+  /** Optional updated canonical product name */
+  productName?: string
+  /** Optional notes */
+  notes?: string | null
+}
+
+/** Pure helper that previews and builds the database fields for a manual offer edit. */
+export function buildManualOfferPatch(input: ManualOfferInput, existingAttrs?: SourceAttrs | null) {
+  const expr = input.offerExpr.trim()
+  const parsed = parseOfferRateCell(expr)
+  const comp = parsed.scheme
+  const isNet = Boolean(input.priceIsNet || parsed.isNetPrice || comp?.isNetPrice)
+  const basePrice =
+    input.basePriceOverride != null && input.basePriceOverride > 0
+      ? input.basePriceOverride
+      : parsed.price ?? comp?.netPrice ?? null
+
+  const discountPct = isNet ? null : (comp?.discountPct ?? null)
+  const flatDiscount = isNet ? null : (comp?.flatDiscount ?? null)
+  const bonusBuy = comp?.bonusBuy ?? null
+  const bonusFree = comp?.bonusFree ?? null
+  const cartonDiscountPct = comp?.cartonDiscountPct ?? null
+  const cartonRate = comp?.cartonRate ?? null
+  const isTradePrice = Boolean(!isNet && comp?.isTradePrice)
+  const baseDiscountPct =
+    cartonDiscountPct != null && discountPct === cartonDiscountPct && comp?.plainDiscountPct == null && !isTradePrice
+      ? null
+      : discountPct
+
+  let schemeText: string | null = null
+  if (isNet && basePrice != null) {
+    schemeText = `Net Rs ${basePrice} (fixed rate)`
+  } else if (comp) {
+    schemeText = comp.summary || expr
+  } else if (expr && parsed.price === null) {
+    schemeText = expr
+  }
+
+  let cost: CostResult
+  if (basePrice === null && comp && !comp.ambiguous) {
+    cost = { status: 'ok', effective: null, steps: [schemeText || expr] }
+  } else if (basePrice !== null && basePrice > 0) {
+    cost = calculateEffectiveCost({
+      basePrice,
+      discountPct,
+      flatDiscount,
+      bonusBuy,
+      bonusFree,
+      priceIsNet: isNet,
+      combine: true,
+      ambiguous: false,
+    })
+  } else if (expr) {
+    cost = { status: 'review', effective: null, steps: [`Custom offer note: ${expr}`] }
+  } else {
+    cost = { status: 'missing', effective: null, steps: ['No price or offer supplied.'] }
+  }
+
+  const baseAttrs: SourceAttrs = existingAttrs ?? {
+    brand: null,
+    manufacturer: null,
+    barcode: null,
+    mfr_code: null,
+    strength_value: null,
+    strength_unit: null,
+    weight_value: null,
+    weight_unit: null,
+    pack_size: null,
+    dosage_form: null,
+  }
+
+  const source_attrs: SourceAttrs = {
+    ...baseAttrs,
+    offer_raw: expr || (basePrice != null ? String(basePrice) : null),
+    base_discount_pct: baseDiscountPct,
+    carton_discount_pct: cartonDiscountPct,
+    carton_rate: cartonRate,
+    is_trade_price: isTradePrice,
+    is_net_price: isNet,
+  }
+
+  return {
+    base_price: basePrice,
+    discount_pct: discountPct,
+    flat_discount: flatDiscount,
+    bonus_buy: bonusBuy,
+    bonus_free: bonusFree,
+    scheme_text: schemeText,
+    price_is_net: isNet,
+    combine_discounts: true,
+    effective_cost: cost.effective,
+    scheme_status: cost.status,
+    calc_notes: cost.steps.join('\n'),
+    source_attrs,
+    cost,
+  }
+}
+
+/** Update an existing price record's rate, discount, TP, or net price (and optionally its product name). */
+export async function updatePriceRecordOffer(rec: PriceRecord, input: ManualOfferInput): Promise<void> {
+  const built = buildManualOfferPatch(input, rec.source_attrs)
+  const patch: Record<string, unknown> = {
+    base_price: built.base_price,
+    discount_pct: built.discount_pct,
+    flat_discount: built.flat_discount,
+    bonus_buy: built.bonus_buy,
+    bonus_free: built.bonus_free,
+    scheme_text: built.scheme_text,
+    price_is_net: built.price_is_net,
+    combine_discounts: built.combine_discounts,
+    effective_cost: built.effective_cost,
+    scheme_status: built.scheme_status,
+    calc_notes: built.calc_notes,
+    source_attrs: built.source_attrs,
+  }
+  if (input.originalTitle !== undefined && input.originalTitle.trim()) {
+    patch.original_title = input.originalTitle.trim()
+  }
+  if (input.notes !== undefined) {
+    patch.notes = input.notes?.trim() || null
+  }
+  must(await supabase.from('price_records').update(patch).eq('id', rec.id))
+
+  if (rec.product_id && input.productName !== undefined && input.productName.trim()) {
+    const newName = input.productName.trim()
+    const pt = parseTitle(newName)
+    await supabase
+      .from('products')
+      .update({
+        name: newName,
+        normalized_name: pt.name || newName.toLowerCase(),
+      })
+      .eq('id', rec.product_id)
+  }
+}
+
+/** Create a manual price record for a product and shop when none exists yet. */
+export async function createManualPriceRecord(
+  product: Product,
+  shopId: string,
+  input: ManualOfferInput,
+): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10)
+  // Find latest survey for this shop or create one for today
+  const { data: existingSurveys } = await supabase
+    .from('surveys')
+    .select('id,survey_date')
+    .eq('shop_id', shopId)
+    .order('survey_date', { ascending: false })
+    .limit(1)
+
+  let surveyId = existingSurveys?.[0]?.id
+  const observedOn = existingSurveys?.[0]?.survey_date ?? today
+  if (!surveyId) {
+    const { data: createdSurvey, error: sErr } = await supabase
+      .from('surveys')
+      .insert({ shop_id: shopId, survey_date: today, notes: 'Manual entry' })
+      .select('id')
+      .single()
+    if (sErr) throw new Error(sErr.message)
+    surveyId = createdSurvey.id
+  }
+
+  const built = buildManualOfferPatch(input, null)
+  const title = input.originalTitle?.trim() || input.productName?.trim() || product.name
+  must(
+    await supabase.from('price_records').insert({
+      product_id: product.id,
+      shop_id: shopId,
+      survey_id: surveyId,
+      observed_on: observedOn,
+      original_title: title,
+      base_price: built.base_price,
+      discount_pct: built.discount_pct,
+      flat_discount: built.flat_discount,
+      bonus_buy: built.bonus_buy,
+      bonus_free: built.bonus_free,
+      scheme_text: built.scheme_text,
+      price_is_net: built.price_is_net,
+      combine_discounts: built.combine_discounts,
+      effective_cost: built.effective_cost,
+      scheme_status: built.scheme_status,
+      calc_notes: built.calc_notes,
+      match_status: 'manual',
+      source_attrs: built.source_attrs,
+      notes: input.notes?.trim() || null,
+    }),
+  )
+
+  if (input.productName !== undefined && input.productName.trim() && input.productName.trim() !== product.name) {
+    const newName = input.productName.trim()
+    const pt = parseTitle(newName)
+    await supabase
+      .from('products')
+      .update({
+        name: newName,
+        normalized_name: pt.name || newName.toLowerCase(),
+      })
+      .eq('id', product.id)
+  }
 }

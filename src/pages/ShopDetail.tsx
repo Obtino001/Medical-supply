@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { IconTrash } from '../components/icons'
+import { EditOfferModal } from '../components/EditOfferModal'
+import { IconEdit, IconTrash } from '../components/icons'
 import { ShopForm } from '../components/ShopForm'
 import { Badge, Button, Card, Empty, PageHeader, Stat, fmtDate, rs, useConfirm, useToast } from '../components/ui'
 import { deleteShopWithItems } from '../lib/actions'
 import { compareOffers } from '../lib/compare'
 import { useData } from '../lib/data'
 import { updateChecked } from '../lib/supabase'
+import type { PriceRecord } from '../lib/types'
 
 export default function ShopDetail() {
   const { id } = useParams()
@@ -15,6 +17,7 @@ export default function ShopDetail() {
   const toast = useToast()
   const confirm = useConfirm()
   const [editing, setEditing] = useState(false)
+  const [editingOffer, setEditingOffer] = useState<PriceRecord | null>(null)
   const [deleting, setDeleting] = useState(false)
   const shop = id ? shopMap.get(id) : undefined
 
@@ -103,7 +106,7 @@ export default function ShopDetail() {
           <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)]">
             <table className="w-full text-sm">
               <thead className="border-b border-[var(--border-default)] bg-[var(--bg-subtle)] text-left text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-                <tr><th className="px-3.5 py-2">Product</th><th className="px-3 py-2">Offer Rate</th><th className="px-3 py-2">Scheme / Discount</th><th className="px-3 py-2">Effective Price</th><th className="px-3.5 py-2">Date</th></tr>
+                <tr><th className="px-3.5 py-2">Product</th><th className="px-3 py-2">Offer Rate</th><th className="px-3 py-2">Scheme / Discount</th><th className="px-3 py-2">Effective Price</th><th className="px-3.5 py-2">Date</th><th className="px-3.5 py-2 text-right">Action</th></tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)]">
                 {mine.slice(0, 200).sort((a, b) => (productMap.get(a.product_id!)?.name ?? '').localeCompare(productMap.get(b.product_id!)?.name ?? '')).map((r) => (
@@ -113,6 +116,16 @@ export default function ShopDetail() {
                     <td className="px-3 py-2 text-[var(--text-secondary)]">{r.scheme_text || '—'}</td>
                     <td className="whitespace-nowrap px-3 py-2 font-medium text-[var(--text-primary)] tabular-nums">{r.scheme_status === 'ok' ? (r.effective_cost != null ? rs(r.effective_cost) : r.scheme_text || '—') : '—'}</td>
                     <td className="whitespace-nowrap px-3.5 py-2 text-xs text-[var(--text-secondary)]">{fmtDate(r.observed_on)}</td>
+                    <td className="whitespace-nowrap px-3.5 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setEditingOffer(r)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline"
+                      >
+                        <IconEdit size={13} />
+                        <span>Edit</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -122,6 +135,7 @@ export default function ShopDetail() {
         )}
       </section>
       {editing && <ShopForm open onClose={() => setEditing(false)} shop={shop} onSaved={reload} />}
+      {editingOffer && <EditOfferModal open onClose={() => setEditingOffer(null)} record={editingOffer} product={editingOffer.product_id ? productMap.get(editingOffer.product_id) : null} />}
     </div>
   )
 }

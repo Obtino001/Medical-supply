@@ -7,6 +7,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconClose,
+  IconEdit,
   IconFileSpreadsheet,
   IconPlus,
   IconStore,
@@ -19,7 +20,7 @@ import { Badge, Button, Card, ErrorBox, Field, Input, PageHeader, Pagination, Se
 import { ADDITIONAL_FIELDS, DEFAULT_OPTIONS, REQUIRED_FIELDS, suggestMapping, type ImportOptions, type Mapping } from '../lib/columns'
 import { useData } from '../lib/data'
 import { download, toCsv, toMatrix } from '../lib/exporter'
-import { buildRows, detectColumns, detectHeaderRow, detectSideBySide, errorReportRows, getHeaders, type BuiltRow, type RowKind } from '../lib/importBuild'
+import { buildRows, detectColumns, detectHeaderRow, detectSideBySide, errorReportRows, getHeaders, type BuiltRow, type RowKind, type RowOverride } from '../lib/importBuild'
 import { buildCommitPayload, defaultChoice, runMatching, type Choice, type RowMatch } from '../lib/importPlan'
 import { buildIndex, matchProduct, type CatalogDecision, type CatalogIdentifier, type CatalogRejection } from '../lib/matching'
 import { FileError, readFile, type ParsedGrid } from '../lib/parseFile'
@@ -58,6 +59,10 @@ export default function ImportWizard() {
   const [mPage, setMPage] = useState(0)
   const [mFilter, setMFilter] = useState<'attention' | 'all'>('attention')
   const [picker, setPicker] = useState<BuiltRow | null>(null)
+  const [rowOverrides, setRowOverrides] = useState<Map<number, RowOverride>>(new Map())
+  const [editingRowNum, setEditingRowNum] = useState<number | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editOffer, setEditOffer] = useState('')
   const [busy, setBusy] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const matchKey = useRef('')
@@ -91,7 +96,7 @@ export default function ImportWizard() {
 
   const onFile = async (f: File | undefined) => {
     if (!f) return
-    setFileErr(null); setReading(true); setDupJob(null); setAllowDup(false); setCatalog(null); setMatches(new Map()); matchKey.current = ''
+    setFileErr(null); setReading(true); setDupJob(null); setAllowDup(false); setCatalog(null); setMatches(new Map()); setRowOverrides(new Map()); setEditingRowNum(null); matchKey.current = ''
     try {
       const g = await readFile(f)
       if (g.grid.filter((r) => r.some(Boolean)).length < 2) throw new FileError('The file has no data rows.')
@@ -114,12 +119,52 @@ export default function ImportWizard() {
     setDupJob(null)
     setAllowDup(false)
     setMatches(new Map())
+    setRowOverrides(new Map())
+    setEditingRowNum(null)
     matchKey.current = ''
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const built = useMemo(() => (file && step >= 2 ? buildRows(file.grid, mapping, options) : null), [file, mapping, options, step])
+  const built = useMemo(
+    () => (file && step >= 2 ? buildRows(file.grid, mapping, options, rowOverrides) : null),
+    [file, mapping, options, step, rowOverrides],
+  )
   const importable = built?.rows.filter((r) => r.kind === 'valid' || r.kind === 'review') ?? []
+
+  const openRowEditor = (r: BuiltRow) => {
+    const ov = rowOverrides.get(r.rowNumber)
+    setEditingRowNum(r.rowNumber)
+    setEditTitle(ov?.title ?? r.title)
+    setEditOffer(ov?.offerRaw ?? r.offerRaw ?? '')
+  }
+
+  const applyRowOverride = (rowNumber: number, patch: RowOverride) => {
+    setRowOverrides((prev) => {
+      const next = new Map(prev)
+      next.set(rowNumber, { ...prev.get(rowNumber), ...patch })
+      return next
+    })
+    matchKey.current = ''
+    setEditingRowNum(null)
+    toast('ok', `Row ${rowNumber} updated`)
+  }
+
+  const setAllMissingToTp = () => {
+    if (!built) return
+    let count = 0
+    setRowOverrides((prev) => {
+      const next = new Map(prev)
+      for (const r of built.rows) {
+        if (r.errors.includes('Missing price')) {
+          next.set(r.rowNumber, { ...next.get(r.rowNumber), offerRaw: 'TP' })
+          count++
+        }
+      }
+      return next
+    })
+    matchKey.current = ''
+    toast('ok', `Set ${count} missing price row${count === 1 ? '' : 's'} to TP (Trade Price)`)
+  }
 
   // load catalogue data when entering step 3 (Validate & confirm)
   useEffect(() => {
@@ -142,12 +187,24 @@ export default function ImportWizard() {
   )
   useEffect(() => {
     if (!built || !index || step !== 3) return
-    const key = (file?.hash ?? '') + JSON.stringify([mapping, options, shopId])
+    const key = (file?.hash ?? '') + JSON.stringify([mapping, options, shopId, [...rowOverrides.entries()]])
     if (matchKey.current === key) return
     matchKey.current = key
-    setMatches(runMatching(built.rows, index, shopId))
+    const fresh = runMatching(built.rows, index, shopId)
+    setMatches((prev) => {
+      if (prev.size === 0) return fresh
+      const merged = new Map(fresh)
+      for (const [rn, oldMatch] of prev.entries()) {
+        const row = built.rows.find((x) => x.rowNumber === rn)
+        if (row && (row.kind === 'valid' || row.kind === 'review') && oldMatch.choice.action !== 'skip') {
+          const cur = merged.get(rn)
+          if (cur) merged.set(rn, { ...cur, choice: oldMatch.choice })
+        }
+      }
+      return merged
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [built, index, step, shopId])
+  }, [built, index, step, shopId, rowOverrides])
 
   const setChoice = (row: BuiltRow, choice: Choice) =>
     setMatches((m) => {
@@ -721,6 +778,27 @@ export default function ImportWizard() {
               />
             </div>
 
+            {built.stats.invalid > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] px-3.5 py-2.5 text-xs text-[var(--text-primary)]">
+                <span>
+                  <b>{built.stats.invalid} row{built.stats.invalid === 1 ? '' : 's'}</b> have missing or unrecognized rates. You can edit them manually or set missing prices to <b>TP (Trade Price)</b>.
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {built.stats.missingPrice > 0 && (
+                    <Button small variant="secondary" onClick={setAllMissingToTp}>
+                      Set all {built.stats.missingPrice} missing to TP
+                    </Button>
+                  )}
+                  {reviewTab !== 'validation' && (
+                    <Button small variant="secondary" onClick={() => setReviewTab('validation')}>
+                      <IconEdit size={13} />
+                      <span>Edit invalid rows ({built.stats.invalid})</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {commitErr && <ErrorBox>Import failed and nothing was saved: {commitErr}</ErrorBox>}
           </Card>
 
@@ -808,10 +886,60 @@ export default function ImportWizard() {
                             }[m.match.confidence]}
                           </Badge>
                         </div>
-                        <div className="mt-0.5 text-sm text-[var(--text-secondary)]">
-                          {m.match.reason} ·{' '}
-                          {r.price != null ? `Rate ${rs(r.price)}${r.schemeText ? ` (${r.schemeText})` : ''}` : `Offer: ${r.schemeText || '—'}`}
+                        <div className="mt-0.5 flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--text-secondary)]">
+                          <span>
+                            {m.match.reason} ·{' '}
+                            {r.price != null ? `Rate ${rs(r.price)}${r.schemeText ? ` (${r.schemeText})` : ''}` : `Offer: ${r.schemeText || '—'}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openRowEditor(r)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline"
+                          >
+                            <IconEdit size={12} />
+                            <span>Edit rate / title</span>
+                          </button>
                         </div>
+                        {editingRowNum === r.rowNumber && (
+                          <div className="my-2.5 space-y-2.5 rounded-xl border border-[var(--color-primary-border)] bg-[var(--bg-subtle)] p-3">
+                            <div className="grid gap-2.5 sm:grid-cols-2">
+                              <Field label="Product Name">
+                                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                              </Field>
+                              <Field label="Offer Rate / Net Price / Discount (e.g. N 75, TP, 15%)">
+                                <Input
+                                  value={editOffer}
+                                  onChange={(e) => setEditOffer(e.target.value)}
+                                  placeholder="e.g. N 75, TP, 15%, or 145"
+                                  autoFocus
+                                />
+                              </Field>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[11px] text-[var(--text-secondary)]">Quick set:</span>
+                                {['TP', 'N 75', '5%', '10%', '12%', '15%', '20%'].map((presetVal) => (
+                                  <button
+                                    key={presetVal}
+                                    type="button"
+                                    onClick={() => setEditOffer(presetVal)}
+                                    className="rounded border border-[var(--border-default)] bg-[var(--bg-surface)] px-2 py-0.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                                  >
+                                    {presetVal}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Button small variant="secondary" onClick={() => setEditingRowNum(null)}>
+                                  Cancel
+                                </Button>
+                                <Button small onClick={() => applyRowOverride(r.rowNumber, { title: editTitle, offerRaw: editOffer })}>
+                                  Save row
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="my-2">
                           <AttrTable imported={incomingView(r)} existing={existing ? productView(existing) : null} />
                         </div>
@@ -879,7 +1007,7 @@ export default function ImportWizard() {
                 <Stat label="Invalid rows" value={built.stats.invalid} tone={built.stats.invalid ? 'amber' : undefined} />
                 <Stat label="Duplicate rows" value={built.stats.duplicate} />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Select
                   className="!w-auto"
                   value={vFilter}
@@ -895,6 +1023,11 @@ export default function ImportWizard() {
                   <option value="review">Scheme review</option>
                   <option value="valid">Valid</option>
                 </Select>
+                {built.stats.missingPrice > 0 && (
+                  <Button variant="secondary" small onClick={setAllMissingToTp}>
+                    Set all {built.stats.missingPrice} missing prices to TP (Trade Price)
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   small
@@ -917,13 +1050,47 @@ export default function ImportWizard() {
               </div>
               <div className="space-y-2">
                 {vRows.slice(vPage * 20, vPage * 20 + 20).map((r) => (
-                  <Card key={r.rowNumber} className="!p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-[var(--text-secondary)] tabular-nums">Row {r.rowNumber}</span>
-                      <b className="font-medium text-[var(--text-primary)]">{r.title || '(no title)'}</b>
-                      <Badge tone={r.kind === 'valid' ? 'green' : r.kind === 'invalid' ? 'red' : 'amber'}>{r.kind}</Badge>
+                  <Card key={r.rowNumber} className="!p-3 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-[var(--text-secondary)] tabular-nums">Row {r.rowNumber}</span>
+                        <b className="font-medium text-[var(--text-primary)]">{r.title || '(no title)'}</b>
+                        <Badge tone={r.kind === 'valid' ? 'green' : r.kind === 'invalid' ? 'red' : 'amber'}>{r.kind}</Badge>
+                        {rowOverrides.has(r.rowNumber) && <Badge tone="blue">Manually edited</Badge>}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {r.kind !== 'valid' && editingRowNum !== r.rowNumber && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => applyRowOverride(r.rowNumber, { offerRaw: 'TP' })}
+                              className="rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                            >
+                              Set TP
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openRowEditor(r)}
+                              className="inline-flex items-center gap-1 rounded-md border border-[var(--color-primary)] bg-[var(--color-primary-light)] px-2.5 py-1 text-xs font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-[var(--color-primary-text)]"
+                            >
+                              <IconEdit size={12} />
+                              <span>Edit / Set rate</span>
+                            </button>
+                          </>
+                        )}
+                        {r.kind === 'valid' && editingRowNum !== r.rowNumber && (
+                          <button
+                            type="button"
+                            onClick={() => openRowEditor(r)}
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                          >
+                            <IconEdit size={12} />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-0.5 text-sm text-[var(--text-secondary)]">
+                    <div className="text-sm text-[var(--text-secondary)]">
                       {r.price != null ? (
                         <>
                           Rate {rs(r.price)} {r.schemeText ? `· ${r.schemeText}` : ''} → effective{' '}
@@ -942,6 +1109,46 @@ export default function ImportWizard() {
                         • {m}
                       </div>
                     ))}
+                    {editingRowNum === r.rowNumber && (
+                      <div className="space-y-2.5 rounded-xl border border-[var(--color-primary-border)] bg-[var(--bg-subtle)] p-3 pt-2.5">
+                        <div className="grid gap-2.5 sm:grid-cols-2">
+                          <Field label="Product Name">
+                            <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                          </Field>
+                          <Field label='Offer Rate / Net Price / Discount (e.g. "N 75", "TP", "15%")'>
+                            <Input
+                              value={editOffer}
+                              onChange={(e) => setEditOffer(e.target.value)}
+                              placeholder="e.g. N 75, TP, 15%, 15% COTON 8%, or 145"
+                              autoFocus
+                            />
+                          </Field>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-[11px] text-[var(--text-secondary)]">Quick set:</span>
+                            {['TP', 'N 75', 'N 100', '5%', '10%', '12%', '15%', '20%', '15% COTON 8%'].map((presetVal) => (
+                              <button
+                                key={presetVal}
+                                type="button"
+                                onClick={() => setEditOffer(presetVal)}
+                                className="rounded border border-[var(--border-default)] bg-[var(--bg-surface)] px-2 py-0.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                              >
+                                {presetVal}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Button small variant="secondary" onClick={() => setEditingRowNum(null)}>
+                              Cancel
+                            </Button>
+                            <Button small onClick={() => applyRowOverride(r.rowNumber, { title: editTitle, offerRaw: editOffer })}>
+                              Save row
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </Card>
                 ))}
                 {vRows.length === 0 && <Card className="text-sm text-[var(--text-secondary)]">No rows in this view.</Card>}

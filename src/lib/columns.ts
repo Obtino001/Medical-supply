@@ -44,7 +44,10 @@ export const FIELDS: FieldDef[] = [
     label: 'Discount',
     hint: 'Optional',
     essential: true,
-    synonyms: ['discount', 'disc', 'disc %', 'discount %', 'less', 'dis', 'less %'],
+    synonyms: [
+      'discount', 'disc', 'disc %', 'disc%', 'discount %', 'discount%',
+      'less', 'less %', 'less%', 'dis', 'dis %', 'dis%', 'des', 'des %', 'des%',
+    ],
   },
   {
     key: 'scheme',
@@ -120,6 +123,13 @@ export function suggestMapping(headers: string[]): Mapping {
   }
   pass((hn, syn) => hn === syn)
   pass((hn, syn) => syn.length >= 4 && (hn.startsWith(syn + ' ') || hn.endsWith(' ' + syn)))
+
+  // Many Pakistani wholesale sheets only have PRODUCT | QTY | DES% (or DISC%) without a separate RATE column.
+  // Promote the discount column to Offer Rate / Price when no separate price column exists.
+  if (!result.price && result.discount) {
+    result.price = result.discount
+    delete result.discount
+  }
   return result
 }
 

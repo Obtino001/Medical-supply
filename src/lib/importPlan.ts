@@ -117,7 +117,7 @@ export function buildCommitPayload(rows: BuiltRow[], matches: Map<number, RowMat
         strength_value: inc.strengthValue, strength_unit: inc.strengthUnit, weight_value: inc.weightValue,
         weight_unit: inc.weightUnit, pack_size: inc.packSize, dosage_form: inc.dosageForm,
         offer_raw: row.offerRaw, base_discount_pct: row.baseDiscountPct, carton_discount_pct: row.cartonDiscountPct,
-        carton_rate: row.cartonRate, is_trade_price: row.isTradePrice,
+        carton_rate: row.cartonRate, is_trade_price: row.isTradePrice, is_net_price: row.priceIsNet,
       },
       original_title: row.title,
       original_code: row.code,

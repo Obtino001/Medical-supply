@@ -65,6 +65,7 @@ export interface SourceAttrs {
   carton_discount_pct?: number | null
   carton_rate?: number | null
   is_trade_price?: boolean
+  is_net_price?: boolean
 }
 
 export interface PriceRecord {

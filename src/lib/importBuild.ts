@@ -6,6 +6,11 @@ import { calculateEffectiveCost, parseNumber, parseOfferRateCell, parseSchemeTex
 
 export type RowKind = 'valid' | 'review' | 'invalid' | 'duplicate'
 
+export interface RowOverride {
+  title?: string
+  offerRaw?: string
+}
+
 export interface BuiltRow {
   rowNumber: number
   raw: Record<string, string>
@@ -120,10 +125,16 @@ export function detectSideBySide(grid: string[][], headerRow: number): SideBySid
   const fields: (FieldKey | null)[] = rawRow.map((cell) => matchHeaderField(cell ?? ''))
   const titleCols: number[] = []
   const priceCols: number[] = []
+  const discountCols: number[] = []
   fields.forEach((f, idx) => {
     if (f === 'title') titleCols.push(idx)
     else if (f === 'price') priceCols.push(idx)
+    else if (f === 'discount') discountCols.push(idx)
   })
+  // Support side-by-side sheets where the offer column header is DES% / DISC% instead of RATE
+  if (priceCols.length === 0 && discountCols.length === titleCols.length) {
+    priceCols.push(...discountCols)
+  }
 
   if (titleCols.length >= 2 && priceCols.length === titleCols.length) {
     // Check that each (titleCols[k], priceCols[k]) forms a non-overlapping left-to-right pair
@@ -170,7 +181,7 @@ export function detectSideBySide(grid: string[][], headerRow: number): SideBySid
       for (let c = start; c < end; c++) {
         colIndices.push(c)
         const f = fields[c]
-        if (f && !groupMapping[f]) {
+        if (f && c !== priceCols[k] && c !== titleCols[k] && !groupMapping[f]) {
           groupMapping[f] = headers[c]
         }
       }
@@ -226,6 +237,7 @@ export function buildRows(
   grid: string[][],
   mapping: Mapping,
   options: ImportOptions,
+  rowOverrides?: Map<number, RowOverride>,
 ): { rows: BuiltRow[]; stats: BuildStats; headers: string[]; sideBySide: SideBySideDetection } {
   const headers = getHeaders(grid, options.headerRow)
   const sideBySide = detectSideBySide(grid, options.headerRow)
@@ -267,7 +279,26 @@ export function buildRows(
       discount: colIndex('discount'), scheme: colIndex('scheme'), qty: colIndex('quantity'), expiry: colIndex('expiry'),
       avail: colIndex('availability'), notes: colIndex('notes'),
     }
+    // Prevent double-applying a column if the user mapped the same column to both Offer Rate and Discount/Scheme
+    if (idx.discount >= 0 && idx.discount === idx.price) idx.discount = -1
+    if (idx.scheme >= 0 && idx.scheme === idx.price) idx.scheme = -1
     const groupCols = Object.values(idx).filter((c) => c >= 0)
+
+    // Detect if the mapped Offer Rate column is a discount-percentage column (e.g. header "DES%" or "DISC%", or >=40% cells have %/TP)
+    const priceHeader = curMap.price ?? ''
+    const isDiscountHeader = matchHeaderField(priceHeader) === 'discount' || /%|disc|des\b|less/i.test(priceHeader)
+    let preferDiscountCol = isDiscountHeader
+    if (!preferDiscountCol && idx.price >= 0 && idx.discount < 0) {
+      let nonEmpty = 0
+      let pctOrTp = 0
+      for (let r = options.headerRow; r < grid.length; r++) {
+        const v = (grid[r]?.[idx.price] ?? '').trim()
+        if (!v) continue
+        nonEmpty++
+        if (/%|\bt\.?p\.?\b/i.test(v)) pctOrTp++
+      }
+      if (nonEmpty >= 3 && pctOrTp / nonEmpty >= 0.4) preferDiscountCol = true
+    }
 
     for (let r = options.headerRow; r < grid.length; r++) {
       if (blankRow.has(r)) continue
@@ -279,13 +310,16 @@ export function buildRows(
         continue
       }
 
+      const rowNumber = gIdx === 0 ? r + 1 : gIdx * grid.length + (r + 1)
+      const override = rowOverrides?.get(rowNumber)
+
       stats.total++
       const raw: Record<string, string> = {}
       headers.forEach((h, i) => (raw[h] = (cells[i] ?? '').trim()))
       const errors: string[] = []
       const warnings: string[] = []
 
-      const title = get(idx.title) || get(idx.description)
+      const title = (override?.title !== undefined ? override.title.trim() : '') || get(idx.title) || get(idx.description)
       const desc = get(idx.title) ? get(idx.description) : ''
       if (!title) {
         errors.push('Missing product title')
@@ -331,8 +365,9 @@ export function buildRows(
       }
 
       // ---- price & scheme
-      const priceRaw = get(idx.price)
-      const parsedOffer = parseOfferRateCell(priceRaw)
+      const hasOfferOverride = override?.offerRaw !== undefined && override.offerRaw.trim() !== ''
+      const priceRaw = hasOfferOverride ? override!.offerRaw!.trim() : get(idx.price)
+      const parsedOffer = parseOfferRateCell(priceRaw, { preferDiscountPct: hasOfferOverride ? false : preferDiscountCol })
       let price = parsedOffer.price
       const inlineScheme = parsedOffer.scheme
 
@@ -357,11 +392,11 @@ export function buildRows(
       const comp: SchemeComponents = inlineScheme
         ? { ...inlineScheme, notes: [...inlineScheme.notes] }
         : { discountPct: null, flatDiscount: null, bonusBuy: null, bonusFree: null, ambiguous: false, notes: [] }
-      const discRaw = get(idx.discount)
-      const schemeRaw = get(idx.scheme)
+      const discRaw = hasOfferOverride ? '' : get(idx.discount)
+      const schemeRaw = hasOfferOverride ? '' : get(idx.scheme)
       if (discRaw) {
         const asNum = parseNumber(discRaw)
-        if (asNum !== null && !/%/.test(discRaw) && !/rs|pkr/i.test(discRaw)) {
+        if (asNum !== null && !/%/.test(discRaw) && !/rs|pkr/i.test(discRaw) && !/^(?:n|net|fix)\b/i.test(discRaw)) {
           if (options.discountMode === 'percent') comp.discountPct = asNum
           else comp.flatDiscount = asNum
         } else {
@@ -377,8 +412,16 @@ export function buildRows(
             comp[k] = s[k]
           }
         }
+        if (s.isNetPrice && s.netPrice != null) {
+          comp.isNetPrice = true
+          comp.netPrice = s.netPrice
+          comp.summary = s.summary
+        }
         if (s.ambiguous) comp.ambiguous = true
         comp.notes.push(...s.notes)
+      }
+      if (price === null && comp.isNetPrice && comp.netPrice != null && comp.netPrice > 0) {
+        price = comp.netPrice
       }
       if (comp.discountPct != null && (comp.discountPct < 0 || comp.discountPct >= 100)) errors.push(`Invalid discount ${comp.discountPct}%`)
       comp.notes.forEach((n) => warnings.push(n))
@@ -387,6 +430,7 @@ export function buildRows(
       const qty = parseNumber(qtyRaw)
       if (qtyRaw && qty === null) warnings.push(`Quantity "${qtyRaw}" is not a number; ignored`)
 
+      const rowPriceIsNet = Boolean(options.priceIsNet || parsedOffer.isNetPrice || comp.isNetPrice)
       const cost: CostResult =
         price === null && inlineScheme && !comp.ambiguous
           ? {
@@ -400,7 +444,7 @@ export function buildRows(
               flatDiscount: comp.flatDiscount,
               bonusBuy: comp.bonusBuy,
               bonusFree: comp.bonusFree,
-              priceIsNet: options.priceIsNet && !inlineScheme,
+              priceIsNet: rowPriceIsNet && (!inlineScheme || Boolean(parsedOffer.isNetPrice || comp.isNetPrice)),
               combine: options.combine,
               ambiguous: comp.ambiguous,
             })
@@ -437,7 +481,6 @@ export function buildRows(
       stats[kind]++
 
       const tax = options.taxIncluded === 'yes' ? true : options.taxIncluded === 'no' ? false : null
-      const rowNumber = gIdx === 0 ? r + 1 : gIdx * grid.length + (r + 1)
       rows.push({
         rowNumber, raw, kind, errors, warnings, incoming, identity, title, code, price, mrp,
         discountPct: comp.discountPct, flatDiscount: comp.flatDiscount, bonusBuy: comp.bonusBuy, bonusFree: comp.bonusFree,
@@ -451,7 +494,7 @@ export function buildRows(
         cartonRate: comp.cartonRate ?? null,
         isTradePrice: Boolean(comp.isTradePrice),
         minOrderQty: qty, availability: get(idx.avail) || null, expiry: get(idx.expiry) || null, notes: get(idx.notes) || null,
-        taxIncluded: tax, priceIsNet: options.priceIsNet, combine: options.combine, packSize, cost,
+        taxIncluded: tax, priceIsNet: rowPriceIsNet, combine: options.combine, packSize, cost,
       })
     }
   }
