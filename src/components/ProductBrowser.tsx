@@ -63,8 +63,11 @@ const PAGE = 50
 const distinct = (vals: (string | null)[]) =>
   [...new Set(vals.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
 
-const DESKTOP_GRID =
-  'md:grid-cols-[20px_minmax(190px,1.45fr)_minmax(270px,2.25fr)_212px] md:items-center md:gap-x-3.5'
+// Synchronized desktop flex widths for table header & row
+const DESKTOP_CHECKBOX_CLASS = 'w-5 shrink-0'
+const DESKTOP_PRODUCT_CLASS = 'min-w-0 md:flex-[1.35_1_0%]'
+const DESKTOP_OFFER_CLASS = 'min-w-0 md:flex-[2.15_1_0%]'
+const DESKTOP_ACTIONS_CLASS = 'md:w-[224px] lg:w-[284px] md:shrink-0'
 
 export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   const { products, current, shopMap, shops, settings, wishlistMap, selected, setSelected, reload } = useData()
@@ -613,14 +616,11 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
         )
       ) : (
         <div className="overflow-clip rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] divide-y divide-[var(--border-default)]">
-          {/* Desktop Column Header Strip — 4 explicit in-flow columns matching DESKTOP_GRID */}
+          {/* Desktop Column Header Strip — synchronized with Row desktop flex columns */}
           <div
-            className={cx(
-              'hidden md:sticky md:top-13.5 md:z-20 md:grid bg-[var(--bg-subtle)] px-3.5 sm:px-4 py-2 text-[11px] font-semibold tracking-wider text-[var(--text-secondary)] uppercase',
-              DESKTOP_GRID,
-            )}
+            className="hidden md:sticky md:top-13.5 md:z-20 md:flex md:items-center md:gap-x-3.5 bg-[var(--bg-subtle)] px-3.5 sm:px-4 py-2 text-[11px] font-semibold tracking-wider text-[var(--text-secondary)] uppercase"
           >
-            <div className="flex items-center">
+            <div className={cx('flex items-center', DESKTOP_CHECKBOX_CLASS)}>
               <input
                 type="checkbox"
                 className="h-4 w-4 rounded border-[var(--border-default)]"
@@ -630,9 +630,9 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 aria-label="Select all products on this page"
               />
             </div>
-            <div>Product &amp; form</div>
-            <div>{stats.withBestPrice > 0 ? 'Best supplier & effective price' : 'Best offer & supplier'}</div>
-            <div className="text-right">Actions</div>
+            <div className={DESKTOP_PRODUCT_CLASS}>Product &amp; form</div>
+            <div className={DESKTOP_OFFER_CLASS}>{stats.withBestPrice > 0 ? 'Best supplier & effective price' : 'Best offer & supplier'}</div>
+            <div className={cx('text-right pr-1', DESKTOP_ACTIONS_CLASS)}>Actions</div>
           </div>
 
           {pageItems.map((it, i) =>
@@ -759,7 +759,7 @@ const Row = memo(function Row({
         className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5 px-3 py-2.5 sm:px-4 md:flex md:items-center md:gap-x-3.5 md:py-2"
       >
         {/* Col 1: Checkbox */}
-        <div className="flex items-center pt-0.5 md:w-5 md:shrink-0 md:pt-0">
+        <div className={cx('flex items-center pt-0.5 md:pt-0', DESKTOP_CHECKBOX_CLASS)}>
           <input
             type="checkbox"
             className="h-4 w-4 shrink-0 rounded border-[var(--border-default)]"
@@ -770,7 +770,7 @@ const Row = memo(function Row({
         </div>
 
         {/* Col 2 (Left): Product Name, Form/Strength & Code */}
-        <div className="min-w-0 md:flex-[1.45_1_0%]">
+        <div className={DESKTOP_PRODUCT_CLASS}>
           <div className="flex items-center gap-1.5 min-w-0">
             <Link
               to={`/products/${p.id}`}
@@ -791,7 +791,7 @@ const Row = memo(function Row({
         </div>
 
         {/* Col 3 (Middle): Winning Supplier Offer Highlight (spans full width below title on mobile) */}
-        <div className="col-span-3 col-start-1 min-w-0 md:flex-[2.25_1_0%]">
+        <div className={cx('col-span-3 col-start-1', DESKTOP_OFFER_CLASS)}>
           {best ? (
             <div className="rounded-lg border border-[var(--color-best-border)] border-l-3 border-l-[var(--color-best-solid)] bg-[var(--color-best-bg)] px-2.5 py-1.5">
               <div className="flex items-center justify-between gap-2 min-w-0">
@@ -862,13 +862,13 @@ const Row = memo(function Row({
         </div>
 
         {/* Col 4 (Right): Actions (Edit + Wishlist + Expand Offers) */}
-        <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-1 sm:gap-1.5 md:w-[212px] md:shrink-0">
+        <div className={cx('col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-1 sm:gap-1.5', DESKTOP_ACTIONS_CLASS)}>
           <button
             type="button"
             onClick={() => onEdit(r)}
             title="Manually edit or set item price, Net rate (N), TP, or discount %"
             aria-label={`Edit price or offer for ${p.name}`}
-            className="inline-flex h-8 w-8 sm:h-7.5 sm:w-auto sm:px-2 items-center justify-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--color-primary)]"
+            className="inline-flex h-8 w-8 sm:h-7.5 sm:w-auto sm:px-2 shrink-0 items-center justify-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-xs font-medium text-[var(--text-secondary)] whitespace-nowrap transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--color-primary)]"
           >
             <IconEdit size={13} />
             <span className="hidden sm:inline">Edit</span>
@@ -881,7 +881,7 @@ const Row = memo(function Row({
               aria-expanded={open}
               title={open ? 'Collapse supplier offers' : `Compare all ${r.records.length} supplier offers`}
               className={cx(
-                'inline-flex h-8 sm:h-7.5 items-center gap-1 whitespace-nowrap rounded-md border px-2 sm:px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]',
+                'inline-flex h-8 sm:h-7.5 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 sm:px-2.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]',
                 open
                   ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
                   : 'border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]',
@@ -901,7 +901,7 @@ const Row = memo(function Row({
           ) : (
             <Link
               to={`/products/${p.id}`}
-              className="inline-flex h-8 sm:h-7.5 items-center rounded-md border border-[var(--border-default)] px-2.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="inline-flex h-8 sm:h-7.5 shrink-0 items-center rounded-md border border-[var(--border-default)] px-2.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             >
               Details
             </Link>
