@@ -59,4 +59,16 @@ describe('two-shop sample flow (docs/samples)', () => {
     const row = buildRows(g, suggestMapping(g[0]), DEFAULT_OPTIONS).rows.find((r) => r.code === 'A103')!
     expect(row.cost.effective).toBeCloseTo((180 * 10) / 11, 6)
   })
+
+  it('validates all 1,445 rows of bahadur_fakheer_stock_list_with_discounts.csv with 0 errors', () => {
+    const g = load('bahadur_fakheer_stock_list_with_discounts.csv')
+    const map = suggestMapping(g[0])
+    const { rows, stats } = buildRows(g, map, DEFAULT_OPTIONS)
+    expect(stats.total).toBe(1445)
+    expect(stats.invalid).toBe(0)
+    expect(stats.review).toBe(0)
+    expect(stats.missingPrice).toBe(0)
+    expect(stats.badNumbers).toBe(0)
+    expect(rows.length).toBe(1445)
+  })
 })

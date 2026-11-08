@@ -125,6 +125,21 @@ export default function ImportWizard() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  const loadPresetCsv = async (url: string, filename: string) => {
+    setReading(true)
+    setFileErr(null)
+    try {
+      const resp = await fetch(url)
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const blob = await resp.blob()
+      const f = new File([blob], filename, { type: 'text/csv' })
+      await onFile(f)
+    } catch (e) {
+      setFileErr(`Could not load preset file: ${(e as Error).message}`)
+      setReading(false)
+    }
+  }
+
   const built = useMemo(
     () => (file && step >= 2 ? buildRows(file.grid, mapping, options, rowOverrides) : null),
     [file, mapping, options, step, rowOverrides],
@@ -455,19 +470,38 @@ export default function ImportWizard() {
             />
 
             {!file ? (
-              <label
-                htmlFor="price-list-file-input"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] px-4 py-7 text-center transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"
-              >
-                <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)]">
-                  <IconUpload size={22} />
+              <div className="space-y-2.5">
+                <label
+                  htmlFor="price-list-file-input"
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--border-default)] bg-[var(--bg-subtle)] px-4 py-7 text-center transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"
+                >
+                  <div className="mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)]">
+                    <IconUpload size={22} />
+                  </div>
+                  <span className="text-sm font-medium text-[var(--color-primary)]">Choose price list</span>
+                  <span className="mt-1 text-xs font-medium text-[var(--text-primary)]">Supported formats: CSV, XLSX and XLS</span>
+                  <span className="mt-1 max-w-md text-xs text-[var(--text-secondary)]">
+                    PDF and photo price lists are not supported yet — ask the supplier for Excel/CSV or export to .xlsx first.
+                  </span>
+                </label>
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--bg-subtle)] px-3.5 py-2.5">
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-[var(--text-primary)]">Ready-to-import supplier sheet</div>
+                    <div className=" truncate text-[11px] text-[var(--text-secondary)]">
+                      bahadur_fakheer_stock_list_with_discounts.csv (1,445 products · Disc % + Carton/Bulk Schemes + TP)
+                    </div>
+                  </div>
+                  <Button
+                    small
+                    variant="secondary"
+                    disabled={reading}
+                    onClick={() => void loadPresetCsv('/samples/bahadur_fakheer_stock_list_with_discounts.csv', 'bahadur_fakheer_stock_list_with_discounts.csv')}
+                  >
+                    <IconFileSpreadsheet size={14} className="text-[var(--color-primary)]" />
+                    <span>Load Bahadur Fakheer CSV (1,445)</span>
+                  </Button>
                 </div>
-                <span className="text-sm font-medium text-[var(--color-primary)]">Choose price list</span>
-                <span className="mt-1 text-xs font-medium text-[var(--text-primary)]">Supported formats: CSV, XLSX and XLS</span>
-                <span className="mt-1 max-w-md text-xs text-[var(--text-secondary)]">
-                  PDF and photo price lists are not supported yet — ask the supplier for Excel/CSV or export to .xlsx first.
-                </span>
-              </label>
+              </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-best-border)] bg-[var(--color-best-bg)] p-3.5">
                 <div className="flex min-w-0 items-center gap-3">

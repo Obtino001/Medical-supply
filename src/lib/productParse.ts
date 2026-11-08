@@ -36,14 +36,37 @@ const UNIT_MAP: Record<string, { unit: string; factor: number }> = {
   liter: { unit: 'ml', factor: 1000 },
 }
 
+const HOMOGLYPH_MAP: Record<string, string> = {
+  // Cyrillic lookalikes
+  А: 'A', а: 'a', В: 'B', в: 'b', С: 'C', с: 'c', Е: 'E', е: 'e',
+  Н: 'H', н: 'h', І: 'I', і: 'i', Ј: 'J', ј: 'j', К: 'K', к: 'k',
+  М: 'M', м: 'm', О: 'O', о: 'o', Р: 'P', р: 'p', Ѕ: 'S', ѕ: 's',
+  Т: 'T', т: 't', У: 'Y', у: 'y', Х: 'X', х: 'x',
+  // Greek lookalikes
+  Α: 'A', α: 'a', Β: 'B', β: 'b', Ε: 'E', ε: 'e', Ζ: 'Z', ζ: 'z',
+  Η: 'H', η: 'h', Ι: 'I', ι: 'i', Κ: 'K', κ: 'k', Μ: 'M',
+  Ν: 'N', ν: 'n', Ο: 'O', ο: 'o', Ρ: 'P', ρ: 'p', Τ: 'T', τ: 't',
+  Υ: 'Y', υ: 'y', Χ: 'X', χ: 'x',
+}
+
+const HOMOGLYPH_RE = new RegExp(`[${Object.keys(HOMOGLYPH_MAP).join('')}]`, 'g')
+
+/** Transliterate Cyrillic/Greek OCR lookalike characters to standard Latin ASCII. */
+export function normalizeHomoglyphs(s: string | null | undefined): string {
+  if (!s) return ''
+  return s.toString().replace(HOMOGLYPH_RE, (ch) => HOMOGLYPH_MAP[ch] ?? ch)
+}
+
 const FORMS: Record<string, string> = {
-  tab: 'tablet', tabs: 'tablet', tablet: 'tablet', tablets: 'tablet',
+  tab: 'tablet', tabs: 'tablet', tablet: 'tablet', tablets: 'tablet', tabb: 'tablet', tba: 'tablet',
   cap: 'capsule', caps: 'capsule', capsule: 'capsule', capsules: 'capsule',
-  syp: 'syrup', syrup: 'syrup', syrups: 'syrup',
+  syp: 'syrup', syrup: 'syrup', syrups: 'syrup', botl: 'syrup', botle: 'syrup', btl: 'syrup',
   susp: 'suspension', suspension: 'suspension',
-  inj: 'injection', injs: 'injection', injection: 'injection', injections: 'injection', amp: 'injection', vial: 'injection',
-  cream: 'cream', crm: 'cream', oint: 'ointment', ointment: 'ointment', gel: 'gel', lotion: 'lotion',
-  drops: 'drops', drop: 'drops', sachet: 'sachet', sachets: 'sachet', spray: 'spray', powder: 'powder',
+  inj: 'injection', injs: 'injection', injection: 'injection', injections: 'injection', amp: 'injection', amps: 'injection', vial: 'injection', vials: 'injection', vail: 'injection',
+  cream: 'cream', crm: 'cream', crem: 'cream', crea: 'cream', oint: 'ointment', ointment: 'ointment', gel: 'gel', lotion: 'lotion', lot: 'lotion',
+  drops: 'drops', drop: 'drops', drp: 'drops',
+  sachet: 'sachet', sachets: 'sachet', scheet: 'sachet', sahet: 'sachet', sach: 'sachet', sch: 'sachet',
+  spray: 'spray', powder: 'powder',
   shampoo: 'shampoo', soap: 'soap', inf: 'infusion', infusion: 'infusion', inh: 'inhaler', inhaler: 'inhaler',
 }
 
@@ -62,7 +85,7 @@ export function toNumber(s: string): number {
 }
 
 export function parseTitle(title: string): ParsedProduct {
-  const raw = (title ?? '').toString()
+  const raw = normalizeHomoglyphs((title ?? '').toString())
   let work = ' ' + raw.replace(/\s+/g, ' ').trim() + ' '
 
   let strengthValue: number | null = null
@@ -127,14 +150,14 @@ function round(n: number): number {
 }
 
 export function normalizeText(s: string | null | undefined): string {
-  return (s ?? '').toString().toLowerCase().replace(/[^a-z0-9%\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  return normalizeHomoglyphs(s ?? '').toLowerCase().replace(/[^a-z0-9%\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 /** Source key used to remember a human match decision for one supplier. */
 export function sourceKey(code: string | null | undefined, title: string): string {
-  const c = (code ?? '').toString().trim().toLowerCase()
+  const c = normalizeHomoglyphs(code ?? '').trim().toLowerCase()
   if (c) return 'code:' + c
-  return 'title:' + title.toString().trim().toLowerCase().replace(/\s+/g, ' ')
+  return 'title:' + normalizeHomoglyphs(title).trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 export interface ProductIdentityInput {

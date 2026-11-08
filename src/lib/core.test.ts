@@ -440,6 +440,72 @@ describe('import pipeline', () => {
     expect(discWithTp.effective_cost).toBe(170)
     expect(discWithTp.source_attrs.carton_discount_pct).toBe(8)
   })
+  it('parses Bahadur Fakheer stock list CSV with Disc % + Scheme, OCR homoglyphs, bulk pack schemes, and blank TP rows', () => {
+    const csv = [
+      'Item Name,Qty,Disc %,Scheme',
+      'ACEFYL 125 SYP NEW,,15,COTON 8%',
+      'ACENAC 100 NEW TАВ,,10,',
+      'НЕРТОСАМM SYP LRG,,15,',
+      'ΜΑΧΝΑ 500 NEW CAPS,,30,',
+      'BRITANYL SYP NEW,,,COTON 1%',
+      'CALVIT-C-SACHET,,,COTON 60%',
+      'SANGOBION SYP NEW,,,50PC 1%',
+      '2SUM-1G-INJ,,,',
+      'CEFSPAN 400 CAPS,,10,20PKT 103',
+      'AUGMENTIN DS SYP,,12,CIN 6%',
+      'PANADOL TAB,,10,50PC 343%',
+      'BRUFEN SYP,,12,COTON 128%',
+      'FLAGYL TAB,,10,50PC 25% | 4',
+    ].join('\n')
+    const g = parseCsvText(csv)
+    const hr = detectHeaderRow(g)
+    const headers = g[hr - 1].map((x) => x.trim())
+    const map = suggestMapping(headers)
+    expect(map.title).toBe('Item Name')
+    expect(map.price).toBe('Disc %')
+    expect(map.scheme).toBe('Scheme')
+
+    const { rows, stats } = buildRows(g, map, { ...DEFAULT_OPTIONS, headerRow: hr })
+    expect(stats.invalid).toBe(0)
+    expect(stats.review).toBe(0)
+    expect(stats.missingPrice).toBe(0)
+    expect(stats.badNumbers).toBe(0)
+    expect(stats.valid).toBe(13)
+
+    // Loose discount + Carton discount in separate columns
+    const acefyl = rows.find((r) => r.title === 'ACEFYL 125 SYP NEW')!
+    expect(acefyl.discountPct).toBe(15)
+    expect(acefyl.baseDiscountPct).toBe(15)
+    expect(acefyl.cartonDiscountPct).toBe(8)
+    expect(acefyl.schemeText).toBe('15% discount · Full box (carton) 8%')
+
+    // Cyrillic/Greek homoglyphs normalized cleanly
+    const acenac = rows.find((r) => r.title === 'ACENAC 100 NEW TAB')!
+    expect(acenac).toBeDefined()
+    expect(acenac.incoming.dosageForm).toBe('tablet')
+    expect(rows.find((r) => r.title === 'HEPTOCAMM SYP LRG')?.incoming.normalizedName).toBe('heptocamm syp lrg'.replace(' syp', ''))
+    expect(rows.find((r) => r.title === 'MAXNA 500 NEW CAPS')?.incoming.normalizedName).toBe('maxna 500 new')
+
+    // Blank Disc % with Carton Scheme in Scheme column
+    const britanyl = rows.find((r) => r.title === 'BRITANYL SYP NEW')!
+    expect(britanyl.kind).toBe('valid')
+    expect(britanyl.cartonDiscountPct).toBe(1)
+    expect(britanyl.schemeText).toBe('Full box (carton) 1% discount')
+
+    // Blank Disc % and Blank Scheme -> TP (0% discount)
+    const twoSum = rows.find((r) => r.title === '2SUM-1G-INJ')!
+    expect(twoSum.kind).toBe('valid')
+    expect(twoSum.isTradePrice).toBe(true)
+    expect(twoSum.discountPct).toBe(0)
+    expect(twoSum.schemeText).toBe('TP (0% discount)')
+
+    // OCR scheme typos cleaned
+    expect(rows.find((r) => r.title === 'CEFSPAN 400 CAPS')?.cartonDiscountPct).toBe(10)
+    expect(rows.find((r) => r.title === 'AUGMENTIN DS SYP')?.cartonDiscountPct).toBe(6)
+    expect(rows.find((r) => r.title === 'PANADOL TAB')?.cartonDiscountPct).toBe(34)
+    expect(rows.find((r) => r.title === 'BRUFEN SYP')?.cartonDiscountPct).toBe(12)
+    expect(rows.find((r) => r.title === 'FLAGYL TAB')?.cartonDiscountPct).toBe(25)
+  })
 })
 
 // ---------- comparison

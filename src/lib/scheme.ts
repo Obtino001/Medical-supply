@@ -47,7 +47,7 @@ export interface CostResult {
 }
 
 const NUM = String.raw`(\d+(?:[.,]\d+)?)`
-const CARTON_KW = String.raw`(?:full\s*box(?:es)?|master\s*carton|c[oa]tt?on|cart[ao]n|cr?tn|box|peti|case)`
+const CARTON_KW = String.raw`(?:full\s*box(?:es)?|master\s*carton|c[oa]tt?on|cart[ao]n|cr?tn|c[ti]n|box|peti|case|\d+\s*(?:pc|pcs|pkt|pkts|pack|packs))`
 const TP_TOKEN = String.raw`(?:[1il!|]?\s*t(?:[./-]\s*)?p\.?|trade\s*price|market\s*t\.?\s*p\.?|net\s*t\.?\s*p\.?)`
 const NET_PREFIX_RE = new RegExp(
   String.raw`^(?:n|net|fix|fixed|net\s*(?:rate|price)|fixed\s*(?:rate|price)|flat\s*(?:rate|price)?)\s*[:=./-]?\s*(?:rs\.?|pkr|₨)?\s*${NUM}\s*(?:rs\.?|pkr|₨|only|/-)?$`,
@@ -107,6 +107,14 @@ export function parseSchemeText(text: string | null | undefined): SchemeComponen
 
   // Normalize unicode arrows and common symbols (e.g. "↑ 12%", "↓ 12%", "→")
   t = t.replace(/[↑↓←→↖↗↘↙⇧⇩]/g, ' ').trim()
+
+  // Clean common OCR artifacts in scheme cells:
+  // 1. Trailing pipe/bracket noise after % (e.g. "50PC 25% | 4" -> "50PC 25%", "10PC 7% [" -> "10PC 7%")
+  t = t.replace(/%\s*[|[\]\\/]+\s*\d*$/g, '%').replace(/[[\]|\\]+/g, ' ').replace(/\s+/g, ' ').trim()
+  // 2. OCR misread of '%' as '3%' or '8%' on 2-digit percentages (e.g. "COTON 128%" -> "COTON 12%", "50PC 343%" -> "50PC 34%")
+  t = t.replace(/\b(\d{2})[38]\s*%/g, '$1%')
+  // 3. OCR misread of trailing '%' as '3' after pack-quantity keywords (e.g. "20PKT 103" -> "20PKT 10%", "10PC 53" -> "10PC 5%")
+  t = t.replace(/\b(\d+\s*(?:pc|pcs|pkt|pkts|pack|packs)\s*[:=-]?\s*\d{1,2})3\b(?!\s*%)/gi, '$1%')
 
   // Check for Net Fixed Rate token (e.g. "N 75", "NET 75", "75 NET", "FIXED 75")
   const netVal = parseNetPriceToken(t)
@@ -216,33 +224,39 @@ export function parseSchemeText(text: string | null | undefined): SchemeComponen
   }
 
   // Build a clean human-readable summary
+  out.summary = formatSchemeSummary(out)
+
+  return out
+}
+
+/** Build a normalized human-readable summary string from SchemeComponents. */
+export function formatSchemeSummary(out: SchemeComponents): string | null {
+  if (out.isNetPrice && out.netPrice != null) {
+    return `Net Rs ${out.netPrice} (fixed rate)`
+  }
   const parts: string[] = []
   if (out.isTradePrice && (out.discountPct === 0 || out.discountPct === null)) {
     parts.push('TP (0% discount)')
   } else if (out.discountPct !== null) {
-    if (out.cartonDiscountPct !== null && out.discountPct === out.cartonDiscountPct && !out.isTradePrice) {
+    if (out.cartonDiscountPct != null && out.discountPct === out.cartonDiscountPct && !out.isTradePrice && out.plainDiscountPct == null) {
       parts.push(`Full box (carton) ${out.cartonDiscountPct}% discount`)
     } else {
       parts.push(`${out.discountPct}% discount`)
     }
   }
-  if (out.cartonDiscountPct !== null && !(out.discountPct === out.cartonDiscountPct && !out.isTradePrice)) {
+  if (out.cartonDiscountPct != null && !(out.discountPct === out.cartonDiscountPct && !out.isTradePrice && out.plainDiscountPct == null)) {
     parts.push(`Full box (carton) ${out.cartonDiscountPct}%`)
   }
-  if (out.cartonRate !== null) {
+  if (out.cartonRate != null) {
     parts.push(`Full box (carton) Rs ${out.cartonRate}`)
   }
-  if (out.flatDiscount !== null) {
+  if (out.flatDiscount != null) {
     parts.push(`Rs ${out.flatDiscount} off`)
   }
-  if (out.bonusBuy !== null && out.bonusFree !== null) {
+  if (out.bonusBuy != null && out.bonusFree != null) {
     parts.push(`Bonus ${out.bonusBuy}+${out.bonusFree}`)
   }
-  if (parts.length > 0) {
-    out.summary = parts.join(' · ')
-  }
-
-  return out
+  return parts.length > 0 ? parts.join(' · ') : null
 }
 
 export interface ParsedOfferCell {
@@ -301,8 +315,8 @@ export function parseOfferRateCell(
   if (!hasSchemeTokens) {
     const num = parseNumber(s)
     if (num !== null) {
-      // When the column is a discount column (e.g. header "DES%" or "DISC%") and the cell is a bare number 0..50 without Rs/PKR
-      if (opts?.preferDiscountPct && !/rs\.?|pkr|₨/i.test(s) && num >= 0 && num <= 50) {
+      // When the column is a discount column (e.g. header "DES%" or "DISC%") and the cell is a bare number 0..<100 without Rs/PKR
+      if (opts?.preferDiscountPct && !/rs\.?|pkr|₨/i.test(s) && num >= 0 && num < 100) {
         const scheme = parseSchemeText(num === 0 ? 'TP' : `${num}%`)
         return { price: null, scheme }
       }

@@ -1,8 +1,8 @@
 // Turns a raw grid + column mapping into validated, typed import rows. Pure and testable.
 import { matchHeaderField, suggestMapping, type FieldKey, type ImportOptions, type Mapping } from './columns'
 import type { IncomingProduct } from './matching'
-import { identityKey, normalizeText, parseTitle, sourceKey } from './productParse'
-import { calculateEffectiveCost, parseNumber, parseOfferRateCell, parseSchemeText, type CostResult, type SchemeComponents } from './scheme'
+import { identityKey, normalizeHomoglyphs, normalizeText, parseTitle, sourceKey } from './productParse'
+import { calculateEffectiveCost, formatSchemeSummary, parseNumber, parseOfferRateCell, parseSchemeText, type CostResult, type SchemeComponents } from './scheme'
 
 export type RowKind = 'valid' | 'review' | 'invalid' | 'duplicate'
 
@@ -319,8 +319,9 @@ export function buildRows(
       const errors: string[] = []
       const warnings: string[] = []
 
-      const title = (override?.title !== undefined ? override.title.trim() : '') || get(idx.title) || get(idx.description)
-      const desc = get(idx.title) ? get(idx.description) : ''
+      const rawTitle = (override?.title !== undefined ? override.title.trim() : '') || get(idx.title) || get(idx.description)
+      const title = normalizeHomoglyphs(rawTitle)
+      const desc = get(idx.title) ? normalizeHomoglyphs(get(idx.description)) : ''
       if (!title) {
         errors.push('Missing product title')
         stats.missingTitle++
@@ -366,21 +367,27 @@ export function buildRows(
 
       // ---- price & scheme
       const hasOfferOverride = override?.offerRaw !== undefined && override.offerRaw.trim() !== ''
-      const priceRaw = hasOfferOverride ? override!.offerRaw!.trim() : get(idx.price)
+      const rawPriceCell = hasOfferOverride ? override!.offerRaw!.trim() : get(idx.price)
+      const discRaw = hasOfferOverride ? '' : get(idx.discount)
+      const schemeRaw = hasOfferOverride ? '' : get(idx.scheme)
+
+      // In a single-table stock list where the price column is a Discount % column and a dedicated Scheme column exists,
+      // rows with a valid product title and blank discount & blank scheme represent Trade Price (TP = 0% discount).
+      const autoTpForBlankDiscount =
+        !hasOfferOverride &&
+        !rawPriceCell &&
+        !discRaw &&
+        !schemeRaw &&
+        Boolean(title) &&
+        activeMappings.length === 1 &&
+        preferDiscountCol &&
+        idx.scheme >= 0
+
+      const priceRaw = autoTpForBlankDiscount ? 'TP' : rawPriceCell
       const parsedOffer = parseOfferRateCell(priceRaw, { preferDiscountPct: hasOfferOverride ? false : preferDiscountCol })
       let price = parsedOffer.price
       const inlineScheme = parsedOffer.scheme
 
-      if (!priceRaw) {
-        errors.push('Missing price')
-        stats.missingPrice++
-      } else if (price === null && !inlineScheme) {
-        errors.push(`Price "${priceRaw}" is not a number`)
-        stats.badNumbers++
-      } else if (price !== null && price <= 0) {
-        errors.push('Price must be greater than zero')
-        price = null
-      }
       const mrpRaw = get(idx.mrp)
       const mrp = parseNumber(mrpRaw)
       if (mrpRaw && mrp === null) warnings.push(`MRP "${mrpRaw}" is not a number; ignored`)
@@ -392,13 +399,15 @@ export function buildRows(
       const comp: SchemeComponents = inlineScheme
         ? { ...inlineScheme, notes: [...inlineScheme.notes] }
         : { discountPct: null, flatDiscount: null, bonusBuy: null, bonusFree: null, ambiguous: false, notes: [] }
-      const discRaw = hasOfferOverride ? '' : get(idx.discount)
-      const schemeRaw = hasOfferOverride ? '' : get(idx.scheme)
       if (discRaw) {
         const asNum = parseNumber(discRaw)
         if (asNum !== null && !/%/.test(discRaw) && !/rs|pkr/i.test(discRaw) && !/^(?:n|net|fix)\b/i.test(discRaw)) {
-          if (options.discountMode === 'percent') comp.discountPct = asNum
-          else comp.flatDiscount = asNum
+          if (options.discountMode === 'percent') {
+            comp.discountPct = asNum
+            comp.plainDiscountPct = asNum
+          } else {
+            comp.flatDiscount = asNum
+          }
         } else {
           const d = parseSchemeText(discRaw)
           Object.assign(comp, { ...d, notes: d.notes })
@@ -406,7 +415,21 @@ export function buildRows(
       }
       if (schemeRaw) {
         const s = parseSchemeText(schemeRaw)
-        for (const k of ['discountPct', 'flatDiscount', 'bonusBuy', 'bonusFree'] as const) {
+        if (s.cartonDiscountPct != null) comp.cartonDiscountPct = s.cartonDiscountPct
+        if (s.cartonRate != null) comp.cartonRate = s.cartonRate
+        if (s.isTradePrice && comp.discountPct == null) comp.isTradePrice = true
+
+        // Only treat s.discountPct as a loose discount if s had a non-carton discount (plainDiscountPct)
+        // or if comp has no loose discount yet.
+        if (s.plainDiscountPct != null) {
+          if (comp.discountPct != null && comp.discountPct !== s.plainDiscountPct) comp.ambiguous = true
+          comp.discountPct = s.plainDiscountPct
+          comp.plainDiscountPct = s.plainDiscountPct
+        } else if (comp.discountPct == null && s.discountPct != null) {
+          comp.discountPct = s.discountPct
+        }
+
+        for (const k of ['flatDiscount', 'bonusBuy', 'bonusFree'] as const) {
           if (s[k] != null) {
             if (comp[k] != null && comp[k] !== s[k]) comp.ambiguous = true
             comp[k] = s[k]
@@ -420,9 +443,35 @@ export function buildRows(
         if (s.ambiguous) comp.ambiguous = true
         comp.notes.push(...s.notes)
       }
+      if (discRaw || schemeRaw) {
+        comp.summary = formatSchemeSummary(comp) ?? comp.summary
+      }
       if (price === null && comp.isNetPrice && comp.netPrice != null && comp.netPrice > 0) {
         price = comp.netPrice
       }
+
+      const hasFallbackScheme =
+        preferDiscountCol &&
+        !comp.ambiguous &&
+        (Boolean(inlineScheme) ||
+          Boolean(comp.isTradePrice) ||
+          comp.discountPct != null ||
+          comp.cartonDiscountPct != null ||
+          comp.cartonRate != null ||
+          comp.flatDiscount != null ||
+          (comp.bonusBuy != null && comp.bonusFree != null))
+
+      if (!priceRaw && !hasFallbackScheme) {
+        errors.push('Missing price')
+        stats.missingPrice++
+      } else if (priceRaw && price === null && !inlineScheme && !hasFallbackScheme) {
+        errors.push(`Price "${priceRaw}" is not a number`)
+        stats.badNumbers++
+      } else if (price !== null && price <= 0) {
+        errors.push('Price must be greater than zero')
+        price = null
+      }
+
       if (comp.discountPct != null && (comp.discountPct < 0 || comp.discountPct >= 100)) errors.push(`Invalid discount ${comp.discountPct}%`)
       comp.notes.forEach((n) => warnings.push(n))
 
@@ -432,11 +481,11 @@ export function buildRows(
 
       const rowPriceIsNet = Boolean(options.priceIsNet || parsedOffer.isNetPrice || comp.isNetPrice)
       const cost: CostResult =
-        price === null && inlineScheme && !comp.ambiguous
+        price === null && (inlineScheme || hasFallbackScheme) && !comp.ambiguous
           ? {
               status: 'ok',
               effective: null,
-              steps: [comp.summary || priceRaw],
+              steps: [comp.summary || priceRaw || schemeRaw || discRaw],
             }
           : calculateEffectiveCost({
               basePrice: price,
@@ -467,8 +516,10 @@ export function buildRows(
       }
       const identity = identityKey({ normalizedName, strengthValue, strengthUnit, weightValue, weightUnit, packSize, dosageForm, manufacturer: incoming.manufacturer })
 
-      const inlineLabel = inlineScheme ? (comp.summary || priceRaw) : null
-      const schemeText = [inlineLabel, discRaw, schemeRaw].filter(Boolean).join(' | ') || null
+      const schemeText =
+        price === null && (inlineScheme || hasFallbackScheme)
+          ? comp.summary || [priceRaw, discRaw, schemeRaw].filter(Boolean).join(' | ') || null
+          : [inlineScheme ? comp.summary || priceRaw : null, discRaw, schemeRaw].filter(Boolean).join(' | ') || null
 
       let kind: RowKind = errors.length ? 'invalid' : cost.status === 'review' ? 'review' : 'valid'
       if (kind !== 'invalid') {
