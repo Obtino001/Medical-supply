@@ -80,7 +80,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Market overview"
+        title="Hafsa Medicose Overview"
         subtitle="Compare wholesale medicine rates, track supplier surveys, and share findings across partners."
       />
 

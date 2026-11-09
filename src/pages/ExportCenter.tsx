@@ -50,7 +50,7 @@ export default function ExportCenter() {
   const cols = profile.columns
   const matrix = useMemo(() => toMatrix(rows, cols), [rows, cols])
   const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16)
-  const base = `price-intelligence-${ds}-${stamp}`
+  const base = `hafsa-medicose-${ds}-${stamp}`
 
   const move = (i: number, d: -1 | 1) => {
     const c = [...cols]; const j = i + d

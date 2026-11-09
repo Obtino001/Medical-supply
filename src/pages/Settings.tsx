@@ -58,9 +58,9 @@ export default function Settings() {
       </Card>
 
       <Card>
-        <h2 className="mb-1.5 text-base font-medium text-[var(--text-primary)]">Workspace members</h2>
+        <h2 className="mb-1.5 text-base font-medium text-[var(--text-primary)]">Hafsa Medicose Workspace</h2>
         <p className="mb-3 text-sm text-[var(--text-secondary)]">
-          Both accounts see the same shops, products, prices, wishlist and match decisions. You are signed in as{' '}
+          Both partner accounts share real-time access to Hafsa Medicose shops, products, prices, wishlist and match decisions. You are signed in as{' '}
           <b className="font-medium text-[var(--text-primary)]">{email}</b> ({role}).
         </p>
         <div className="space-y-2">

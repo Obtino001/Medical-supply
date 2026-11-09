@@ -26,8 +26,8 @@ export default function Login() {
       </div>
       <div className="mb-6 flex flex-col items-center text-center">
         <IconBrandMark size={40} />
-        <h1 className="mt-3 text-2xl font-medium tracking-tight text-[var(--text-primary)]">Wholesale Price Intelligence</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Medical wholesale market price comparison &amp; supplier survey system</p>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Hafsa Medicose</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Wholesale Price Intelligence &amp; Market Comparison System</p>
       </div>
 
       <Card className="p-6">
