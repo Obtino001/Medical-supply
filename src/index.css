@@ -198,3 +198,47 @@ input[type="radio"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* Native A4 Print Sheet layout: hides app chrome/dark mode and prints clean black-on-white slips */
+.print-portal {
+  display: none;
+}
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color-scheme: light !important;
+  }
+
+  #root {
+    display: none !important;
+  }
+
+  .print-portal {
+    display: block !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    width: 100% !important;
+    font-family: var(--font-sans);
+  }
+
+  .print-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

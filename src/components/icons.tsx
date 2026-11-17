@@ -313,6 +313,21 @@ export const IconSparkles = (p: IconProps) => (
   </BaseIcon>
 )
 
+export const IconPrinter = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <polyline points="6 9 6 2 18 2 18 9" />
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    <rect x="6" y="14" width="12" height="8" />
+  </BaseIcon>
+)
+
+export const IconCopy = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </BaseIcon>
+)
+
 export const IconBrandMark = ({ size = 28 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <rect width="32" height="32" rx="8" fill="#1A73E8" />

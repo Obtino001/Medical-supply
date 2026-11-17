@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconChevronDown, IconClose, IconFilter, IconPlus, IconSearch } from '../components/icons'
+import { IconChevronDown, IconClose, IconFilter, IconPlus, IconPrinter, IconSearch } from '../components/icons'
 import { OfferLeadBox, OfferRow } from '../components/Offers'
 import { ProductPicker } from '../components/Match'
+import { PrintOrderModal } from '../components/PrintOrderModal'
 import { Badge, Button, Card, Empty, Field, Modal, PageHeader, Pagination, Select, Stat, Textarea, cx, fmtDate, rs, useConfirm, useLocalState, useToast } from '../components/ui'
 import { addToWishlist, removeFromWishlist, updateWishlist } from '../lib/actions'
 import { compareOffers, findOpportunities, ageInDays, type CompareResult } from '../lib/compare'
@@ -39,6 +40,7 @@ export default function Wishlist() {
   const [f, setF] = useState(DEFAULT_F)
   const [showFilters, setShowFilters] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [printing, setPrinting] = useState(false)
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(0)
 
@@ -151,6 +153,12 @@ export default function Wishlist() {
         title="My wishlist"
         subtitle="Shared priority purchasing list with automatic cheapest-supplier ranking and verified savings."
       >
+        {shown.length > 0 && (
+          <Button variant="secondary" small onClick={() => setPrinting(true)}>
+            <IconPrinter size={15} className="text-[var(--color-primary)]" />
+            <span>Print / PDF ({shown.length})</span>
+          </Button>
+        )}
         <Button small onClick={() => setAdding(true)}>
           <IconPlus size={15} />
           <span>Add product</span>
@@ -550,6 +558,14 @@ export default function Wishlist() {
             setAdding(false)
             void act(() => addToWishlist(p.id), 'Added to shared wishlist')
           }}
+        />
+      )}
+      {printing && (
+        <PrintOrderModal
+          open
+          onClose={() => setPrinting(false)}
+          productIds={shown.map((e) => e.product.id)}
+          title="Wishlist - Order & Best Price Sheet"
         />
       )}
     </div>

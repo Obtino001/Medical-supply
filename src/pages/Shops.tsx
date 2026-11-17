@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconEdit, IconPlus, IconTrash, IconUpload } from '../components/icons'
+import { IconEdit, IconPlus, IconPrinter, IconTrash, IconUpload } from '../components/icons'
 import { ShopForm } from '../components/ShopForm'
 import { Badge, Button, Card, Empty, Input, PageHeader, Select, fmtDate, useConfirm, useToast } from '../components/ui'
 import { deleteShopWithItems } from '../lib/actions'
@@ -135,6 +135,14 @@ export default function Shops() {
                         <span>Import</span>
                       </Button>
                     </Link>
+                    {count > 0 && (
+                      <Link to={`/shops/${s.id}`}>
+                        <Button variant="ghost" small title="Select items and print / PDF purchase order for this shop">
+                          <IconPrinter size={14} />
+                          <span>Order / PDF</span>
+                        </Button>
+                      </Link>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">

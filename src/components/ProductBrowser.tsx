@@ -7,8 +7,9 @@ import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
 import { AssignCompanyModal } from './AssignCompanyModal'
 import { EditOfferModal } from './EditOfferModal'
-import { IconArrowRight, IconBuilding, IconChevronDown, IconClose, IconEdit, IconFilter, IconSearch, IconTrash, IconUpload } from './icons'
+import { IconArrowRight, IconBuilding, IconChevronDown, IconClose, IconEdit, IconFilter, IconPrinter, IconSearch, IconTrash, IconUpload } from './icons'
 import { OfferLeadBox, OfferRow } from './Offers'
+import { PrintOrderModal } from './PrintOrderModal'
 import { WishlistToggle } from './WishlistToggle'
 import { Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useConfirm, useDebounced, useLocalState, useToast } from './ui'
 
@@ -156,6 +157,7 @@ export function ProductBrowser({
   const [showFilters, setShowFilters] = useState(false)
   const [editingRow, setEditingRow] = useState<ProductRow | null>(null)
   const [assigningCompany, setAssigningCompany] = useState(false)
+  const [printingSelected, setPrintingSelected] = useState(false)
   const [saved, setSaved] = useState<{ id: string; name: string; config: View }[]>([])
 
   useEffect(() => {
@@ -632,6 +634,14 @@ export function ProductBrowser({
               <button
                 type="button"
                 className="inline-flex items-center gap-1 font-medium text-[var(--color-primary)] hover:underline"
+                onClick={() => setPrintingSelected(true)}
+              >
+                <IconPrinter size={13} />
+                <span>Print / PDF ({selected.size})</span>
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 font-medium text-[var(--color-primary)] hover:underline"
                 onClick={() => setAssigningCompany(true)}
               >
                 <IconBuilding size={13} />
@@ -767,6 +777,19 @@ export function ProductBrowser({
           onClose={() => setAssigningCompany(false)}
           productIds={[...selected]}
           onAssigned={() => setSelected(new Set())}
+        />
+      )}
+      {printingSelected && (
+        <PrintOrderModal
+          open
+          onClose={() => setPrintingSelected(false)}
+          productIds={[...selected]}
+          preferredShopId={v.shop || undefined}
+          title={
+            companyScope && companyScope !== '__uncategorized__'
+              ? `${companyScope} - Order & Selection Sheet`
+              : undefined
+          }
         />
       )}
 
