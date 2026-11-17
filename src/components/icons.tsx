@@ -295,6 +295,24 @@ export const IconEdit = (p: IconProps) => (
   </BaseIcon>
 )
 
+export const IconBuilding = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <path d="M3 21h18" />
+    <path d="M5 21V7l8-4v18" />
+    <path d="M19 21V11l-6-4" />
+    <path d="M9 9v.01" />
+    <path d="M9 12v.01" />
+    <path d="M9 15v.01" />
+    <path d="M9 18v.01" />
+  </BaseIcon>
+)
+
+export const IconSparkles = (p: IconProps) => (
+  <BaseIcon {...p}>
+    <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+  </BaseIcon>
+)
+
 export const IconBrandMark = ({ size = 28 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <rect width="32" height="32" rx="8" fill="#1A73E8" />

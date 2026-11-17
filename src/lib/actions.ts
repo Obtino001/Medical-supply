@@ -1,4 +1,5 @@
 // Mutations shared by several pages. All of them write to the shared database; RLS enforces who may do what.
+import { extractCompanyFromTitle, resolveCanonicalCompany } from './companies'
 import { parseTitle, identityKey } from './productParse'
 import { calculateEffectiveCost, parseOfferRateCell, type CostResult } from './scheme'
 import { fetchAll, supabase, updateChecked } from './supabase'
@@ -43,11 +44,12 @@ export async function undoDecision(decisionId: string) {
 export async function createProductFromSource(title: string, attrs: SourceAttrs | null): Promise<Product> {
   const p = parseTitle(title)
   const a = attrs
+  const manufacturer = resolveCanonicalCompany(a?.manufacturer) ?? extractCompanyFromTitle(title)?.name ?? null
   const row = {
     name: title.trim(),
     normalized_name: p.name,
     brand: a?.brand ?? null,
-    manufacturer: a?.manufacturer ?? null,
+    manufacturer,
     strength_value: a?.strength_value ?? p.strengthValue,
     strength_unit: a?.strength_unit ?? p.strengthUnit,
     weight_value: a?.weight_value ?? p.weightValue,
@@ -373,4 +375,33 @@ export async function createManualPriceRecord(
       })
       .eq('id', product.id)
   }
+}
+
+/**
+ * Bulk-update the company (`manufacturer`) field on existing catalog products in safe 150-ID chunks.
+ * Intentionally leaves `identity_key` untouched so partial/unstandardized duplicates never trigger unique-index collisions.
+ */
+export async function bulkAssignCompany(
+  assignments: { productId: string; manufacturer: string | null }[],
+): Promise<number> {
+  const byCompany = new Map<string, string[]>()
+  for (const a of assignments) {
+    if (!a.productId) continue
+    const key = a.manufacturer === null ? '' : (resolveCanonicalCompany(a.manufacturer) ?? a.manufacturer.trim())
+    const arr = byCompany.get(key)
+    if (arr) arr.push(a.productId)
+    else byCompany.set(key, [a.productId])
+  }
+
+  let updated = 0
+  for (const [key, ids] of byCompany.entries()) {
+    const unique = [...new Set(ids)]
+    const mfrValue = key || null
+    for (let i = 0; i < unique.length; i += 150) {
+      const chunk = unique.slice(i, i + 150)
+      must(await supabase.from('products').update({ manufacturer: mfrValue }).in('id', chunk))
+      updated += chunk.length
+    }
+  }
+  return updated
 }

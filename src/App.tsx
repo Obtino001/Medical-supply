@@ -3,6 +3,7 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-rou
 import {
   IconAlert,
   IconBrandMark,
+  IconBuilding,
   IconCalendar,
   IconClose,
   IconDashboard,
@@ -28,6 +29,8 @@ import { DataProvider, useData } from './lib/data'
 import { configured } from './lib/supabase'
 import { ThemeProvider } from './lib/theme'
 import Compare from './pages/Compare'
+import Companies from './pages/Companies'
+import CompanyDetail from './pages/CompanyDetail'
 import Dashboard from './pages/Dashboard'
 import ExportCenter from './pages/ExportCenter'
 import ImportHistory from './pages/ImportHistory'
@@ -57,6 +60,7 @@ const NAV: NavItem[] = [
   { to: '/opportunities', label: 'Best Opportunities', icon: IconTrendingDown, group: 'Market Intelligence' },
   { to: '/wishlist', label: 'My Wishlist', icon: IconStar, group: 'Market Intelligence' },
   { to: '/products', label: 'Product Master', icon: IconPackage, group: 'Market Intelligence' },
+  { to: '/companies', label: 'Companies', icon: IconBuilding, group: 'Market Intelligence' },
   { to: '/shops', label: 'Shops', icon: IconStore, group: 'Suppliers & Imports' },
   { to: '/import', label: 'Import Price List', icon: IconUpload, group: 'Suppliers & Imports' },
   { to: '/review', label: 'Match Review', icon: IconGitCompare, group: 'Suppliers & Imports' },
@@ -401,6 +405,8 @@ export default function App() {
               <Route path="/review" element={<Review />} />
               <Route path="/products" element={<Products />} />
               <Route path="/products/:id" element={<ProductDetail />} />
+              <Route path="/companies" element={<Companies />} />
+              <Route path="/companies/:companyId" element={<CompanyDetail />} />
               <Route path="/compare" element={<Compare />} />
               <Route path="/opportunities" element={<Opportunities />} />
               <Route path="/wishlist" element={<Wishlist />} />

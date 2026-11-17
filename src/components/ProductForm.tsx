@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PHARMA_COMPANIES, resolveCanonicalCompany } from '../lib/companies'
 import { identityKey, parseTitle } from '../lib/productParse'
 import { supabase, updateChecked } from '../lib/supabase'
 import type { Product } from '../lib/types'
@@ -37,9 +38,10 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
     const strengthUnit = sv != null ? f.strength_unit || null : sv == null ? parsed.strengthUnit : null
     const weightValue = wv ?? parsed.weightValue
     const weightUnit = (wv != null ? f.weight_unit : parsed.weightUnit) as 'g' | 'ml' | null
+    const canonicalMfr = resolveCanonicalCompany(f.manufacturer) ?? (f.manufacturer.trim() || null)
     const row = {
       name: f.name.trim(), normalized_name: parsed.name || f.name.trim().toLowerCase(),
-      brand: f.brand.trim() || null, manufacturer: f.manufacturer.trim() || null, active_ingredient: f.active_ingredient.trim() || null,
+      brand: f.brand.trim() || null, manufacturer: canonicalMfr, active_ingredient: f.active_ingredient.trim() || null,
       strength_value: strengthValue, strength_unit: strengthValue != null ? strengthUnit : null,
       weight_value: weightValue, weight_unit: weightValue != null ? weightUnit : null,
       pack_size: ps ?? parsed.packSize, dosage_form: f.dosage_form.trim().toLowerCase() || parsed.dosageForm,
@@ -87,7 +89,14 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
           {showMore && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Field label="Brand"><Input value={f.brand} onChange={(e) => set('brand', e.target.value)} /></Field>
-              <Field label="Manufacturer"><Input value={f.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} /></Field>
+              <Field label="Company / Manufacturer" hint="Pick from Pakistan Top 50 Pharma or type custom">
+                <Input list="pk-pharma-companies" placeholder="e.g. Getz Pharma, GSK, CCL…" value={f.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} />
+                <datalist id="pk-pharma-companies">
+                  {PHARMA_COMPANIES.map((c) => (
+                    <option key={c.id} value={c.name} />
+                  ))}
+                </datalist>
+              </Field>
               <Field label="Active ingredient"><Input value={f.active_ingredient} onChange={(e) => set('active_ingredient', e.target.value)} /></Field>
               <Field label="Dosage form"><Input placeholder="tablet, syrup, cream…" value={f.dosage_form} onChange={(e) => set('dosage_form', e.target.value)} /></Field>
               <div className="grid grid-cols-[1fr_6rem] gap-2">

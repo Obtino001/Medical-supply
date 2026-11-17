@@ -1,11 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { deleteProductsByIds } from '../lib/actions'
+import { companySlug, resolveCanonicalCompany } from '../lib/companies'
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
+import { AssignCompanyModal } from './AssignCompanyModal'
 import { EditOfferModal } from './EditOfferModal'
-import { IconArrowRight, IconChevronDown, IconClose, IconEdit, IconFilter, IconSearch, IconTrash, IconUpload } from './icons'
+import { IconArrowRight, IconBuilding, IconChevronDown, IconClose, IconEdit, IconFilter, IconSearch, IconTrash, IconUpload } from './icons'
 import { OfferLeadBox, OfferRow } from './Offers'
 import { WishlistToggle } from './WishlistToggle'
 import { Button, Card, Empty, Field, Modal, Pagination, Select, cx, fmtDate, rs, useConfirm, useDebounced, useLocalState, useToast } from './ui'
@@ -16,6 +18,7 @@ interface View {
   group: GroupKey
   brand: string
   manufacturer: string
+  dosageForm: string
   strength: string
   weight: string
   pack: string
@@ -40,6 +43,7 @@ function getDefaultView(mode: 'compare' | 'master'): View {
     group: 'none',
     brand: '',
     manufacturer: '',
+    dosageForm: '',
     strength: '',
     weight: '',
     pack: '',
@@ -69,27 +73,62 @@ const DESKTOP_PRODUCT_CLASS = 'min-w-0 md:flex-[1.35_1_0%]'
 const DESKTOP_OFFER_CLASS = 'min-w-0 md:flex-[2.15_1_0%]'
 const DESKTOP_ACTIONS_CLASS = 'md:w-[224px] lg:w-[284px] md:shrink-0'
 
-export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
+export function ProductBrowser({
+  mode,
+  companyScope,
+  externalShop,
+  externalForm,
+  onResetExternal,
+}: {
+  mode: 'compare' | 'master'
+  companyScope?: string
+  externalShop?: string
+  externalForm?: string
+  onResetExternal?: () => void
+}) {
   const { products, current, shopMap, shops, settings, wishlistMap, selected, setSelected, reload } = useData()
   const toast = useToast()
   const confirm = useConfirm()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const defaultView = useMemo(() => getDefaultView(mode), [mode])
-  const [stored, setView] = useLocalState<View>(`view:${mode}:v2`, defaultView)
+  const storageKey = companyScope ? `view:company:${companySlug(companyScope)}:v2` : `view:${mode}:v2`
+  const [stored, setView] = useLocalState<View>(storageKey, defaultView)
   const urlQ = params.get('q')
+  const urlCompany = params.get('company')
   const view = urlQ !== null ? { ...stored, q: urlQ } : stored
-  const v: View = { ...defaultView, ...view }
+  const v: View = {
+    ...defaultView,
+    ...view,
+    manufacturer: companyScope
+      ? ''
+      : urlCompany !== null
+        ? urlCompany === '__uncategorized__'
+          ? '__uncategorized__'
+          : resolveCanonicalCompany(urlCompany) ?? urlCompany
+        : view.manufacturer ?? '',
+    shop: externalShop !== undefined && externalShop !== '' ? externalShop : view.shop ?? '',
+    dosageForm: externalForm !== undefined && externalForm !== '' ? externalForm : view.dosageForm ?? '',
+  }
 
   const [page, setPage] = useState(0)
   const [extraPages, setExtraPages] = useState(0)
   const set = useCallback(
     (patch: Partial<View>) => {
+      if ('manufacturer' in patch && urlCompany !== null) {
+        const next = new URLSearchParams(params)
+        next.delete('company')
+        setParams(next, { replace: true })
+      }
+      if (('shop' in patch || 'dosageForm' in patch) && onResetExternal) {
+        if ('shop' in patch && externalShop) onResetExternal()
+        if ('dosageForm' in patch && externalForm) onResetExternal()
+      }
       setView({ ...v, ...patch })
       setPage(0)
       setExtraPages(0)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [v, setView],
+    [v, setView, params, urlCompany],
   )
 
   const [qInput, setQInput] = useState(v.q)
@@ -99,9 +138,24 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dq])
 
+  const resetAllFilters = useCallback(() => {
+    if (urlCompany !== null || urlQ !== null) {
+      const next = new URLSearchParams(params)
+      next.delete('company')
+      next.delete('q')
+      setParams(next, { replace: true })
+    }
+    onResetExternal?.()
+    setView(defaultView)
+    setQInput('')
+    setPage(0)
+    setExtraPages(0)
+  }, [defaultView, onResetExternal, params, setParams, setView, urlCompany, urlQ])
+
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [editingRow, setEditingRow] = useState<ProductRow | null>(null)
+  const [assigningCompany, setAssigningCompany] = useState(false)
   const [saved, setSaved] = useState<{ id: string; name: string; config: View }[]>([])
 
   useEffect(() => {
@@ -114,7 +168,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
   }, [mode])
 
   const freshness = v.freshness ?? settings.freshness_days
-  const rows = useMemo(
+  const allRows = useMemo(
     () =>
       buildProductRows(products.filter((p) => !p.archived), current, shopMap, {
         freshnessDays: freshness,
@@ -123,10 +177,19 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
     [products, current, shopMap, freshness, v.excludeStale, v.freshOnly],
   )
 
+  const rows = useMemo(() => {
+    if (!companyScope) return allRows
+    if (companyScope === '__uncategorized__') return allRows.filter((r) => !r.company)
+    return allRows.filter((r) => r.company === companyScope)
+  }, [allRows, companyScope])
+
+  const uncategorizedCount = useMemo(() => rows.filter((r) => !r.company).length, [rows])
+
   const options = useMemo(
     () => ({
       brand: distinct(rows.map((r) => r.product.brand)),
-      manufacturer: distinct(rows.map((r) => r.product.manufacturer)),
+      manufacturer: distinct(rows.map((r) => r.company)),
+      dosageForm: distinct(rows.map((r) => r.product.dosage_form)),
       strength: distinct(rows.map((r) => (r.product.strength_value != null ? `${r.product.strength_value}${r.product.strength_unit ?? ''}` : null))),
       weight: distinct(rows.map((r) => (r.product.weight_value != null ? `${r.product.weight_value}${r.product.weight_unit ?? ''}` : null))),
       pack: distinct(rows.map((r) => (r.product.pack_size != null ? String(r.product.pack_size) : null))),
@@ -139,7 +202,9 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
       const p = r.product
       if (v.q && !matchesQuery(r, v.q, shopMap)) return false
       if (v.brand && p.brand !== v.brand) return false
-      if (v.manufacturer && p.manufacturer !== v.manufacturer) return false
+      if (v.manufacturer === '__uncategorized__' && r.company !== null) return false
+      else if (v.manufacturer && v.manufacturer !== '__uncategorized__' && r.company !== v.manufacturer) return false
+      if (v.dosageForm && (p.dosage_form ?? '') !== v.dosageForm) return false
       if (v.strength && `${p.strength_value}${p.strength_unit ?? ''}` !== v.strength) return false
       if (v.weight && `${p.weight_value}${p.weight_unit ?? ''}` !== v.weight) return false
       if (v.pack && String(p.pack_size) !== v.pack) return false
@@ -174,7 +239,8 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
 
   const sheetFilterCount = [
     v.brand,
-    v.manufacturer,
+    !companyScope && v.manufacturer,
+    v.dosageForm,
     v.strength,
     v.weight,
     v.pack,
@@ -318,6 +384,24 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
                 </option>
               ))}
             </Select>
+            {!companyScope && (
+              <Select
+                value={v.manufacturer}
+                onChange={(e) => set({ manufacturer: e.target.value })}
+                aria-label="Filter by company"
+                className="col-span-2 sm:col-span-1 !min-h-9 sm:!min-h-8.5 sm:!w-44 !py-1 !px-2.5 text-xs sm:text-[13px]"
+              >
+                <option value="">All companies ({options.manufacturer.length})</option>
+                {uncategorizedCount > 0 && (
+                  <option value="__uncategorized__">Uncategorized ({uncategorizedCount})</option>
+                )}
+                {options.manufacturer.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </Select>
+            )}
             <Button
               variant="secondary"
               small
@@ -412,12 +496,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
             {hasAnyFilter && (
               <button
                 type="button"
-                onClick={() => {
-                  setView(defaultView)
-                  setQInput('')
-                  setPage(0)
-                  setExtraPages(0)
-                }}
+                onClick={resetAllFilters}
                 className="rounded-md px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               >
                 Reset
@@ -431,8 +510,27 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
       <Modal open={showFilters} onClose={() => setShowFilters(false)} title="Filter & group products">
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {(['brand', 'manufacturer', 'strength', 'weight', 'pack'] as const).map((k) => (
-              <Field key={k} label={{ brand: 'Brand', manufacturer: 'Manufacturer', strength: 'Strength', weight: 'Grams / volume', pack: 'Pack size' }[k]}>
+            {!companyScope && (
+              <Field label="Company / Manufacturer">
+                <Select value={v.manufacturer} onChange={(e) => set({ manufacturer: e.target.value })}>
+                  <option value="">All companies</option>
+                  {uncategorizedCount > 0 && <option value="__uncategorized__">Uncategorized ({uncategorizedCount})</option>}
+                  {options.manufacturer.map((o) => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+            <Field label="Dosage form">
+              <Select value={v.dosageForm} onChange={(e) => set({ dosageForm: e.target.value })}>
+                <option value="">All forms</option>
+                {options.dosageForm.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </Select>
+            </Field>
+            {(['brand', 'strength', 'weight', 'pack'] as const).map((k) => (
+              <Field key={k} label={{ brand: 'Brand', strength: 'Strength', weight: 'Grams / volume', pack: 'Pack size' }[k]}>
                 <Select value={v[k]} onChange={(e) => set({ [k]: e.target.value })}>
                   <option value="">All</option>
                   {options[k].map((o) => (
@@ -493,15 +591,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] pt-3">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setView(defaultView)
-                setQInput('')
-                setPage(0)
-                setExtraPages(0)
-              }}
-            >
+            <Button variant="ghost" onClick={resetAllFilters}>
               Reset all
             </Button>
             <Button onClick={() => setShowFilters(false)}>
@@ -539,6 +629,14 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
           </div>
           {selected.size > 0 && (
             <span className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 font-medium text-[var(--color-primary)] hover:underline"
+                onClick={() => setAssigningCompany(true)}
+              >
+                <IconBuilding size={13} />
+                <span>Set company ({selected.size})</span>
+              </button>
               <Link to="/export" className="inline-flex items-center gap-1 font-medium text-[var(--color-primary)] hover:underline">
                 <span>Export selected ({selected.size})</span>
                 <IconArrowRight size={13} />
@@ -599,16 +697,7 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
           <Empty title="No products match these filters">
             <p>Try clearing or resetting your active search and filter criteria.</p>
             <div className="mt-3">
-              <Button
-                variant="secondary"
-                small
-                onClick={() => {
-                  setView(defaultView)
-                  setQInput('')
-                  setPage(0)
-                  setExtraPages(0)
-                }}
-              >
+              <Button variant="secondary" small onClick={resetAllFilters}>
                 Reset filters
               </Button>
             </div>
@@ -670,6 +759,14 @@ export function ProductBrowser({ mode }: { mode: 'compare' | 'master' }) {
           product={editingRow.product}
           record={editingRow.bestOffer?.rec ?? editingRow.ranking.lead?.view.rec ?? editingRow.records[0] ?? null}
           records={editingRow.records}
+        />
+      )}
+      {assigningCompany && (
+        <AssignCompanyModal
+          open
+          onClose={() => setAssigningCompany(false)}
+          productIds={[...selected]}
+          onAssigned={() => setSelected(new Set())}
         />
       )}
 
@@ -743,7 +840,7 @@ const Row = memo(function Row({
 
   const ordered = bestOnly ? ranking.ordered.filter((e) => e.winner || e.view.eligible) : ranking.ordered
   const formBadge = r.variant || p.dosage_form
-  const codeAndMeta = [`#${p.product_no}`, p.mfr_code ? `Code ${p.mfr_code}` : null, p.brand, p.manufacturer]
+  const codeAndMeta = [`#${p.product_no}`, p.mfr_code ? `Code ${p.mfr_code}` : null, p.brand, r.company ?? p.manufacturer]
     .filter(Boolean)
     .join(' · ')
 

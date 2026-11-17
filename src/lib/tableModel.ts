@@ -1,4 +1,5 @@
 // Row model, sorting and grouping for the product / comparison tables. Pure functions.
+import { resolveProductDisplayCompany } from './companies'
 import { compareOffers, type CompareOptions, type CompareResult, type OfferView } from './compare'
 import { rankOffers, type OfferRanking } from './offerRank'
 import { naturalCompare, numCompare, variantLabel } from './productParse'
@@ -6,6 +7,7 @@ import type { PriceRecord, Product, Shop } from './types'
 
 export interface ProductRow {
   product: Product
+  company: string | null
   cmp: CompareResult
   /** Price ranking when purchase prices exist, otherwise offer-rate ranking */
   ranking: OfferRanking
@@ -40,6 +42,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
   }
   return products.map((product) => {
     const records = by.get(product.id) ?? []
+    const company = resolveProductDisplayCompany(product, records)
     const cmp = compareOffers(records, product, opt)
     const eligible = cmp.offers.filter((o) => o.eligible)
     const bestOffer = eligible[0] ?? null
@@ -60,6 +63,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
       product.normalized_name,
       product.brand,
       product.manufacturer,
+      company,
       product.active_ingredient,
       product.dosage_form,
       product.variant,
@@ -79,6 +83,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
 
     return {
       product,
+      company,
       cmp,
       ranking,
       records,
@@ -206,7 +211,7 @@ export function sortRows(
     name_desc: (a, b) => -naturalCompare(a.product.normalized_name, b.product.normalized_name) || variantCompare(a.product, b.product),
     code: (a, b) => a.product.product_no - b.product.product_no,
     brand: (a, b) => naturalCompare(str(a.product.brand), str(b.product.brand)) || nameCmp(a, b),
-    manufacturer: (a, b) => naturalCompare(str(a.product.manufacturer), str(b.product.manufacturer)) || nameCmp(a, b),
+    manufacturer: (a, b) => naturalCompare(str(a.company ?? a.product.manufacturer), str(b.company ?? b.product.manufacturer)) || nameCmp(a, b),
     strength: (a, b) => numCompare(a.product.strength_value, b.product.strength_value) || nameCmp(a, b),
     weight: (a, b) => numCompare(a.product.weight_value, b.product.weight_value) || nameCmp(a, b),
     pack: (a, b) => numCompare(a.product.pack_size, b.product.pack_size) || nameCmp(a, b),
@@ -246,7 +251,7 @@ export function groupRows(rows: ProductRow[], key: GroupKey): Group[] {
       case 'title': return titleCase(p.normalized_name || p.name)
       case 'product': return `#${p.product_no} ${p.name}`
       case 'brand': return p.brand || 'No brand'
-      case 'manufacturer': return p.manufacturer || 'No manufacturer'
+      case 'manufacturer': return r.company || 'Uncategorized (No company)'
       case 'shop': return r.bestShop?.name ?? 'No valid offer'
       case 'strength': return p.strength_value != null ? `${p.strength_value}${p.strength_unit ?? ''}` : 'No strength'
       case 'weight': return p.weight_value != null ? `${p.weight_value}${p.weight_unit ?? ''}` : 'No weight'

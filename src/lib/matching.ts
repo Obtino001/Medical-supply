@@ -3,6 +3,7 @@
 // strength / weight / pack / formulation conflicts always keep products separate;
 // anything ambiguous is returned as "needs_review" and never merged silently.
 
+import { companyCompareKey } from './companies'
 import { normalizeText } from './productParse'
 
 export type Confidence = 'exact' | 'high' | 'needs_review' | 'unmatched' | 'conflicting'
@@ -163,6 +164,13 @@ function cmpWeak(a: string | null, b: string | null): Cmp {
   return x === y ? 'agree' : 'conflict'
 }
 
+function cmpCompany(a: string | null, b: string | null): Cmp {
+  const x = companyCompareKey(a), y = companyCompareKey(b)
+  if (!x && !y) return 'none'
+  if (!x || !y) return 'unknown'
+  return x === y ? 'agree' : 'conflict'
+}
+
 interface Compared {
   strength: Cmp
   weight: Cmp
@@ -186,7 +194,7 @@ export function compareAttributes(i: IncomingProduct, p: CatalogProduct): Compar
     weight,
     pack: cmpNum(i.packSize, 'pc', p.pack_size, 'pc'),
     form: cmpWeak(i.dosageForm, p.dosage_form),
-    mfr: cmpWeak(i.manufacturer, p.manufacturer),
+    mfr: cmpCompany(i.manufacturer, p.manufacturer),
   }
 }
 

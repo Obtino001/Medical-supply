@@ -1,5 +1,6 @@
 // Turns a raw grid + column mapping into validated, typed import rows. Pure and testable.
 import { matchHeaderField, suggestMapping, type FieldKey, type ImportOptions, type Mapping } from './columns'
+import { extractCompanyFromTitle, resolveCanonicalCompany } from './companies'
 import type { IncomingProduct } from './matching'
 import { identityKey, normalizeHomoglyphs, normalizeText, parseTitle, sourceKey } from './productParse'
 import { calculateEffectiveCost, formatSchemeSummary, parseNumber, parseOfferRateCell, parseSchemeText, type CostResult, type SchemeComponents } from './scheme'
@@ -503,6 +504,7 @@ export function buildRows(
       const normalizedName = pt.name
       if (title && !normalizedName) errors.push('Title contains no product name (only sizes / pack)')
       const code = get(idx.code) || null
+      const manufacturer = resolveCanonicalCompany(get(idx.manufacturer)) ?? extractCompanyFromTitle(title)?.name ?? null
       const incoming: IncomingProduct = {
         title,
         normalizedName,
@@ -510,7 +512,7 @@ export function buildRows(
         barcode: get(idx.barcode) || null,
         mfrCode: get(idx.mfr) || null,
         brand: get(idx.brand) || null,
-        manufacturer: get(idx.manufacturer) || null,
+        manufacturer,
         strengthValue, strengthUnit, weightValue, weightUnit, packSize, dosageForm,
         sourceKey: sourceKey(code, title),
       }

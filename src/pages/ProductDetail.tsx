@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EditOfferModal } from '../components/EditOfferModal'
+import { AssignCompanyModal } from '../components/AssignCompanyModal'
 import { IconEdit, IconTrash } from '../components/icons'
 import { ProductPicker } from '../components/Match'
 import { OfferCard } from '../components/Offers'
@@ -8,6 +9,7 @@ import { ProductForm } from '../components/ProductForm'
 import { WishlistToggle } from '../components/WishlistToggle'
 import { Badge, Button, Card, Empty, PageHeader, Spinner, Textarea, fmtDate, rs, useConfirm, useToast } from '../components/ui'
 import { confirmMatch, deleteProductsByIds } from '../lib/actions'
+import { companySlug, resolveProductDisplayCompany } from '../lib/companies'
 import { compareOffers } from '../lib/compare'
 import { useData } from '../lib/data'
 import { variantLabel } from '../lib/productParse'
@@ -28,6 +30,7 @@ export default function ProductDetail() {
   const [aliases, setAliases] = useState<Alias[]>([])
   const [idents, setIdents] = useState<Ident[]>([])
   const [editing, setEditing] = useState(false)
+  const [assigningCompany, setAssigningCompany] = useState(false)
   const [editingOffer, setEditingOffer] = useState<PriceRecord | null>(null)
   const [addingOffer, setAddingOffer] = useState(false)
   const [moving, setMoving] = useState<PriceRecord | null>(null)
@@ -52,6 +55,7 @@ export default function ProductDetail() {
   if (!history) return <Spinner />
   const family = products.filter((p) => p.id !== product.id && p.normalized_name === product.normalized_name && !p.archived)
   const latestIds = new Set(records.map((r) => r.id))
+  const resolvedCompany = resolveProductDisplayCompany(product, records)
 
   const archive = async () => {
     const ok = await confirm({ title: product.archived ? 'Restore product?' : 'Archive product?', body: 'Price history is kept either way.', danger: !product.archived })
@@ -115,8 +119,27 @@ export default function ProductDetail() {
           {product.archived && <Badge tone="amber">Archived</Badge>}
           <span className="text-sm text-[var(--text-secondary)]">Product #{product.product_no} · updated {fmtDate(product.updated_at)}</span>
         </div>
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-          {([['Brand', product.brand], ['Manufacturer', product.manufacturer], ['Ingredient', product.active_ingredient], ['Dosage form', product.dosage_form], ['Barcode', product.barcode], ['Manufacturer code', product.mfr_code], ['Normalized name', product.normalized_name]] as const).map(([k, v]) => (
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+          <div>
+            <dt className="text-xs text-[var(--text-secondary)]">Company / Manufacturer</dt>
+            <dd className="flex flex-wrap items-center gap-1.5 font-medium text-[var(--text-primary)]">
+              {resolvedCompany ? (
+                <Link to={`/companies/${encodeURIComponent(companySlug(resolvedCompany))}`} className="text-[var(--color-primary)] hover:underline">
+                  {resolvedCompany}
+                </Link>
+              ) : (
+                <span>Uncategorized</span>
+              )}
+              <button
+                type="button"
+                onClick={() => setAssigningCompany(true)}
+                className="text-xs font-medium text-[var(--color-primary)] hover:underline"
+              >
+                ({resolvedCompany ? 'Change' : 'Set'})
+              </button>
+            </dd>
+          </div>
+          {([['Brand', product.brand], ['Ingredient', product.active_ingredient], ['Dosage form', product.dosage_form], ['Barcode', product.barcode], ['Manufacturer code', product.mfr_code], ['Normalized name', product.normalized_name]] as const).map(([k, v]) => (
             <div key={k}><dt className="text-xs text-[var(--text-secondary)]">{k}</dt><dd className="font-medium text-[var(--text-primary)]">{v || '—'}</dd></div>
           ))}
         </dl>
@@ -203,6 +226,7 @@ export default function ProductDetail() {
       </Card>
 
       {editing && <ProductForm open onClose={() => setEditing(false)} product={product} onSaved={async () => { await reload(); toast('ok', 'Product saved') }} />}
+      {assigningCompany && <AssignCompanyModal open onClose={() => setAssigningCompany(false)} productIds={[product.id]} initialCompany={resolvedCompany ?? ''} />}
       {editingOffer && <EditOfferModal open onClose={() => setEditingOffer(null)} record={editingOffer} product={product} onSaved={load} />}
       {addingOffer && <EditOfferModal open onClose={() => setAddingOffer(false)} product={product} records={records} onSaved={load} />}
       {moving && <ProductPicker open onClose={() => setMoving(null)} onPick={(p) => p.id !== product.id && move(p.id)} initialQuery={moving.original_title} title="Move this price record to…" />}

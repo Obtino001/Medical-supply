@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
+  IconBuilding,
   IconCalendar,
   IconChevronRight,
   IconClose,
@@ -17,6 +18,7 @@ import {
   IconUpload,
 } from '../components/icons'
 import { Badge, Button, Card, PageHeader, Stat, fmtDate, rs } from '../components/ui'
+import { buildCompanySummaries, companySlug } from '../lib/companies'
 import { findOpportunities } from '../lib/compare'
 import { useData } from '../lib/data'
 import { variantLabel } from '../lib/productParse'
@@ -72,6 +74,21 @@ export default function Dashboard() {
   }, [current])
   const top = [...opps].filter((o) => o.verified).sort((a, b) => b.savingPct - a.savingPct).slice(0, 5)
   const newLowCount = opps.filter((o) => o.reasons.includes('new_low')).length
+  const companyOverview = useMemo(() => {
+    const activeProds = products.filter((p) => !p.archived)
+    const summaries = buildCompanySummaries(activeProds, current, shopMap)
+    const uncat = summaries.find((s) => s.isUncategorized)?.productCount ?? 0
+    const activeCompanies = summaries
+      .filter((s) => !s.isUncategorized && s.productCount > 0)
+      .sort((a, b) => b.productCount - a.productCount)
+    return {
+      totalProducts: activeProds.length,
+      categorized: Math.max(0, activeProds.length - uncat),
+      uncategorized: uncat,
+      companyCount: activeCompanies.length,
+      topCompanies: activeCompanies.slice(0, 5),
+    }
+  }, [products, current, shopMap])
   const search = (e: FormEvent) => {
     e.preventDefault()
     nav(`/compare?q=${encodeURIComponent(q.trim())}`)
@@ -186,6 +203,50 @@ export default function Dashboard() {
           <Stat label="Need manual matching" value={review.length} to="/review" tone={review.length ? 'amber' : undefined} icon={<IconGitCompare size={16} />} />
           <Stat label="Wishlist products" value={wishlist.length} to="/wishlist" icon={<IconStar size={16} />} />
         </div>
+      </section>
+
+      {/* Pharmaceutical Companies Coverage */}
+      <section aria-label="Pharmaceutical companies overview">
+        <Card className="!p-3.5 sm:!p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <IconBuilding size={16} className="shrink-0 text-[var(--color-primary)]" />
+                <h2 className="text-sm font-medium text-[var(--text-primary)] sm:text-[15px]">Pharmaceutical companies</h2>
+                <Badge tone="blue">{companyOverview.companyCount} active</Badge>
+                <Badge tone={companyOverview.uncategorized === 0 ? 'green' : 'slate'}>
+                  {companyOverview.categorized.toLocaleString()} / {companyOverview.totalProducts.toLocaleString()} categorized
+                </Badge>
+              </div>
+              {companyOverview.topCompanies.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {companyOverview.topCompanies.map((c) => (
+                    <Link
+                      key={c.id}
+                      to={`/companies/${encodeURIComponent(companySlug(c.name))}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2 py-0.5 text-xs text-[var(--text-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"
+                    >
+                      <span className="font-medium">{c.shortName}</span>
+                      <span className="text-[var(--text-secondary)] tabular-nums">({c.productCount})</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Organize all medicines by Top 50 Pakistan Pharmaceutical Companies and track listed counts &amp; rates.
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link to="/companies">
+                <Button small variant="secondary">
+                  <span>View all companies</span>
+                  <IconChevronRight size={14} />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </Card>
       </section>
 
       {/* Best Purchase Opportunities */}
