@@ -3,14 +3,16 @@ import {
   PHARMA_COMPANIES,
   buildCompanySuggestions,
   buildCompanySummaries,
+  companyProductDedupeKey,
   extractCompanyFromTitle,
+  findDuplicateProductGroups,
   isPlaceholderCompany,
   resolveCanonicalCompany,
   resolveProductDisplayCompany,
 } from './companies'
 import { buildIndex, matchProduct, type CatalogProduct, type IncomingProduct } from './matching'
 import { parseTitle, sourceKey } from './productParse'
-import { groupRows } from './tableModel'
+import { buildProductRows, dedupeProductRowsForCompany, groupRows } from './tableModel'
 import type { PriceRecord, Product, Shop } from './types'
 
 let seq = 0
@@ -248,5 +250,53 @@ describe('Pakistan Top 50 Pharmaceutical Companies & auto-categorization', () =>
     } as never
     const groups = groupRows([dummyRow], 'manufacturer')
     expect(groups[0].label).toBe('Getz Pharma')
+  })
+
+  it('deduplicates same-company duplicate products while preserving combined supplier offers and distinct strengths', () => {
+    const pDupTagged = mkProd('RISEK 40MG CAP. (GETZ)', { manufacturer: 'GETZ', dosage_form: 'capsule' })
+    const pClean = mkProd('Risek 40mg Capsule', { manufacturer: 'Getz Pharma', dosage_form: 'capsule' })
+    const pOtherStrength = mkProd('Risek 20mg Capsule', { manufacturer: 'Getz Pharma', dosage_form: 'capsule' })
+    const pAlpha = mkProd('Amkay 500mg Inj', { manufacturer: 'Getz Pharma', dosage_form: 'injection' })
+
+    // Duplicate title variations (title tag + punctuation) produce identical dedupe keys, while 20mg stays separate
+    expect(companyProductDedupeKey(pDupTagged)).toBe(companyProductDedupeKey(pClean))
+    expect(companyProductDedupeKey(pClean)).not.toBe(companyProductDedupeKey(pOtherStrength))
+
+    const shops = new Map<string, Shop>([
+      ['S1', { id: 'S1', name: 'Noman Impex' } as Shop],
+      ['S2', { id: 'S2', name: 'Kirpal Medicos' } as Shop],
+    ])
+    const recs: PriceRecord[] = [
+      mkRec({ product_id: pDupTagged.id, shop_id: 'S1', base_price: 500, effective_cost: 460, discount_pct: 8 }),
+      mkRec({ product_id: pClean.id, shop_id: 'S2', base_price: 500, effective_cost: 430, discount_pct: 14 }),
+      mkRec({ product_id: pOtherStrength.id, shop_id: 'S1', base_price: 320, effective_cost: 290, discount_pct: 9 }),
+      mkRec({ product_id: pAlpha.id, shop_id: 'S1', base_price: 200, effective_cost: 180, discount_pct: 10 }),
+    ]
+
+    const dupGroups = findDuplicateProductGroups([pDupTagged, pClean, pOtherStrength, pAlpha], recs, 'Getz Pharma')
+    expect(dupGroups).toHaveLength(1)
+    expect(dupGroups[0].primary.id).toBe(pClean.id)
+    expect(dupGroups[0].duplicates.map((d) => d.id)).toEqual([pDupTagged.id])
+
+    const summaries = buildCompanySummaries([pDupTagged, pClean, pOtherStrength, pAlpha], recs, shops)
+    const getz = summaries.find((s) => s.name === 'Getz Pharma')!
+    expect(getz.rawProductCount).toBe(4)
+    expect(getz.productCount).toBe(3)
+    expect(getz.duplicateCount).toBe(1)
+    expect(getz.multiShopCount).toBe(1)
+    expect(getz.sampleProducts.map((p) => p.name)).toEqual([
+      'Amkay 500mg Inj',
+      'Risek 20mg Capsule',
+      'Risek 40mg Capsule',
+    ])
+
+    const opt = { freshnessDays: 30, excludeStale: false }
+    const rawRows = buildProductRows([pDupTagged, pClean, pOtherStrength, pAlpha], recs, shops, opt)
+    const dedupedRows = dedupeProductRowsForCompany(rawRows, shops, opt)
+    expect(dedupedRows).toHaveLength(3)
+    const risek40Row = dedupedRows.find((r) => r.product.id === pClean.id)!
+    // Combined offers from BOTH suppliers S1 and S2 are visible on the single surviving Risek 40mg row
+    expect(risek40Row.records.map((r) => r.shop_id).sort()).toEqual(['S1', 'S2'])
+    expect(risek40Row.bestShop?.id).toBe('S2')
   })
 })

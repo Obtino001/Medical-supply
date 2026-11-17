@@ -7,18 +7,20 @@ import {
   IconCheck,
   IconClose,
   IconDownload,
+  IconGitCompare,
   IconPlus,
   IconSearch,
   IconSparkles,
   IconStore,
 } from '../components/icons'
-import { Badge, Button, Card, Empty, Input, Modal, PageHeader, Pagination, Select, Stat, cx, rs, useToast } from '../components/ui'
-import { bulkAssignCompany } from '../lib/actions'
+import { Badge, Button, Card, Empty, Input, Modal, PageHeader, Pagination, Select, Stat, cx, rs, useConfirm, useToast } from '../components/ui'
+import { bulkAssignCompany, mergeDuplicateProductGroups } from '../lib/actions'
 import {
   PHARMA_COMPANIES,
   buildCompanySummaries,
   buildCompanySuggestions,
   companySlug,
+  findDuplicateProductGroups,
   resolveCanonicalCompany,
   resolveProductDisplayCompany,
   type CompanySummary,
@@ -26,10 +28,11 @@ import {
 } from '../lib/companies'
 import { useData } from '../lib/data'
 import { download, toCsv, toMatrix, toXlsxBuffer } from '../lib/exporter'
+import { naturalCompare } from '../lib/productParse'
 import { matchesQuery } from '../lib/tableModel'
 
 type Tab = 'all' | 'top50' | 'categorize'
-type DirSort = 'products' | 'rank' | 'name' | 'offers' | 'discount'
+type DirSort = 'listed_az' | 'products' | 'rank' | 'name' | 'offers' | 'discount'
 type DirFilter = 'all' | 'listed' | 'empty' | 'multi'
 type CatScope = 'uncategorized' | 'suggested' | 'needs_cleanup' | 'all'
 
@@ -62,6 +65,7 @@ const WORKBENCH_PER_PAGE = 50
 export default function Companies() {
   const { products, current, shopMap, shops, reload } = useData()
   const toast = useToast()
+  const confirm = useConfirm()
 
   const activeProducts = useMemo(() => products.filter((p) => !p.archived), [products])
 
@@ -73,6 +77,15 @@ export default function Companies() {
   const suggestions = useMemo(
     () => buildCompanySuggestions(activeProducts, current),
     [activeProducts, current],
+  )
+
+  const allDupGroups = useMemo(
+    () => findDuplicateProductGroups(activeProducts, current),
+    [activeProducts, current],
+  )
+  const totalDupRows = useMemo(
+    () => allDupGroups.reduce((sum, g) => sum + g.duplicates.length, 0),
+    [allDupGroups],
   )
 
   const suggestionByProductId = useMemo(
@@ -92,7 +105,7 @@ export default function Companies() {
 
   const kpis = useMemo(() => {
     const total = activeProducts.length
-    const uncat = uncategorizedSummary?.productCount ?? 0
+    const uncat = uncategorizedSummary?.rawProductCount ?? 0
     const categorized = Math.max(0, total - uncat)
     const pct = total > 0 ? Math.round((categorized / total) * 100) : 0
     const top50Total = companyEntries.filter((c) => c.top50Rank != null).length
@@ -104,12 +117,13 @@ export default function Companies() {
   const [tab, setTab] = useState<Tab>('all')
   const [dirSearch, setDirSearch] = useState('')
   const [dirFilter, setDirFilter] = useState<DirFilter>('all')
-  const [dirSort, setDirSort] = useState<DirSort>('products')
+  const [dirSort, setDirSort] = useState<DirSort>('listed_az')
 
   // Auto-categorize review modal state
   const [showAutoModal, setShowAutoModal] = useState(false)
   const [enabledReasons, setEnabledReasons] = useState<Set<DetectionReason>>(() => new Set(ALL_REASONS))
   const [autoBusy, setAutoBusy] = useState(false)
+  const [mergeBusy, setMergeBusy] = useState(false)
 
   // Add custom / assign modal from a company card
   const [addingCustomOpen, setAddingCustomOpen] = useState(false)
@@ -149,19 +163,24 @@ export default function Companies() {
     })
 
     out.sort((a, b) => {
+      if (dirSort === 'listed_az') {
+        const aListed = a.productCount > 0 ? 0 : 1
+        const bListed = b.productCount > 0 ? 0 : 1
+        return aListed - bListed || naturalCompare(a.name, b.name)
+      }
       if (dirSort === 'rank') {
         const ar = a.top50Rank ?? 9999
         const br = b.top50Rank ?? 9999
-        return ar - br || b.productCount - a.productCount || a.name.localeCompare(b.name)
+        return ar - br || b.productCount - a.productCount || naturalCompare(a.name, b.name)
       }
-      if (dirSort === 'name') return a.name.localeCompare(b.name)
-      if (dirSort === 'offers') return b.offerCount - a.offerCount || b.productCount - a.productCount || a.name.localeCompare(b.name)
-      if (dirSort === 'discount') return (b.bestDiscountPct ?? -1) - (a.bestDiscountPct ?? -1) || b.productCount - a.productCount
-      // 'products' default: listed companies first, highest count first, then Top 50 rank
+      if (dirSort === 'name') return naturalCompare(a.name, b.name)
+      if (dirSort === 'offers') return b.offerCount - a.offerCount || b.productCount - a.productCount || naturalCompare(a.name, b.name)
+      if (dirSort === 'discount') return (b.bestDiscountPct ?? -1) - (a.bestDiscountPct ?? -1) || b.productCount - a.productCount || naturalCompare(a.name, b.name)
+      // 'products': highest count first, then A-Z
       return (
         b.productCount - a.productCount ||
         (a.top50Rank ?? 9999) - (b.top50Rank ?? 9999) ||
-        a.name.localeCompare(b.name)
+        naturalCompare(a.name, b.name)
       )
     })
     return out
@@ -179,20 +198,22 @@ export default function Companies() {
     return m
   }, [current])
 
-  // Workbench items
+  // Workbench items sorted strictly A-Z
   const workbenchProducts = useMemo(() => {
-    return activeProducts.filter((p) => {
-      const recs = recordsByProduct.get(p.id) ?? []
-      const liveCompany = resolveProductDisplayCompany(p, recs)
-      const sug = suggestionByProductId.get(p.id)
+    return activeProducts
+      .filter((p) => {
+        const recs = recordsByProduct.get(p.id) ?? []
+        const liveCompany = resolveProductDisplayCompany(p, recs)
+        const sug = suggestionByProductId.get(p.id)
 
-      if (catScope === 'uncategorized' && liveCompany !== null) return false
-      if (catScope === 'suggested' && !sug) return false
-      if (catScope === 'needs_cleanup' && !(sug && (sug.reason === 'canonical_existing' || sug.reason === 'clear_placeholder'))) return false
-      if (catShop && !recs.some((r) => r.shop_id === catShop)) return false
-      if (catSearch && !matchesQuery({ product: p, records: recs }, catSearch, shopMap)) return false
-      return true
-    })
+        if (catScope === 'uncategorized' && liveCompany !== null) return false
+        if (catScope === 'suggested' && !sug) return false
+        if (catScope === 'needs_cleanup' && !(sug && (sug.reason === 'canonical_existing' || sug.reason === 'clear_placeholder'))) return false
+        if (catShop && !recs.some((r) => r.shop_id === catShop)) return false
+        if (catSearch && !matchesQuery({ product: p, records: recs }, catSearch, shopMap)) return false
+        return true
+      })
+      .sort((a, b) => naturalCompare(a.name, b.name))
   }, [activeProducts, recordsByProduct, suggestionByProductId, catScope, catShop, catSearch, shopMap])
 
   const wbPages = Math.max(1, Math.ceil(workbenchProducts.length / WORKBENCH_PER_PAGE))
@@ -295,9 +316,32 @@ export default function Companies() {
     }
   }
 
+  const runMergeAllDuplicates = async () => {
+    if (allDupGroups.length === 0) return
+    const ok = await confirm({
+      title: `Merge ${totalDupRows} duplicate product${totalDupRows === 1 ? '' : 's'} across companies?`,
+      body: `This will permanently consolidate ${allDupGroups.length} duplicate product group${allDupGroups.length === 1 ? '' : 's'} into single clean records while keeping all supplier offers, price history, and wishlist items intact.`,
+      confirmLabel: `Merge ${totalDupRows} duplicate${totalDupRows === 1 ? '' : 's'}`,
+    })
+    if (!ok) return
+    setMergeBusy(true)
+    try {
+      const { mergedGroups, removedProducts } = await mergeDuplicateProductGroups(allDupGroups)
+      await reload()
+      toast('ok', `Merged ${mergedGroups} product group${mergedGroups === 1 ? '' : 's'} (${removedProducts} duplicate row${removedProducts === 1 ? '' : 's'} removed)`)
+    } catch (e) {
+      toast('err', (e as Error).message)
+    } finally {
+      setMergeBusy(false)
+    }
+  }
+
   const exportCompanySummary = (format: 'csv' | 'xlsx') => {
+    const sortedEntries = [...companyEntries]
+      .filter((c) => c.productCount > 0 || c.top50Rank != null)
+      .sort((a, b) => (a.productCount > 0 ? 0 : 1) - (b.productCount > 0 ? 0 : 1) || naturalCompare(a.name, b.name))
     const rows = [
-      ...companyEntries.filter((c) => c.productCount > 0 || c.top50Rank != null),
+      ...sortedEntries,
       ...(uncategorizedSummary && uncategorizedSummary.productCount > 0 ? [uncategorizedSummary] : []),
     ].map((c) => ({
       top50_rank: c.top50Rank ?? '',
@@ -350,7 +394,7 @@ export default function Companies() {
   const companyDropdownList = useMemo(() => {
     const names = new Set<string>(PHARMA_COMPANIES.map((c) => c.name))
     for (const c of companyEntries) if (!c.isUncategorized) names.add(c.name)
-    return [...names]
+    return [...names].sort(naturalCompare)
   }, [companyEntries])
 
   return (
@@ -430,6 +474,35 @@ export default function Companies() {
         </Card>
       )}
 
+      {/* Duplicate products cleanup banner */}
+      {allDupGroups.length > 0 && (
+        <Card className="!p-3.5 border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+                <IconGitCompare size={16} className="shrink-0 text-[var(--color-warning)]" />
+                <span>
+                  <b className="font-semibold tabular-nums">{totalDupRows}</b> duplicate product row{totalDupRows === 1 ? '' : 's'} detected across{' '}
+                  {new Set(allDupGroups.map((g) => g.company ?? 'Uncategorized')).size} compan{new Set(allDupGroups.map((g) => g.company ?? 'Uncategorized')).size === 1 ? 'y' : 'ies'}
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
+                E.g.{' '}
+                {allDupGroups
+                  .slice(0, 3)
+                  .map((g) => `${g.primary.name} (${g.company ?? 'Uncategorized'})`)
+                  .join(' · ')}
+                {allDupGroups.length > 3 ? ` +${allDupGroups.length - 3} more` : ''} — already hidden in company views; click Merge to clean up permanently.
+              </p>
+            </div>
+            <Button small variant="secondary" disabled={mergeBusy} className="shrink-0" onClick={() => void runMergeAllDuplicates()}>
+              <IconGitCompare size={14} className="text-[var(--color-primary)]" />
+              <span>{mergeBusy ? 'Merging…' : `Merge duplicates (${totalDupRows})`}</span>
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Segmented Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-default)] pb-2.5">
         <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Company view mode">
@@ -500,11 +573,12 @@ export default function Companies() {
                   aria-label="Sort companies"
                   className="!min-h-9 !w-auto text-xs sm:text-[13px]"
                 >
+                  <option value="listed_az">Sort: Listed companies A → Z</option>
+                  <option value="name">Sort: All companies A → Z</option>
                   <option value="products">Sort: Most products first</option>
                   <option value="rank">Sort: Top 50 Rank (#1 → #50)</option>
                   <option value="offers">Sort: Most supplier offers</option>
                   <option value="discount">Sort: Highest discount %</option>
-                  <option value="name">Sort: Company Name A → Z</option>
                 </Select>
               </div>
             </div>
@@ -970,7 +1044,8 @@ function CompanyCard({ c, onAssignToCompany }: { c: CompanySummary; onAssignToCo
             )}
           </div>
 
-          <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
+            {c.duplicateCount > 0 && <Badge tone="amber">{c.duplicateCount} dup</Badge>}
             <Badge tone={hasProducts ? 'green' : 'slate'}>
               {c.productCount.toLocaleString()} {c.productCount === 1 ? 'product' : 'products'}
             </Badge>

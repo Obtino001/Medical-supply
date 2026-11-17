@@ -1,5 +1,5 @@
 // Mutations shared by several pages. All of them write to the shared database; RLS enforces who may do what.
-import { extractCompanyFromTitle, resolveCanonicalCompany } from './companies'
+import { extractCompanyFromTitle, resolveCanonicalCompany, type DuplicateProductGroup } from './companies'
 import { parseTitle, identityKey } from './productParse'
 import { calculateEffectiveCost, parseOfferRateCell, type CostResult } from './scheme'
 import { fetchAll, supabase, updateChecked } from './supabase'
@@ -404,4 +404,66 @@ export async function bulkAssignCompany(
     }
   }
   return updated
+}
+
+/**
+ * Permanently merge duplicate products into their primary surviving product:
+ * moves all price records and saved match decisions to the primary product,
+ * ensures canonical company name is stored on primary, and removes the duplicate rows.
+ */
+export async function mergeDuplicateProductGroups(
+  groups: DuplicateProductGroup[],
+): Promise<{ mergedGroups: number; removedProducts: number }> {
+  let mergedGroups = 0
+  let removedProducts = 0
+
+  for (const g of groups) {
+    const dupIds = g.duplicates.map((d) => d.id).filter((id) => id && id !== g.primary.id)
+    if (dupIds.length === 0) continue
+
+    // 1. Re-point all price records from duplicate IDs to primary product ID
+    const { error: prErr } = await supabase
+      .from('price_records')
+      .update({ product_id: g.primary.id })
+      .in('product_id', dupIds)
+    if (prErr) {
+      // Fallback for partner role (who may lack direct UPDATE on price_records): use security-definer RPC per record
+      const recs = await fetchAll<{ id: string }>((a, b) =>
+        supabase.from('price_records').select('id').in('product_id', dupIds).range(a, b),
+      )
+      for (const r of recs) {
+        must(await supabase.rpc('rematch_price_record', { p_record: r.id, p_product: g.primary.id, p_save_decision: false }))
+      }
+    }
+
+    // 2. Re-point saved match decisions so future imports go directly to primary
+    await supabase.from('match_decisions').update({ product_id: g.primary.id }).in('product_id', dupIds)
+
+    // 3. Preserve wishlist membership if any duplicate was wishlisted and primary is not
+    const { data: wlRows } = await supabase
+      .from('wishlist_items')
+      .select('id,product_id')
+      .in('product_id', [g.primary.id, ...dupIds])
+    if (wlRows && wlRows.length > 0 && !wlRows.some((w) => w.product_id === g.primary.id)) {
+      await supabase.from('wishlist_items').update({ product_id: g.primary.id }).eq('id', wlRows[0].id)
+    }
+
+    // 4. Delete any remaining references that could clash & ensure canonical company on primary
+    await supabase.from('wishlist_items').delete().in('product_id', dupIds)
+    await supabase.from('match_rejections').delete().in('product_id', dupIds)
+    if (g.company && resolveCanonicalCompany(g.primary.manufacturer) !== g.company) {
+      await supabase.from('products').update({ manufacturer: g.company }).eq('id', g.primary.id)
+    }
+
+    // 5. Remove duplicate products (or archive if current user is partner without delete privilege)
+    const { error: delErr } = await supabase.from('products').delete().in('id', dupIds)
+    if (delErr) {
+      must(await supabase.from('products').update({ archived: true }).in('id', dupIds))
+    }
+
+    mergedGroups++
+    removedProducts += dupIds.length
+  }
+
+  return { mergedGroups, removedProducts }
 }

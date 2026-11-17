@@ -1,9 +1,9 @@
 // Order slip builder, WhatsApp formatter, and pure A4 PDF-1.4 generator for Hafsa Medicose.
 // Pure functions (except trigger browser download/print helpers).
-import { resolveProductDisplayCompany } from './companies'
+import { companyProductDedupeKey, resolveProductDisplayCompany } from './companies'
 import { compareOffers, type CompareOptions } from './compare'
 import { rankOffers } from './offerRank'
-import { normalizeHomoglyphs, variantLabel } from './productParse'
+import { naturalCompare, normalizeHomoglyphs, variantLabel } from './productParse'
 import type { PriceRecord, Product, Shop } from './types'
 
 export interface OrderLineDraft {
@@ -109,39 +109,68 @@ export function buildResolvedLines(
   })
 }
 
+function dedupeAndSortOrderLines(lines: ResolvedOrderLine[]): ResolvedOrderLine[] {
+  const byKey = new Map<string, ResolvedOrderLine>()
+  for (const l of lines) {
+    const key = `${l.company ?? ''}::${companyProductDedupeKey(l.product)}`
+    const prev = byKey.get(key)
+    if (!prev) {
+      byKey.set(key, l)
+      continue
+    }
+    const prevScore =
+      (prev.qty ? 4 : 0) + (prev.effectiveUnitCost != null ? 2 : 0) + (prev.record ? 1 : 0)
+    const curScore =
+      (l.qty ? 4 : 0) + (l.effectiveUnitCost != null ? 2 : 0) + (l.record ? 1 : 0)
+    if (
+      curScore > prevScore ||
+      (curScore === prevScore &&
+        l.effectiveUnitCost != null &&
+        prev.effectiveUnitCost != null &&
+        l.effectiveUnitCost < prev.effectiveUnitCost)
+    ) {
+      byKey.set(key, l)
+    }
+  }
+  return [...byKey.values()].sort((a, b) => naturalCompare(a.product.name, b.product.name))
+}
+
 export function buildOrderGroups(lines: ResolvedOrderLine[], groupByShop: boolean): ShopOrderGroup[] {
   if (!groupByShop) {
-    const estimatedTotal = lines.reduce((sum, l) => sum + (l.lineTotal ?? 0), 0)
-    const pricedLines = lines.filter((l) => l.lineTotal != null).length
-    return [{ shopId: null, shop: null, shopName: 'Selected Products', lines, estimatedTotal, pricedLines }]
+    const clean = dedupeAndSortOrderLines(lines)
+    const estimatedTotal = Math.round(clean.reduce((sum, l) => sum + (l.lineTotal ?? 0), 0) * 100) / 100
+    const pricedLines = clean.filter((l) => l.lineTotal != null).length
+    return [{ shopId: null, shop: null, shopName: 'Selected Products', lines: clean, estimatedTotal, pricedLines }]
   }
 
-  const map = new Map<string, ShopOrderGroup>()
+  const rawByShop = new Map<string, { shopId: string | null; shop: Shop | null; shopName: string; lines: ResolvedOrderLine[] }>()
   for (const l of lines) {
     const key = l.shop?.id ?? '__no_shop__'
-    let g = map.get(key)
+    let g = rawByShop.get(key)
     if (!g) {
       g = {
         shopId: l.shop?.id ?? null,
         shop: l.shop,
         shopName: l.shop?.name ?? 'No Supplier Selected',
         lines: [],
-        estimatedTotal: 0,
-        pricedLines: 0,
       }
-      map.set(key, g)
+      rawByShop.set(key, g)
     }
     g.lines.push(l)
-    if (l.lineTotal != null) {
-      g.estimatedTotal = Math.round((g.estimatedTotal + l.lineTotal) * 100) / 100
-      g.pricedLines++
-    }
   }
-  return [...map.values()].sort((a, b) => {
-    if (!a.shop && b.shop) return 1
-    if (a.shop && !b.shop) return -1
-    return a.shopName.localeCompare(b.shopName)
-  })
+
+  return [...rawByShop.values()]
+    .map((g) => {
+      const clean = dedupeAndSortOrderLines(g.lines)
+      const estimatedTotal = Math.round(clean.reduce((sum, l) => sum + (l.lineTotal ?? 0), 0) * 100) / 100
+      const pricedLines = clean.filter((l) => l.lineTotal != null).length
+      return { ...g, lines: clean, estimatedTotal, pricedLines }
+    })
+    .sort((a, b) => {
+      if (!a.shop && b.shop) return 1
+      if (a.shop && !b.shop) return -1
+      return naturalCompare(a.shopName, b.shopName)
+    })
 }
 
 export function buildWhatsAppOrderText(opts: OrderPdfOptions): string {

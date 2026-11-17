@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ProductBrowser } from '../components/ProductBrowser'
-import { IconArrowLeft, IconBuilding, IconClose, IconDownload, IconPlus, IconSearch, IconStore } from '../components/icons'
-import { Badge, Button, Card, Empty, Modal, PageHeader, Stat, cx, rs, useToast } from '../components/ui'
-import { bulkAssignCompany } from '../lib/actions'
+import { IconArrowLeft, IconBuilding, IconClose, IconDownload, IconGitCompare, IconPlus, IconSearch, IconStore } from '../components/icons'
+import { Badge, Button, Card, Empty, Modal, PageHeader, Stat, cx, rs, useConfirm, useToast } from '../components/ui'
+import { bulkAssignCompany, mergeDuplicateProductGroups } from '../lib/actions'
 import {
   PHARMA_COMPANIES,
   buildCompanySummaries,
   companySlug,
+  findDuplicateProductGroups,
   resolveProductDisplayCompany,
 } from '../lib/companies'
 import { useData } from '../lib/data'
 import { DEFAULT_COLUMN_KEYS, EXPORT_COLUMNS, buildExportRows, download, toCsv, toMatrix, toXlsxBuffer } from '../lib/exporter'
+import { naturalCompare } from '../lib/productParse'
 import { matchesQuery } from '../lib/tableModel'
 
 export default function CompanyDetail() {
@@ -19,6 +21,7 @@ export default function CompanyDetail() {
   const rawParam = decodeURIComponent(companyId ?? '')
   const { products, current, shopMap, settings, reload } = useData()
   const toast = useToast()
+  const confirm = useConfirm()
 
   const activeProducts = useMemo(() => products.filter((p) => !p.archived), [products])
   const summaries = useMemo(() => buildCompanySummaries(activeProducts, current, shopMap), [activeProducts, current, shopMap])
@@ -40,6 +43,8 @@ export default function CompanyDetail() {
         aliases: known.aliases,
         isUncategorized: false,
         productCount: 0,
+        rawProductCount: 0,
+        duplicateCount: 0,
         offerCount: 0,
         multiShopCount: 0,
         rsPriceCount: 0,
@@ -58,6 +63,7 @@ export default function CompanyDetail() {
 
   const [shopFilter, setShopFilter] = useState('')
   const [formFilter, setFormFilter] = useState('')
+  const [mergeBusy, setMergeBusy] = useState(false)
 
   // Modal to quickly add / pull products from the catalog into this company
   const [addingProducts, setAddingProducts] = useState(false)
@@ -77,13 +83,28 @@ export default function CompanyDetail() {
     return m
   }, [current])
 
+  const companyScopeStr = summary ? (summary.isUncategorized ? '__uncategorized__' : summary.name) : undefined
+
+  const dupGroups = useMemo(
+    () => (companyScopeStr ? findDuplicateProductGroups(activeProducts, current, companyScopeStr) : []),
+    [activeProducts, current, companyScopeStr],
+  )
+  const duplicateRowCount = useMemo(() => dupGroups.reduce((s, g) => s + g.duplicates.length, 0), [dupGroups])
+
   const companyProducts = useMemo(() => {
     if (!summary) return []
-    return activeProducts.filter((p) => {
-      const resolved = resolveProductDisplayCompany(p, recordsByProduct.get(p.id))
-      return summary.isUncategorized ? resolved === null : resolved === summary.name
-    })
-  }, [activeProducts, recordsByProduct, summary])
+    const dupIds = new Set<string>()
+    for (const g of dupGroups) {
+      for (const d of g.duplicates) dupIds.add(d.id)
+    }
+    return activeProducts
+      .filter((p) => {
+        if (dupIds.has(p.id)) return false
+        const resolved = resolveProductDisplayCompany(p, recordsByProduct.get(p.id))
+        return summary.isUncategorized ? resolved === null : resolved === summary.name
+      })
+      .sort((a, b) => naturalCompare(a.name, b.name))
+  }, [activeProducts, dupGroups, recordsByProduct, summary])
 
   const candidateProducts = useMemo(() => {
     if (!addingProducts || !summary || summary.isUncategorized) return []
@@ -95,6 +116,7 @@ export default function CompanyDetail() {
         if (pickQuery && !matchesQuery({ product: p, records: recordsByProduct.get(p.id) ?? [] }, pickQuery, shopMap)) return false
         return true
       })
+      .sort((a, b) => naturalCompare(a.name, b.name))
       .slice(0, 60)
   }, [addingProducts, summary, activeProducts, recordsByProduct, pickScopeUncatOnly, pickQuery, shopMap])
 
@@ -114,12 +136,53 @@ export default function CompanyDetail() {
     }
   }
 
+  const runMergeDuplicates = async () => {
+    if (dupGroups.length === 0) return
+    const ok = await confirm({
+      title: `Merge ${duplicateRowCount} duplicate product${duplicateRowCount === 1 ? '' : 's'}?`,
+      body: `This will permanently combine ${dupGroups.length} duplicate group${dupGroups.length === 1 ? '' : 's'} in ${summary?.name ?? 'this company'}. All supplier offers, price history, and wishlist items will stay intact on the primary item.`,
+      confirmLabel: `Merge ${duplicateRowCount} duplicate${duplicateRowCount === 1 ? '' : 's'}`,
+    })
+    if (!ok) return
+    setMergeBusy(true)
+    try {
+      const { mergedGroups, removedProducts } = await mergeDuplicateProductGroups(dupGroups)
+      await reload()
+      toast('ok', `Merged ${mergedGroups} product group${mergedGroups === 1 ? '' : 's'} (${removedProducts} duplicate row${removedProducts === 1 ? '' : 's'} removed)`)
+    } catch (e) {
+      toast('err', (e as Error).message)
+    } finally {
+      setMergeBusy(false)
+    }
+  }
+
   const exportCompany = (format: 'csv' | 'xlsx') => {
     if (!summary) return
+    const redirect = new Map<string, string>()
+    for (const g of dupGroups) {
+      for (const d of g.duplicates) redirect.set(d.id, g.primary.id)
+    }
+    const exportCurrent =
+      redirect.size === 0
+        ? current
+        : (() => {
+            const byProdShop = new Map<string, (typeof current)[number]>()
+            for (const r of current) {
+              if (!r.product_id) continue
+              const pid = redirect.get(r.product_id) ?? r.product_id
+              const k = `${pid}:${r.shop_id}`
+              const prev = byProdShop.get(k)
+              if (!prev || r.observed_on > prev.observed_on || (r.observed_on === prev.observed_on && r.created_at > prev.created_at)) {
+                byProdShop.set(k, pid === r.product_id ? r : { ...r, product_id: pid })
+              }
+            }
+            return [...byProdShop.values()]
+          })()
+
     const rows = buildExportRows('products', {
       products: companyProducts,
       shops: shopMap,
-      current,
+      current: exportCurrent,
       review: [],
       opt: { freshnessDays: settings.freshness_days, excludeStale: false },
       selectedIds: new Set(),
@@ -296,6 +359,34 @@ export default function CompanyDetail() {
               </div>
             </div>
           )}
+        </Card>
+      )}
+
+      {/* Duplicate Products Cleanup Notice */}
+      {dupGroups.length > 0 && (
+        <Card className="!p-3.5 border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+                <IconGitCompare size={15} className="shrink-0 text-[var(--color-warning)]" />
+                <span>
+                  <b className="font-semibold tabular-nums">{duplicateRowCount}</b> duplicate catalog entr{duplicateRowCount === 1 ? 'y' : 'ies'} consolidated in A–Z list
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
+                E.g.{' '}
+                {dupGroups
+                  .slice(0, 3)
+                  .map((g) => `${g.primary.name} (${g.duplicates.length + 1}x)`)
+                  .join(' · ')}
+                {dupGroups.length > 3 ? ` +${dupGroups.length - 3} more` : ''} — supplier offers are combined automatically. Merge permanently to clean the database.
+              </p>
+            </div>
+            <Button small variant="secondary" disabled={mergeBusy} className="shrink-0" onClick={() => void runMergeDuplicates()}>
+              <IconGitCompare size={14} className="text-[var(--color-primary)]" />
+              <span>{mergeBusy ? 'Merging…' : `Merge duplicates (${duplicateRowCount})`}</span>
+            </Button>
+          </div>
         </Card>
       )}
 

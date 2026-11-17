@@ -4,7 +4,7 @@ import { deleteProductsByIds } from '../lib/actions'
 import { companySlug, resolveCanonicalCompany } from '../lib/companies'
 import { useData } from '../lib/data'
 import { supabase } from '../lib/supabase'
-import { buildProductRows, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
+import { buildProductRows, dedupeProductRowsForCompany, GROUP_OPTIONS, groupRows, matchesQuery, SORT_OPTIONS, sortRows, type GroupKey, type ProductRow, type SortKey } from '../lib/tableModel'
 import { AssignCompanyModal } from './AssignCompanyModal'
 import { EditOfferModal } from './EditOfferModal'
 import { IconArrowRight, IconBuilding, IconChevronDown, IconClose, IconEdit, IconFilter, IconPrinter, IconSearch, IconTrash, IconUpload } from './icons'
@@ -37,10 +37,10 @@ interface View {
   freshness: number | null
 }
 
-function getDefaultView(mode: 'compare' | 'master'): View {
+function getDefaultView(mode: 'compare' | 'master', companyScope?: string): View {
   return {
     q: '',
-    sort: mode === 'compare' ? 'price_low' : 'price_low',
+    sort: companyScope ? 'name_asc' : mode === 'compare' ? 'price_low' : 'price_low',
     group: 'none',
     brand: '',
     manufacturer: '',
@@ -91,8 +91,8 @@ export function ProductBrowser({
   const toast = useToast()
   const confirm = useConfirm()
   const [params, setParams] = useSearchParams()
-  const defaultView = useMemo(() => getDefaultView(mode), [mode])
-  const storageKey = companyScope ? `view:company:${companySlug(companyScope)}:v2` : `view:${mode}:v2`
+  const defaultView = useMemo(() => getDefaultView(mode, companyScope), [mode, companyScope])
+  const storageKey = companyScope ? `view:company:${companySlug(companyScope)}:v3` : `view:${mode}:v2`
   const [stored, setView] = useLocalState<View>(storageKey, defaultView)
   const urlQ = params.get('q')
   const urlCompany = params.get('company')
@@ -181,9 +181,15 @@ export function ProductBrowser({
 
   const rows = useMemo(() => {
     if (!companyScope) return allRows
-    if (companyScope === '__uncategorized__') return allRows.filter((r) => !r.company)
-    return allRows.filter((r) => r.company === companyScope)
-  }, [allRows, companyScope])
+    const scoped =
+      companyScope === '__uncategorized__'
+        ? allRows.filter((r) => !r.company)
+        : allRows.filter((r) => r.company === companyScope)
+    return dedupeProductRowsForCompany(scoped, shopMap, {
+      freshnessDays: freshness,
+      excludeStale: v.excludeStale || v.freshOnly,
+    })
+  }, [allRows, companyScope, shopMap, freshness, v.excludeStale, v.freshOnly])
 
   const uncategorizedCount = useMemo(() => rows.filter((r) => !r.company).length, [rows])
 

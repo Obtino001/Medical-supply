@@ -198,4 +198,31 @@ describe('order slip & PDF generation', () => {
       expect(text.slice(entryOffset, entryOffset + `${id} 0 obj`.length)).toBe(`${id} 0 obj`)
     }
   })
+
+  it('sorts order lines A-Z and deduplicates duplicate company items in the same supplier group', () => {
+    const pZ = mkProd('Zyloric 100mg Tab', { manufacturer: 'GlaxoSmithKline Pakistan (GSK)' })
+    const pDup = mkProd('AUGMENTIN 625MG TAB. (GSK)', { manufacturer: 'GSK', dosage_form: 'tablet' })
+    const pA = mkProd('Augmentin 625mg Tab', { manufacturer: 'GlaxoSmithKline Pakistan (GSK)', dosage_form: 'tablet' })
+    const pDiffStrength = mkProd('Augmentin 1g Tab', { manufacturer: 'GlaxoSmithKline Pakistan (GSK)', dosage_form: 'tablet' })
+    const shops = new Map<string, Shop>([['S1', { id: 'S1', name: 'Noman Impex' } as Shop]])
+
+    const resolved = buildResolvedLines(
+      [
+        { product: pZ, company: 'GlaxoSmithKline Pakistan (GSK)', records: [mkRec({ product_id: pZ.id, shop_id: 'S1', base_price: 200, effective_cost: 180 })], chosenShopId: 'S1', qty: '2' },
+        { product: pDup, company: 'GlaxoSmithKline Pakistan (GSK)', records: [mkRec({ product_id: pDup.id, shop_id: 'S1', base_price: 400, effective_cost: 360 })], chosenShopId: 'S1', qty: '' },
+        { product: pA, company: 'GlaxoSmithKline Pakistan (GSK)', records: [mkRec({ product_id: pA.id, shop_id: 'S1', base_price: 400, effective_cost: 350 })], chosenShopId: 'S1', qty: '5' },
+        { product: pDiffStrength, company: 'GlaxoSmithKline Pakistan (GSK)', records: [mkRec({ product_id: pDiffStrength.id, shop_id: 'S1', base_price: 550, effective_cost: 500 })], chosenShopId: 'S1', qty: '3' },
+      ],
+      shops,
+    )
+
+    const groups = buildOrderGroups(resolved, true)
+    expect(groups).toHaveLength(1)
+    expect(groups[0].lines.map((l) => l.product.name)).toEqual([
+      'Augmentin 1g Tab',
+      'Augmentin 625mg Tab',
+      'Zyloric 100mg Tab',
+    ])
+    expect(groups[0].estimatedTotal).toBe(2 * 180 + 5 * 350 + 3 * 500)
+  })
 })

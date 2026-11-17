@@ -1,6 +1,6 @@
 // Pakistan Pharmaceutical Companies registry, alias canonicalization, and smart catalog categorization.
 // Pure functions — no I/O.
-import { normalizeHomoglyphs } from './productParse'
+import { naturalCompare, normalizeHomoglyphs, parseTitle } from './productParse'
 import type { PriceRecord, Product, Shop } from './types'
 
 export interface PharmaCompanyDef {
@@ -245,6 +245,107 @@ export function extractCompanyFromTitle(title: string | null | undefined): Pharm
   return null
 }
 
+/** Remove explicit company tags like "(CCL)", "(AGP)", "(ABBOTT" from a title for duplicate comparison. */
+export function stripTitleCompanyTags(title: string | null | undefined): string {
+  const s = normalizeHomoglyphs(title ?? '').trim()
+  if (!s) return ''
+  return s
+    .replace(/[[(]\s*([A-Za-z][A-Za-z0-9.\s&-]{1,28})\s*(?:[\])]|\s*$)/g, (full, inner: string) => {
+      const cleaned = cleanCompanyToken(inner)
+      if (!cleaned) return full
+      if (TITLE_TAG_TO_COMPANY.has(cleaned) || findKnownCompany(cleaned)) return ' '
+      return full
+    })
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Normalized product identity key within one company (ignores manufacturer alias diffs and title company tags,
+ * while strictly keeping distinct strengths, weights, pack sizes, and dosage forms separate).
+ */
+export function companyProductDedupeKey(p: Product): string {
+  const stripped = stripTitleCompanyTags(p.name)
+  const parsed = parseTitle(stripped || p.name)
+  const coreName = parsed.name || p.normalized_name || cleanCompanyToken(p.name)
+  const sv = p.strength_value ?? parsed.strengthValue
+  const su = (sv != null ? p.strength_unit ?? parsed.strengthUnit : null) ?? ''
+  const wv = p.weight_value ?? parsed.weightValue
+  const wu = (wv != null ? p.weight_unit ?? parsed.weightUnit : null) ?? ''
+  const ps = p.pack_size ?? parsed.packSize
+  const df = (p.dosage_form ?? parsed.dosageForm ?? '').toLowerCase().trim()
+  return [coreName, sv ?? '', su.toLowerCase(), wv ?? '', wu.toLowerCase(), ps ?? '', df].join('|')
+}
+
+export interface DuplicateProductGroup {
+  key: string
+  company: string | null
+  primary: Product
+  duplicates: Product[]
+}
+
+/** Score a Product to choose the best canonical surviving record when merging duplicates. */
+export function primaryProductScore(p: Product, recsCount: number, hasCanonicalMfr: boolean): number {
+  let score = 0
+  if (hasCanonicalMfr && p.manufacturer) score += 20
+  if (p.dosage_form) score += 5
+  if (p.strength_value != null || p.weight_value != null) score += 5
+  if (!/[([.]\s*$/.test(p.name.trim())) score += 8 // prefer clean complete titles over truncated "(ABBOTT" or trailing dot
+  if (!extractCompanyFromTitle(p.name)) score += 3 // prefer clean generic catalog title over "(CCL)" suffix
+  score += Math.min(recsCount, 10)
+  return score
+}
+
+/**
+ * Find duplicate active products belonging to the same company (or a specific companyScope).
+ * Picks the best primary surviving Product and lists redundant duplicates to consolidate.
+ */
+export function findDuplicateProductGroups(
+  products: Product[],
+  currentRecords: PriceRecord[],
+  companyScope?: string,
+): DuplicateProductGroup[] {
+  const recsByProd = new Map<string, PriceRecord[]>()
+  for (const r of currentRecords) {
+    if (!r.product_id || r.archived) continue
+    const arr = recsByProd.get(r.product_id)
+    if (arr) arr.push(r)
+    else recsByProd.set(r.product_id, [r])
+  }
+
+  const buckets = new Map<string, { company: string | null; items: Product[] }>()
+  for (const p of products) {
+    if (p.archived) continue
+    const recs = recsByProd.get(p.id) ?? []
+    const company = resolveProductDisplayCompany(p, recs)
+    if (companyScope !== undefined) {
+      if (companyScope === '__uncategorized__' && company !== null) continue
+      if (companyScope !== '__uncategorized__' && company !== companyScope) continue
+    }
+    const bucketKey = `${company ?? '__uncategorized__'}::${companyProductDedupeKey(p)}`
+    const b = buckets.get(bucketKey)
+    if (b) b.items.push(p)
+    else buckets.set(bucketKey, { company, items: [p] })
+  }
+
+  const out: DuplicateProductGroup[] = []
+  for (const [key, b] of buckets.entries()) {
+    if (b.items.length < 2) continue
+    const sorted = [...b.items].sort((x, y) => {
+      const sx = primaryProductScore(x, (recsByProd.get(x.id) ?? []).length, resolveCanonicalCompany(x.manufacturer) === x.manufacturer)
+      const sy = primaryProductScore(y, (recsByProd.get(y.id) ?? []).length, resolveCanonicalCompany(y.manufacturer) === y.manufacturer)
+      return sy - sx || x.product_no - y.product_no
+    })
+    out.push({
+      key,
+      company: b.company,
+      primary: sorted[0],
+      duplicates: sorted.slice(1),
+    })
+  }
+  return out.sort((a, b) => naturalCompare(a.primary.name, b.primary.name))
+}
+
 // Generic medicine words that are NEVER sufficient by themselves to identify a brand family across products.
 const GENERIC_BRAND_STOPWORDS = new Set([
   'aqua', 'anti', 'baby', 'adult', 'child', 'cold', 'cough', 'pain', 'plus', 'extra', 'forte', 'super', 'ultra',
@@ -449,6 +550,8 @@ export interface CompanySummary {
   aliases: string[]
   isUncategorized: boolean
   productCount: number
+  rawProductCount: number
+  duplicateCount: number
   offerCount: number
   multiShopCount: number
   rsPriceCount: number
@@ -466,8 +569,7 @@ export interface CompanySummary {
 
 /**
  * Aggregate every active product and current supplier offer into rich company summaries.
- * Ensures every Top-50 Pakistan Pharma company always has a directory entry (even when productCount === 0),
- * alongside all other/custom companies found in the catalog plus one Uncategorized bucket if any exist.
+ * Deduplicates identical items within each company so counts are accurate and never double-count duplicates.
  */
 export function buildCompanySummaries(
   products: Product[],
@@ -490,12 +592,9 @@ export function buildCompanySummaries(
     top50Rank: number | null
     aliases: string[]
     isUncategorized: boolean
-    products: Product[]
+    rawProductCount: number
+    uniqueByDedupe: Map<string, { primary: Product; records: PriceRecord[] }>
     offerCount: number
-    multiShopCount: number
-    rsPriceCount: number
-    discountOnlyCount: number
-    tpCount: number
     bestDiscountPct: number | null
     minPriceRs: number | null
     maxPriceRs: number | null
@@ -517,12 +616,9 @@ export function buildCompanySummaries(
         top50Rank: def?.top50Rank ?? null,
         aliases: def ? def.aliases : [],
         isUncategorized,
-        products: [],
+        rawProductCount: 0,
+        uniqueByDedupe: new Map(),
         offerCount: 0,
-        multiShopCount: 0,
-        rsPriceCount: 0,
-        discountOnlyCount: 0,
-        tpCount: 0,
         bestDiscountPct: null,
         minPriceRs: null,
         maxPriceRs: null,
@@ -546,65 +642,100 @@ export function buildCompanySummaries(
     const known = resolvedName ? findKnownCompany(resolvedName) : null
     const acc = resolvedName ? getOrCreate(known, known?.name ?? resolvedName, false) : getOrCreate(null, 'Uncategorized', true)
 
-    acc.products.push(p)
-    const form = (p.dosage_form || 'other').toLowerCase()
-    acc.formCounts.set(form, (acc.formCounts.get(form) ?? 0) + 1)
+    acc.rawProductCount++
+    const dKey = companyProductDedupeKey(p)
+    const existing = acc.uniqueByDedupe.get(dKey)
+    if (!existing) {
+      acc.uniqueByDedupe.set(dKey, { primary: p, records: [...recs] })
+    } else {
+      const curScore = primaryProductScore(
+        existing.primary,
+        (recordsByProduct.get(existing.primary.id) ?? []).length,
+        resolveCanonicalCompany(existing.primary.manufacturer) === existing.primary.manufacturer,
+      )
+      const newScore = primaryProductScore(
+        p,
+        recs.length,
+        resolveCanonicalCompany(p.manufacturer) === p.manufacturer,
+      )
+      if (newScore > curScore || (newScore === curScore && p.product_no < existing.primary.product_no)) {
+        existing.primary = p
+      }
+      existing.records.push(...recs)
+    }
 
-    const distinctShops = new Set<string>()
-    let hasRs = false
-    let hasDisc = false
-    let hasTp = false
     for (const r of recs) {
       acc.offerCount++
-      distinctShops.add(r.shop_id)
       const sSet = acc.shopCounts.get(r.shop_id) ?? new Set<string>()
-      sSet.add(p.id)
+      sSet.add(dKey)
       acc.shopCounts.set(r.shop_id, sSet)
 
       if (r.scheme_status === 'ok' && r.effective_cost != null && r.effective_cost > 0) {
-        hasRs = true
         acc.minPriceRs = acc.minPriceRs == null ? r.effective_cost : Math.min(acc.minPriceRs, r.effective_cost)
         acc.maxPriceRs = acc.maxPriceRs == null ? r.effective_cost : Math.max(acc.maxPriceRs, r.effective_cost)
       }
-      if (r.source_attrs?.is_trade_price && (r.discount_pct == null || r.discount_pct === 0)) {
-        hasTp = true
-      } else if (r.discount_pct != null && r.discount_pct > 0) {
-        hasDisc = true
+      if (!(r.source_attrs?.is_trade_price && (r.discount_pct == null || r.discount_pct === 0)) && r.discount_pct != null && r.discount_pct > 0) {
         acc.bestDiscountPct = acc.bestDiscountPct == null ? r.discount_pct : Math.max(acc.bestDiscountPct, r.discount_pct)
       }
     }
-    if (distinctShops.size >= 2) acc.multiShopCount++
-    if (hasRs) acc.rsPriceCount++
-    else if (hasDisc) acc.discountOnlyCount++
-    else if (hasTp) acc.tpCount++
   }
 
-  return [...accMap.values()].map((a) => ({
-    id: a.id,
-    name: a.name,
-    shortName: a.shortName,
-    top50Rank: a.top50Rank,
-    aliases: a.aliases,
-    isUncategorized: a.isUncategorized,
-    productCount: a.products.length,
-    offerCount: a.offerCount,
-    multiShopCount: a.multiShopCount,
-    rsPriceCount: a.rsPriceCount,
-    discountOnlyCount: a.discountOnlyCount,
-    tpCount: a.tpCount,
-    bestDiscountPct: a.bestDiscountPct,
-    minPriceRs: a.minPriceRs,
-    maxPriceRs: a.maxPriceRs,
-    shops: [...a.shopCounts.entries()]
-      .map(([shopId, pIds]) => ({
-        shopId,
-        shopName: shops.get(shopId)?.name ?? 'Supplier',
-        count: pIds.size,
-      }))
-      .sort((x, y) => y.count - x.count || x.shopName.localeCompare(y.shopName)),
-    forms: [...a.formCounts.entries()]
-      .map(([form, count]) => ({ form, count }))
-      .sort((x, y) => y.count - x.count || x.form.localeCompare(y.form)),
-    sampleProducts: a.products.slice(0, 5),
-  }))
+  return [...accMap.values()].map((a) => {
+    const uniqueEntries = [...a.uniqueByDedupe.values()].sort((x, y) => naturalCompare(x.primary.name, y.primary.name))
+    let multiShopCount = 0
+    let rsPriceCount = 0
+    let discountOnlyCount = 0
+    let tpCount = 0
+
+    for (const entry of uniqueEntries) {
+      const form = (entry.primary.dosage_form || 'other').toLowerCase()
+      a.formCounts.set(form, (a.formCounts.get(form) ?? 0) + 1)
+
+      const distinctShops = new Set<string>()
+      let hasRs = false
+      let hasDisc = false
+      let hasTp = false
+      for (const r of entry.records) {
+        distinctShops.add(r.shop_id)
+        if (r.scheme_status === 'ok' && r.effective_cost != null && r.effective_cost > 0) hasRs = true
+        if (r.source_attrs?.is_trade_price && (r.discount_pct == null || r.discount_pct === 0)) hasTp = true
+        else if (r.discount_pct != null && r.discount_pct > 0) hasDisc = true
+      }
+      if (distinctShops.size >= 2) multiShopCount++
+      if (hasRs) rsPriceCount++
+      else if (hasDisc) discountOnlyCount++
+      else if (hasTp) tpCount++
+    }
+
+    return {
+      id: a.id,
+      name: a.name,
+      shortName: a.shortName,
+      top50Rank: a.top50Rank,
+      aliases: a.aliases,
+      isUncategorized: a.isUncategorized,
+      productCount: uniqueEntries.length,
+      rawProductCount: a.rawProductCount,
+      duplicateCount: Math.max(0, a.rawProductCount - uniqueEntries.length),
+      offerCount: a.offerCount,
+      multiShopCount,
+      rsPriceCount,
+      discountOnlyCount,
+      tpCount,
+      bestDiscountPct: a.bestDiscountPct,
+      minPriceRs: a.minPriceRs,
+      maxPriceRs: a.maxPriceRs,
+      shops: [...a.shopCounts.entries()]
+        .map(([shopId, dKeys]) => ({
+          shopId,
+          shopName: shops.get(shopId)?.name ?? 'Supplier',
+          count: dKeys.size,
+        }))
+        .sort((x, y) => y.count - x.count || x.shopName.localeCompare(y.shopName)),
+      forms: [...a.formCounts.entries()]
+        .map(([form, count]) => ({ form, count }))
+        .sort((x, y) => y.count - x.count || x.form.localeCompare(y.form)),
+      sampleProducts: uniqueEntries.slice(0, 5).map((e) => e.primary),
+    }
+  })
 }

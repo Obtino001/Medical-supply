@@ -1,5 +1,5 @@
 // Row model, sorting and grouping for the product / comparison tables. Pure functions.
-import { resolveProductDisplayCompany } from './companies'
+import { companyProductDedupeKey, primaryProductScore, resolveCanonicalCompany, resolveProductDisplayCompany } from './companies'
 import { compareOffers, type CompareOptions, type CompareResult, type OfferView } from './compare'
 import { rankOffers, type OfferRanking } from './offerRank'
 import { naturalCompare, numCompare, variantLabel } from './productParse'
@@ -107,6 +107,51 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
       searchText,
     }
   })
+}
+
+/**
+ * Consolidate duplicate product rows within a company-scoped view so the same product never appears twice
+ * while preserving the latest offer from every shop across duplicate DB rows.
+ */
+export function dedupeProductRowsForCompany(
+  rows: ProductRow[],
+  shops: Map<string, Shop>,
+  opt: CompareOptions,
+): ProductRow[] {
+  const buckets = new Map<string, ProductRow[]>()
+  for (const r of rows) {
+    const k = companyProductDedupeKey(r.product)
+    const arr = buckets.get(k)
+    if (arr) arr.push(r)
+    else buckets.set(k, [r])
+  }
+
+  const out: ProductRow[] = []
+  for (const group of buckets.values()) {
+    if (group.length === 1) {
+      out.push(group[0])
+      continue
+    }
+    const sorted = [...group].sort((a, b) => {
+      const sa = primaryProductScore(a.product, a.records.length, resolveCanonicalCompany(a.product.manufacturer) === a.product.manufacturer)
+      const sb = primaryProductScore(b.product, b.records.length, resolveCanonicalCompany(b.product.manufacturer) === b.product.manufacturer)
+      return sb - sa || a.product.product_no - b.product.product_no
+    })
+    const primary = sorted[0]
+    const byShop = new Map<string, PriceRecord>()
+    for (const row of sorted) {
+      for (const rec of row.records) {
+        const cur = byShop.get(rec.shop_id)
+        if (!cur || rec.observed_on > cur.observed_on || (rec.observed_on === cur.observed_on && rec.created_at > cur.created_at)) {
+          byShop.set(rec.shop_id, { ...rec, product_id: primary.product.id })
+        }
+      }
+    }
+    const mergedRecs = [...byShop.values()]
+    const [rebuilt] = buildProductRows([primary.product], mergedRecs, shops, opt)
+    if (rebuilt) out.push(rebuilt)
+  }
+  return out
 }
 
 export type SortKey =
