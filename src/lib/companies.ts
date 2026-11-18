@@ -1,6 +1,6 @@
 // Pakistan Pharmaceutical Companies registry, alias canonicalization, and smart catalog categorization.
 // Pure functions — no I/O.
-import { naturalCompare, normalizeHomoglyphs, parseTitle } from './productParse'
+import { countryCompareKey, naturalCompare, normalizeHomoglyphs, parseTitle } from './productParse'
 import type { PriceRecord, Product, Shop } from './types'
 
 export interface PharmaCompanyDef {
@@ -274,7 +274,8 @@ export function companyProductDedupeKey(p: Product): string {
   const wu = (wv != null ? p.weight_unit ?? parsed.weightUnit : null) ?? ''
   const ps = p.pack_size ?? parsed.packSize
   const df = (p.dosage_form ?? parsed.dosageForm ?? '').toLowerCase().trim()
-  return [coreName, sv ?? '', su.toLowerCase(), wv ?? '', wu.toLowerCase(), ps ?? '', df].join('|')
+  const ctry = countryCompareKey(p.country_of_origin)
+  return [coreName, sv ?? '', su.toLowerCase(), wv ?? '', wu.toLowerCase(), ps ?? '', df, ctry].join('|')
 }
 
 export interface DuplicateProductGroup {

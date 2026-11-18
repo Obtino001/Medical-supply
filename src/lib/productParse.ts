@@ -10,6 +10,128 @@ export interface ParsedProduct {
   weightUnit: 'g' | 'ml' | null
   packSize: number | null
   dosageForm: string | null
+  countryOfOrigin: string | null
+}
+
+const COUNTRY_SYNONYMS: Record<string, string> = {
+  pk: 'Pakistan', pak: 'Pakistan', pakistan: 'Pakistan',
+  uk: 'United Kingdom', gb: 'United Kingdom', england: 'United Kingdom', britain: 'United Kingdom', 'great britain': 'United Kingdom', 'united kingdom': 'United Kingdom',
+  us: 'USA', usa: 'USA', america: 'USA', 'united states': 'USA', 'united states of america': 'USA',
+  de: 'Germany', ger: 'Germany', germany: 'Germany', deutschland: 'Germany',
+  ch: 'Switzerland', swiss: 'Switzerland', switzerland: 'Switzerland',
+  fr: 'France', france: 'France', french: 'France',
+  it: 'Italy', italy: 'Italy', italian: 'Italy',
+  tr: 'Turkey', turkey: 'Turkey', turkiye: 'Turkey',
+  cn: 'China', china: 'China', prc: 'China',
+  in: 'India', ind: 'India', india: 'India',
+  jp: 'Japan', jpn: 'Japan', japan: 'Japan',
+  kr: 'South Korea', korea: 'South Korea', 'south korea': 'South Korea',
+  es: 'Spain', spain: 'Spain',
+  be: 'Belgium', belgium: 'Belgium',
+  nl: 'Netherlands', holland: 'Netherlands', netherlands: 'Netherlands',
+  ie: 'Ireland', ireland: 'Ireland',
+  dk: 'Denmark', denmark: 'Denmark',
+  se: 'Sweden', sweden: 'Sweden',
+  at: 'Austria', austria: 'Austria',
+  ae: 'UAE', uae: 'UAE', dubai: 'UAE', 'united arab emirates': 'UAE',
+  sa: 'Saudi Arabia', ksa: 'Saudi Arabia', 'saudi arabia': 'Saudi Arabia',
+  eg: 'Egypt', egypt: 'Egypt',
+  bd: 'Bangladesh', bangladesh: 'Bangladesh',
+  my: 'Malaysia', malaysia: 'Malaysia',
+  id: 'Indonesia', indonesia: 'Indonesia',
+  th: 'Thailand', thailand: 'Thailand',
+  ca: 'Canada', can: 'Canada', canada: 'Canada',
+  au: 'Australia', aus: 'Australia', australia: 'Australia',
+  sg: 'Singapore', singapore: 'Singapore',
+  pt: 'Portugal', portugal: 'Portugal',
+  gr: 'Greece', greece: 'Greece',
+  pl: 'Poland', poland: 'Poland',
+  hu: 'Hungary', hungary: 'Hungary',
+  cz: 'Czech Republic', 'czech republic': 'Czech Republic',
+  jo: 'Jordan', jordan: 'Jordan',
+  ir: 'Iran', iran: 'Iran',
+}
+
+export const COMMON_COUNTRIES = [
+  'Pakistan',
+  'Germany',
+  'United Kingdom',
+  'Switzerland',
+  'USA',
+  'France',
+  'Italy',
+  'Turkey',
+  'Japan',
+  'South Korea',
+  'Spain',
+  'Belgium',
+  'Netherlands',
+  'Ireland',
+  'Denmark',
+  'India',
+  'China',
+  'UAE',
+  'Saudi Arabia',
+  'Egypt',
+  'Bangladesh',
+  'Malaysia',
+  'Indonesia',
+  'Canada',
+] as const
+
+const COUNTRY_PLACEHOLDERS = new Set(['', '-', '--', 'n a', 'na', 'nil', 'none', 'unknown', 'other', 'local', 'imported'])
+
+/** Canonicalize an explicit country string without inventing a country for blank/placeholder values. */
+export function normalizeCountryOfOrigin(raw: string | null | undefined, knownOnly = false): string | null {
+  if (!raw) return null
+  const clean = normalizeHomoglyphs(raw)
+    .toLowerCase()
+    .replace(/[^a-z\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!clean || COUNTRY_PLACEHOLDERS.has(clean)) return null
+  const hit = COUNTRY_SYNONYMS[clean]
+  if (hit) return hit
+  if (knownOnly) return null
+  return clean.replace(/\b([a-z])/g, (m) => m.toUpperCase())
+}
+
+/** Extract an unambiguous explicit country marker from a medicine title (e.g. "(Germany)", "(UK)", "Made in Turkey"). */
+export function extractCountryFromTitle(title: string | null | undefined): { country: string; matchedSpan: string } | null {
+  const s = normalizeHomoglyphs(title ?? '')
+  if (!s.trim()) return null
+
+  const madeInRe = /\b(?:made\s+in|origin\s*:?|product\s+of)\s+([A-Za-z][A-Za-z.\s]{1,24}?)(?=[,.;)\]]|\s*$)/gi
+  let m: RegExpExecArray | null
+  while ((m = madeInRe.exec(s)) !== null) {
+    const c = normalizeCountryOfOrigin(m[1], true)
+    if (c) return { country: c, matchedSpan: m[0] }
+  }
+
+  const parenRe = /[[(]\s*([A-Za-z][A-Za-z.\s]{1,24})\s*[\])]/g
+  while ((m = parenRe.exec(s)) !== null) {
+    const inner = m[1].trim()
+    // Avoid ambiguous single 2-letter codes like "(IN)" matching prepositions or abbreviations unless clear
+    if (inner.length === 2 && !/^(uk|us|pk|de|ch|fr|it|tr|cn|jp|kr|es|be|nl|ie|dk|se|at|ca|au|sg|ae|sa|eg)$/i.test(inner)) continue
+    const c = normalizeCountryOfOrigin(inner, true)
+    if (c) return { country: c, matchedSpan: m[0] }
+  }
+
+  // Also check explicit trailing full country name (min 4 chars) only when at end after dash/comma/space e.g. "Panadol 500mg - Germany"
+  const tailFullRe = /(?:^|[\s\-,/])(Pakistan|Germany|Switzerland|United Kingdom|France|Italy|Turkey|Japan|South Korea|Spain|Belgium|Netherlands|Ireland|Denmark|Sweden|Austria|Bangladesh|Malaysia|Indonesia|Thailand|Canada|Australia|Singapore|USA|U\.S\.A\.|U\.K\.)\s*$/i
+  const tm = tailFullRe.exec(s)
+  if (tm) {
+    const c = normalizeCountryOfOrigin(tm[1], true)
+    if (c) return { country: c, matchedSpan: tm[1] }
+  }
+
+  return null
+}
+
+/** Normalized lowercase comparison key for country of origin. */
+export function countryCompareKey(raw: string | null | undefined): string {
+  const c = normalizeCountryOfOrigin(raw)
+  return c ? c.toLowerCase() : ''
 }
 
 const UNIT_MAP: Record<string, { unit: string; factor: number }> = {
@@ -86,7 +208,9 @@ export function toNumber(s: string): number {
 
 export function parseTitle(title: string): ParsedProduct {
   const raw = normalizeHomoglyphs((title ?? '').toString())
-  let work = ' ' + raw.replace(/\s+/g, ' ').trim() + ' '
+  const countryHit = extractCountryFromTitle(raw)
+  const scrubbed = countryHit ? raw.replace(countryHit.matchedSpan, ' ') : raw
+  let work = ' ' + scrubbed.replace(/\s+/g, ' ').trim() + ' '
 
   let strengthValue: number | null = null
   let strengthUnit: string | null = null
@@ -142,6 +266,7 @@ export function parseTitle(title: string): ParsedProduct {
     weightUnit,
     packSize,
     dosageForm,
+    countryOfOrigin: countryHit?.country ?? null,
   }
 }
 
@@ -169,11 +294,12 @@ export interface ProductIdentityInput {
   packSize: number | null
   dosageForm: string | null
   manufacturer: string | null
+  countryOfOrigin?: string | null
 }
 
 /** Stable key: two products are the same purchase item only if every part of this key is equal. */
 export function identityKey(p: ProductIdentityInput): string {
-  return [
+  const parts = [
     p.normalizedName,
     p.strengthValue ?? '',
     p.strengthUnit ?? '',
@@ -182,7 +308,10 @@ export function identityKey(p: ProductIdentityInput): string {
     p.packSize ?? '',
     p.dosageForm ?? '',
     normalizeText(p.manufacturer),
-  ].join('|')
+  ]
+  const ctry = countryCompareKey(p.countryOfOrigin)
+  if (ctry) parts.push(ctry)
+  return parts.join('|')
 }
 
 /** Human label of the variant part: "100g · 500mg · 10 pcs". */

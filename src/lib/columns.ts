@@ -1,7 +1,7 @@
 // Target fields for column mapping and automatic header suggestions.
 
 export type FieldKey =
-  | 'code' | 'barcode' | 'mfr_code' | 'title' | 'description' | 'brand' | 'manufacturer'
+  | 'code' | 'barcode' | 'mfr_code' | 'title' | 'description' | 'brand' | 'manufacturer' | 'country'
   | 'strength' | 'grams' | 'pack_size' | 'price' | 'mrp' | 'discount' | 'scheme' | 'quantity'
   | 'expiry' | 'availability' | 'notes'
 
@@ -69,6 +69,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'description', label: 'Description', synonyms: ['description', 'desc', 'details', 'detail'] },
   { key: 'brand', label: 'Brand', synonyms: ['brand', 'brand name'] },
   { key: 'manufacturer', label: 'Manufacturer / company', synonyms: ['manufacturer', 'company', 'mfr', 'mfg', 'maker', 'principal', 'supplier company'] },
+  { key: 'country', label: 'Country of origin', synonyms: ['country', 'country of origin', 'origin', 'made in', 'mfg country', 'import country', 'country name'] },
   { key: 'strength', label: 'Strength', synonyms: ['strength', 'potency', 'dose', 'dosage'] },
   { key: 'grams', label: 'Grams / weight / volume', synonyms: ['grams', 'gram', 'gm', 'weight', 'wt', 'size', 'volume', 'net weight', 'net content'] },
   { key: 'pack_size', label: 'Pack size', synonyms: ['pack size', 'pack', 'packing', 'pack qty', 'qty per pack', 'unit size', 'pcs per pack', 'packsize'] },

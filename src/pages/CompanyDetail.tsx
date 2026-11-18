@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ProductBrowser } from '../components/ProductBrowser'
-import { IconArrowLeft, IconBuilding, IconClose, IconDownload, IconGitCompare, IconPlus, IconSearch, IconStore } from '../components/icons'
+import { IconArrowLeft, IconBuilding, IconClipboardList, IconClose, IconDownload, IconGitCompare, IconPlus, IconSearch, IconStore } from '../components/icons'
 import { Badge, Button, Card, Empty, Modal, PageHeader, Stat, cx, rs, useConfirm, useToast } from '../components/ui'
 import { bulkAssignCompany, mergeDuplicateProductGroups } from '../lib/actions'
 import {
@@ -238,10 +238,18 @@ export default function CompanyDetail() {
           }
         >
           {!summary.isUncategorized && (
-            <Button small onClick={() => setAddingProducts(true)}>
-              <IconPlus size={15} />
-              <span>Add products to {summary.shortName}</span>
-            </Button>
+            <>
+              <Link to={`/orders?company=${encodeURIComponent(summary.id)}`}>
+                <Button small>
+                  <IconClipboardList size={15} />
+                  <span>Create Order</span>
+                </Button>
+              </Link>
+              <Button variant="secondary" small onClick={() => setAddingProducts(true)}>
+                <IconPlus size={15} />
+                <span>Add products to {summary.shortName}</span>
+              </Button>
+            </>
           )}
           <Button variant="secondary" small disabled={companyProducts.length === 0} onClick={() => exportCompany('xlsx')}>
             <IconDownload size={15} className="text-[var(--color-primary)]" />

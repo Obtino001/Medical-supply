@@ -11,6 +11,7 @@ export interface IncomingView {
   code: string | null
   brand: string | null
   manufacturer: string | null
+  country?: string | null
   strength: string | null
   weight: string | null
   pack: number | null
@@ -19,11 +20,12 @@ export interface IncomingView {
   form: string | null
 }
 
-export const productView = (p: Product) => ({
+export const productView = (p: Product): IncomingView => ({
   title: p.name,
   code: p.mfr_code,
   brand: p.brand,
   manufacturer: p.manufacturer,
+  country: p.country_of_origin ?? null,
   strength: p.strength_value != null ? `${p.strength_value}${p.strength_unit ?? ''}` : null,
   weight: p.weight_value != null ? `${p.weight_value}${p.weight_unit ?? ''}` : null,
   pack: p.pack_size,
@@ -35,13 +37,14 @@ export const productView = (p: Product) => ({
 const norm = (v: string | number | null | undefined) => (v == null ? '' : String(v).trim().toLowerCase())
 
 export function AttrTable({ imported, existing }: { imported: IncomingView; existing: IncomingView | null }) {
-  const allRows: [string, string | number | null, string | number | null | undefined, boolean][] = [
+  const allRows: [string, string | number | null | undefined, string | number | null | undefined, boolean][] = [
     ['Product name', imported.title, existing?.title, false],
     ['Strength', imported.strength, existing?.strength, true],
     ['Dosage form', imported.form, existing?.form, true],
     ['Grams / volume', imported.weight, existing?.weight, true],
     ['Pack size', imported.pack, existing?.pack, true],
     ['Manufacturer', imported.manufacturer, existing?.manufacturer, true],
+    ['Country of origin', imported.country, existing?.country, true],
     ['Brand', imported.brand, existing?.brand, true],
     ['Product code', imported.code, existing?.mfrCode, true],
     ['Barcode', imported.barcode, existing?.barcode, true],

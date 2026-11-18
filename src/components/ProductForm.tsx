@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PHARMA_COMPANIES, resolveCanonicalCompany } from '../lib/companies'
-import { identityKey, parseTitle } from '../lib/productParse'
+import { COMMON_COUNTRIES, identityKey, normalizeCountryOfOrigin, parseTitle } from '../lib/productParse'
 import { supabase, updateChecked } from '../lib/supabase'
 import type { Product } from '../lib/types'
 import { IconChevronDown, IconChevronUp } from './icons'
@@ -15,13 +15,14 @@ const num = (s: string): number | null => {
 
 export function ProductForm({ open, onClose, product, onSaved }: { open: boolean; onClose: () => void; product?: Product; onSaved: (id: string) => void }) {
   const [f, setF] = useState(() => ({
-    name: product?.name ?? '', brand: product?.brand ?? '', manufacturer: product?.manufacturer ?? '', active_ingredient: product?.active_ingredient ?? '',
+    name: product?.name ?? '', brand: product?.brand ?? '', manufacturer: product?.manufacturer ?? '',
+    country_of_origin: product?.country_of_origin ?? '', active_ingredient: product?.active_ingredient ?? '',
     strength_value: product?.strength_value?.toString() ?? '', strength_unit: product?.strength_unit ?? '',
     weight_value: product?.weight_value?.toString() ?? '', weight_unit: product?.weight_unit ?? 'g',
     pack_size: product?.pack_size?.toString() ?? '', dosage_form: product?.dosage_form ?? '', barcode: product?.barcode ?? '',
     mfr_code: product?.mfr_code ?? '', notes: product?.notes ?? '',
   }))
-  const hasExtra = Boolean(product && (product.brand || product.manufacturer || product.active_ingredient || product.barcode || product.mfr_code))
+  const hasExtra = Boolean(product && (product.brand || product.manufacturer || product.country_of_origin || product.active_ingredient || product.barcode || product.mfr_code))
   const [showMore, setShowMore] = useState(hasExtra)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -39,9 +40,10 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
     const weightValue = wv ?? parsed.weightValue
     const weightUnit = (wv != null ? f.weight_unit : parsed.weightUnit) as 'g' | 'ml' | null
     const canonicalMfr = resolveCanonicalCompany(f.manufacturer) ?? (f.manufacturer.trim() || null)
+    const countryOrigin = normalizeCountryOfOrigin(f.country_of_origin) ?? parsed.countryOfOrigin
     const row = {
       name: f.name.trim(), normalized_name: parsed.name || f.name.trim().toLowerCase(),
-      brand: f.brand.trim() || null, manufacturer: canonicalMfr, active_ingredient: f.active_ingredient.trim() || null,
+      brand: f.brand.trim() || null, manufacturer: canonicalMfr, country_of_origin: countryOrigin, active_ingredient: f.active_ingredient.trim() || null,
       strength_value: strengthValue, strength_unit: strengthValue != null ? strengthUnit : null,
       weight_value: weightValue, weight_unit: weightValue != null ? weightUnit : null,
       pack_size: ps ?? parsed.packSize, dosage_form: f.dosage_form.trim().toLowerCase() || parsed.dosageForm,
@@ -49,7 +51,8 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
     }
     const identity_key = identityKey({
       normalizedName: row.normalized_name, strengthValue: row.strength_value, strengthUnit: row.strength_unit,
-      weightValue: row.weight_value, weightUnit: row.weight_unit, packSize: row.pack_size, dosageForm: row.dosage_form, manufacturer: row.manufacturer,
+      weightValue: row.weight_value, weightUnit: row.weight_unit, packSize: row.pack_size, dosageForm: row.dosage_form,
+      manufacturer: row.manufacturer, countryOfOrigin: row.country_of_origin,
     })
     setBusy(true)
     try {
@@ -94,6 +97,14 @@ export function ProductForm({ open, onClose, product, onSaved }: { open: boolean
                 <datalist id="pk-pharma-companies">
                   {PHARMA_COMPANIES.map((c) => (
                     <option key={c.id} value={c.name} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="Country of origin" hint="Prevents merging imported vs local variants">
+                <Input list="common-pharma-countries" placeholder="e.g. Pakistan, Germany, UK…" value={f.country_of_origin} onChange={(e) => set('country_of_origin', e.target.value)} />
+                <datalist id="common-pharma-countries">
+                  {COMMON_COUNTRIES.map((c) => (
+                    <option key={c} value={c} />
                   ))}
                 </datalist>
               </Field>

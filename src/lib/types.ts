@@ -31,6 +31,7 @@ export interface Product {
   normalized_name: string
   brand: string | null
   manufacturer: string | null
+  country_of_origin?: string | null
   active_ingredient: string | null
   strength_value: number | null
   strength_unit: string | null
@@ -50,6 +51,8 @@ export interface Product {
 export interface SourceAttrs {
   brand: string | null
   manufacturer: string | null
+  country_of_origin?: string | null
+  currency?: string | null
   barcode: string | null
   mfr_code: string | null
   strength_value: number | null
@@ -138,5 +141,73 @@ export interface WishlistItem {
   last_checked_at: string | null
   created_at: string
   created_by: string | null
+  updated_at: string
+}
+
+export interface ManufacturerMapping {
+  id: string
+  pattern_key: string
+  raw_name: string
+  manufacturer: string
+  country_of_origin: string | null
+  product_id: string | null
+  confirmed_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SupplierOfferSnapshot {
+  shop_id: string
+  shop_name: string
+  recorded_price: number | null
+  effective_cost: number | null
+  discount_pct: number | null
+  scheme_text: string | null
+  observed_on: string
+  age_days: number
+  fresh: boolean
+  comparable: boolean
+  currency: string
+  status_note: string | null
+}
+
+export type PurchaseOrderStatus = 'draft' | 'finalized' | 'ordered' | 'cancelled'
+
+export interface PurchaseOrder {
+  id: string
+  workspace_id?: string
+  order_seq: number
+  order_number: string
+  manufacturer: string
+  title: string | null
+  status: PurchaseOrderStatus
+  order_date: string
+  extra_discount_pct: number
+  notes: string | null
+  created_at: string
+  created_by: string | null
+  updated_at: string
+  updated_by?: string | null
+}
+
+export interface PurchaseOrderItem {
+  id: string
+  workspace_id?: string
+  order_id: string
+  product_id: string
+  product_name: string
+  variant_label: string | null
+  manufacturer: string
+  quantity: number
+  selected_shop_id: string | null
+  selected_shop_name: string | null
+  lowest_price: number | null
+  lowest_price_date: string | null
+  target_price: number | null
+  is_target_manual: boolean
+  supplier_offers_snapshot: SupplierOfferSnapshot[]
+  notes: string | null
+  sort_order: number
+  created_at: string
   updated_at: string
 }

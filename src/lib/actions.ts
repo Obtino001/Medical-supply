@@ -1,6 +1,7 @@
 // Mutations shared by several pages. All of them write to the shared database; RLS enforces who may do what.
 import { extractCompanyFromTitle, resolveCanonicalCompany, type DuplicateProductGroup } from './companies'
-import { parseTitle, identityKey } from './productParse'
+import { titlePatternKey } from './matching'
+import { parseTitle, identityKey, normalizeCountryOfOrigin } from './productParse'
 import { calculateEffectiveCost, parseOfferRateCell, type CostResult } from './scheme'
 import { fetchAll, supabase, updateChecked } from './supabase'
 import type { PriceRecord, Product, SourceAttrs, WishlistItem } from './types'
@@ -45,11 +46,13 @@ export async function createProductFromSource(title: string, attrs: SourceAttrs 
   const p = parseTitle(title)
   const a = attrs
   const manufacturer = resolveCanonicalCompany(a?.manufacturer) ?? extractCompanyFromTitle(title)?.name ?? null
+  const country_of_origin = normalizeCountryOfOrigin(a?.country_of_origin) ?? p.countryOfOrigin
   const row = {
     name: title.trim(),
     normalized_name: p.name,
     brand: a?.brand ?? null,
     manufacturer,
+    ...(country_of_origin ? { country_of_origin } : {}),
     strength_value: a?.strength_value ?? p.strengthValue,
     strength_unit: a?.strength_unit ?? p.strengthUnit,
     weight_value: a?.weight_value ?? p.weightValue,
@@ -62,14 +65,24 @@ export async function createProductFromSource(title: string, attrs: SourceAttrs 
   const identity_key = identityKey({
     normalizedName: row.normalized_name, strengthValue: row.strength_value, strengthUnit: row.strength_unit,
     weightValue: row.weight_value, weightUnit: row.weight_unit, packSize: row.pack_size, dosageForm: row.dosage_form,
-    manufacturer: row.manufacturer,
+    manufacturer: row.manufacturer, countryOfOrigin: country_of_origin,
   })
   const { data, error } = await supabase.from('products').insert({ ...row, identity_key }).select('*').single()
   if (error) {
     if (/duplicate key/i.test(error.message)) throw new Error('An identical product already exists in the Product Master. Use "Select another product" and pick it.')
     throw new Error(error.message)
   }
-  return data as Product
+  const created = data as Product
+  if (manufacturer) {
+    const cleanTitle = titlePatternKey(title, country_of_origin)
+    await supabase
+      .from('manufacturer_mappings')
+      .upsert(
+        [{ pattern_key: cleanTitle, raw_name: title.trim(), manufacturer, country_of_origin, product_id: created.id }],
+        { onConflict: 'workspace_id,pattern_key' },
+      )
+  }
+  return created
 }
 
 /** Delete products and their price records in safe chunks of 150 IDs so URL length limits are never exceeded. */
@@ -382,15 +395,28 @@ export async function createManualPriceRecord(
  * Intentionally leaves `identity_key` untouched so partial/unstandardized duplicates never trigger unique-index collisions.
  */
 export async function bulkAssignCompany(
-  assignments: { productId: string; manufacturer: string | null }[],
+  assignments: { productId: string; manufacturer: string | null; rawName?: string; countryOfOrigin?: string | null }[],
 ): Promise<number> {
   const byCompany = new Map<string, string[]>()
+  const mappings: { pattern_key: string; raw_name: string; manufacturer: string; country_of_origin: string | null; product_id: string }[] = []
+
   for (const a of assignments) {
     if (!a.productId) continue
     const key = a.manufacturer === null ? '' : (resolveCanonicalCompany(a.manufacturer) ?? a.manufacturer.trim())
     const arr = byCompany.get(key)
     if (arr) arr.push(a.productId)
     else byCompany.set(key, [a.productId])
+    if (key && a.rawName?.trim()) {
+      const ctry = normalizeCountryOfOrigin(a.countryOfOrigin) ?? null
+      const norm = titlePatternKey(a.rawName, ctry)
+      mappings.push({
+        pattern_key: norm,
+        raw_name: a.rawName.trim(),
+        manufacturer: key,
+        country_of_origin: ctry,
+        product_id: a.productId,
+      })
+    }
   }
 
   let updated = 0
@@ -403,6 +429,16 @@ export async function bulkAssignCompany(
       updated += chunk.length
     }
   }
+
+  if (mappings.length > 0) {
+    const deduped = [...new Map(mappings.map((m) => [m.pattern_key, m])).values()]
+    for (let i = 0; i < deduped.length; i += 200) {
+      await supabase
+        .from('manufacturer_mappings')
+        .upsert(deduped.slice(i, i + 200), { onConflict: 'workspace_id,pattern_key' })
+    }
+  }
+
   return updated
 }
 

@@ -19,6 +19,7 @@ function sourceView(r: PriceRecord): IncomingView {
   const wv = a?.weight_value ?? t.weightValue, wu = a?.weight_unit ?? t.weightUnit
   return {
     title: r.original_title, code: r.original_code, brand: a?.brand ?? null, manufacturer: a?.manufacturer ?? null,
+    country: a?.country_of_origin ?? t.countryOfOrigin,
     strength: sv != null ? `${sv}${su ?? ''}` : null, weight: wv != null ? `${wv}${wu ?? ''}` : null,
     pack: a?.pack_size ?? t.packSize, barcode: a?.barcode ?? null, mfrCode: a?.mfr_code ?? null, form: a?.dosage_form ?? t.dosageForm,
   }

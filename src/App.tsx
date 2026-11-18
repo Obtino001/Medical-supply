@@ -5,6 +5,7 @@ import {
   IconBrandMark,
   IconBuilding,
   IconCalendar,
+  IconClipboardList,
   IconClose,
   IconDashboard,
   IconDownload,
@@ -37,6 +38,7 @@ import ImportHistory from './pages/ImportHistory'
 import ImportWizard from './pages/ImportWizard'
 import Login from './pages/Login'
 import Opportunities from './pages/Opportunities'
+import Orders from './pages/Orders'
 import ProductDetail from './pages/ProductDetail'
 import Products from './pages/Products'
 import Review from './pages/Review'
@@ -58,6 +60,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', end: true, icon: IconDashboard, group: 'Market Intelligence' },
   { to: '/compare', label: 'Compare Prices', icon: IconScale, group: 'Market Intelligence' },
   { to: '/opportunities', label: 'Best Opportunities', icon: IconTrendingDown, group: 'Market Intelligence' },
+  { to: '/orders', label: 'Orders', icon: IconClipboardList, group: 'Market Intelligence' },
   { to: '/wishlist', label: 'My Wishlist', icon: IconStar, group: 'Market Intelligence' },
   { to: '/products', label: 'Product Master', icon: IconPackage, group: 'Market Intelligence' },
   { to: '/companies', label: 'Companies', icon: IconBuilding, group: 'Market Intelligence' },
@@ -75,16 +78,17 @@ const GROUPS: NavItem['group'][] = ['Market Intelligence', 'Suppliers & Imports'
 const BOTTOM: { to: string; label: string; end?: boolean; icon: ComponentType<IconProps> }[] = [
   { to: '/', label: 'Home', end: true, icon: IconDashboard },
   { to: '/compare', label: 'Compare', icon: IconScale },
-  { to: '/import', label: 'Import', icon: IconUpload },
+  { to: '/orders', label: 'Orders', icon: IconClipboardList },
   { to: '/wishlist', label: 'Wishlist', icon: IconStar },
 ]
 
 function Shell() {
   const { email, role, signOut } = useAuth()
-  const { loading, error, reload, review } = useData()
+  const { loading, syncing, error, reload, review, purchaseOrders } = useData()
   const [more, setMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const loc = useLocation()
+  const draftOrdersCount = purchaseOrders.filter((o) => o.status === 'draft').length
 
   const activeNav =
     NAV.find((n) => (n.end ? loc.pathname === n.to : loc.pathname === n.to || loc.pathname.startsWith(n.to + '/'))) ?? NAV[0]
@@ -148,6 +152,11 @@ function Shell() {
                               {review.length}
                             </span>
                           )}
+                          {n.to === '/orders' && draftOrdersCount > 0 && (
+                            <span className="ml-2 rounded-full bg-[var(--color-primary-light)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-primary)] tabular-nums">
+                              {draftOrdersCount}
+                            </span>
+                          )}
                         </>
                       )}
                     </NavLink>
@@ -200,8 +209,8 @@ function Shell() {
             </div>
             <ThemeToggleButton />
             <Button variant="secondary" small onClick={() => void doReload()} disabled={refreshing} title="Sync partner changes">
-              <IconRefresh size={15} className={cx('text-[var(--color-primary)]', refreshing && 'animate-spin')} />
-              <span className="hidden sm:inline">Refresh</span>
+              <IconRefresh size={15} className={cx('text-[var(--color-primary)]', (refreshing || syncing) && 'animate-spin')} />
+              <span className="hidden sm:inline">{syncing && !refreshing ? 'Syncing…' : 'Refresh'}</span>
             </Button>
             <Button variant="ghost" small onClick={() => void signOut()} title="Sign out">
               <IconLogOut size={15} />
@@ -409,6 +418,7 @@ export default function App() {
               <Route path="/companies/:companyId" element={<CompanyDetail />} />
               <Route path="/compare" element={<Compare />} />
               <Route path="/opportunities" element={<Opportunities />} />
+              <Route path="/orders" element={<Orders />} />
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/export" element={<ExportCenter />} />
               <Route path="/settings" element={<Settings />} />

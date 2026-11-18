@@ -21,8 +21,18 @@ import { ADDITIONAL_FIELDS, DEFAULT_OPTIONS, REQUIRED_FIELDS, suggestMapping, ty
 import { useData } from '../lib/data'
 import { download, toCsv, toMatrix } from '../lib/exporter'
 import { buildRows, detectColumns, detectHeaderRow, detectSideBySide, errorReportRows, getHeaders, type BuiltRow, type RowKind, type RowOverride } from '../lib/importBuild'
-import { buildCommitPayload, defaultChoice, runMatching, type Choice, type RowMatch } from '../lib/importPlan'
-import { buildIndex, matchProduct, type CatalogDecision, type CatalogIdentifier, type CatalogRejection } from '../lib/matching'
+import { buildCommitPayload, defaultChoice, runMatchingAsync, type Choice, type MatchProgress, type RowMatch } from '../lib/importPlan'
+import {
+  buildIndex,
+  confidenceToMatchLevel,
+  MATCH_LEVEL_LABEL,
+  matchProduct,
+  type CatalogAlias,
+  type CatalogDecision,
+  type CatalogIdentifier,
+  type CatalogManufacturerMapping,
+  type CatalogRejection,
+} from '../lib/matching'
 import { FileError, readFile, type ParsedGrid } from '../lib/parseFile'
 import { variantLabel } from '../lib/productParse'
 import { fetchAll, supabase } from '../lib/supabase'
@@ -32,7 +42,7 @@ const STEPS = ['Shop', 'Survey & file', 'Preview & map', 'Validate & confirm']
 const today = () => new Date().toISOString().slice(0, 10)
 
 export default function ImportWizard() {
-  const { shops, products, productMap, reload, settings, policy } = useData()
+  const { shops, products, productMap, reload, settings, policy, manufacturerMappings } = useData()
   const [params] = useSearchParams()
   const toast = useToast()
   const [step, setStep] = useState(0)
@@ -53,9 +63,17 @@ export default function ImportWizard() {
   const [reviewTab, setReviewTab] = useState<'matching' | 'validation'>('matching')
   const [vPage, setVPage] = useState(0)
   const [vFilter, setVFilter] = useState<'problems' | RowKind | 'all'>('problems')
-  const [catalog, setCatalog] = useState<{ ids: CatalogIdentifier[]; dec: CatalogDecision[]; rej: CatalogRejection[] } | null>(null)
+  const [catalog, setCatalog] = useState<{
+    ids: CatalogIdentifier[]
+    dec: CatalogDecision[]
+    rej: CatalogRejection[]
+    aliases: CatalogAlias[]
+    mfrMappings: CatalogManufacturerMapping[]
+  } | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(false)
   const [rejections, setRejections] = useState<CatalogRejection[]>([])
   const [matches, setMatches] = useState<Map<number, RowMatch>>(new Map())
+  const [matchProgress, setMatchProgress] = useState<MatchProgress | null>(null)
   const [mPage, setMPage] = useState(0)
   const [mFilter, setMFilter] = useState<'attention' | 'all'>('attention')
   const [picker, setPicker] = useState<BuiltRow | null>(null)
@@ -64,6 +82,7 @@ export default function ImportWizard() {
   const [editTitle, setEditTitle] = useState('')
   const [editOffer, setEditOffer] = useState('')
   const [busy, setBusy] = useState(false)
+  const [commitStage, setCommitStage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const matchKey = useRef('')
   const [commitErr, setCommitErr] = useState<string | null>(null)
@@ -96,7 +115,7 @@ export default function ImportWizard() {
 
   const onFile = async (f: File | undefined) => {
     if (!f) return
-    setFileErr(null); setReading(true); setDupJob(null); setAllowDup(false); setCatalog(null); setMatches(new Map()); setRowOverrides(new Map()); setEditingRowNum(null); matchKey.current = ''
+    setFileErr(null); setReading(true); setDupJob(null); setAllowDup(false); setMatches(new Map()); setRowOverrides(new Map()); setEditingRowNum(null); matchKey.current = ''
     try {
       const g = await readFile(f)
       if (g.grid.filter((r) => r.some(Boolean)).length < 2) throw new FileError('The file has no data rows.')
@@ -181,43 +200,82 @@ export default function ImportWizard() {
     toast('ok', `Set ${count} missing price row${count === 1 ? '' : 's'} to TP (Trade Price)`)
   }
 
-  // load catalogue data when entering step 3 (Validate & confirm)
+  // Preload catalogue matching metadata in background as soon as user enters Step 2 (file upload)
   useEffect(() => {
-    if (step !== 3 || catalog) return
+    if (step < 1 || catalog || catalogLoading) return
+    let active = true
+    setCatalogLoading(true)
     ;(async () => {
       try {
-        const [ids, dec, rej] = await Promise.all([
+        const [ids, dec, rej, aliases] = await Promise.all([
           fetchAll<CatalogIdentifier>((a, b) => supabase.from('product_identifiers').select('product_id,kind,value,shop_id').range(a, b)),
           fetchAll<CatalogDecision>((a, b) => supabase.from('match_decisions').select('shop_id,source_key,product_id').range(a, b)),
           fetchAll<CatalogRejection>((a, b) => supabase.from('match_rejections').select('shop_id,source_key,product_id').range(a, b)),
+          fetchAll<CatalogAlias>((a, b) => supabase.from('product_aliases').select('product_id,shop_id,title').range(a, b)),
         ])
-        setCatalog({ ids, dec, rej })
-      } catch (e) { toast('err', (e as Error).message) }
+        if (active) setCatalog({ ids, dec, rej, aliases, mfrMappings: manufacturerMappings })
+      } catch (e) {
+        if (active) toast('err', (e as Error).message)
+      } finally {
+        if (active) setCatalogLoading(false)
+      }
     })()
-  }, [step, catalog, toast])
+    return () => {
+      active = false
+    }
+  }, [step, catalog, catalogLoading, manufacturerMappings, toast])
 
   const index = useMemo(
-    () => (catalog ? buildIndex(products.filter((p) => !p.archived), catalog.ids, catalog.dec, [...catalog.rej, ...rejections], policy) : null),
-    [catalog, products, rejections, policy],
+    () =>
+      catalog
+        ? buildIndex(
+            products.filter((p) => !p.archived),
+            catalog.ids,
+            catalog.dec,
+            [...catalog.rej, ...rejections],
+            policy,
+            catalog.aliases,
+            catalog.mfrMappings.length ? catalog.mfrMappings : manufacturerMappings,
+          )
+        : null,
+    [catalog, products, rejections, policy, manufacturerMappings],
   )
+
+  // Non-blocking background chunked matching so large imports never freeze the UI
   useEffect(() => {
     if (!built || !index || step !== 3) return
     const key = (file?.hash ?? '') + JSON.stringify([mapping, options, shopId, [...rowOverrides.entries()]])
     if (matchKey.current === key) return
     matchKey.current = key
-    const fresh = runMatching(built.rows, index, shopId)
-    setMatches((prev) => {
-      if (prev.size === 0) return fresh
-      const merged = new Map(fresh)
-      for (const [rn, oldMatch] of prev.entries()) {
-        const row = built.rows.find((x) => x.rowNumber === rn)
-        if (row && (row.kind === 'valid' || row.kind === 'review') && oldMatch.choice.action !== 'skip') {
-          const cur = merged.get(rn)
-          if (cur) merged.set(rn, { ...cur, choice: oldMatch.choice })
+
+    const ac = new AbortController()
+    setMatchProgress({ processed: 0, total: built.rows.length, pct: 0 })
+    void runMatchingAsync(
+      built.rows,
+      index,
+      shopId,
+      (p) => {
+        if (!ac.signal.aborted) setMatchProgress(p)
+      },
+      ac.signal,
+    ).then((fresh) => {
+      if (ac.signal.aborted) return
+      setMatchProgress(null)
+      setMatches((prev) => {
+        if (prev.size === 0) return fresh
+        const rowMap = new Map(built.rows.map((x) => [x.rowNumber, x]))
+        const merged = new Map(fresh)
+        for (const [rn, oldMatch] of prev.entries()) {
+          const row = rowMap.get(rn)
+          if (row && (row.kind === 'valid' || row.kind === 'review') && oldMatch.choice.action !== 'skip') {
+            const cur = merged.get(rn)
+            if (cur) merged.set(rn, { ...cur, choice: oldMatch.choice })
+          }
         }
-      }
-      return merged
+        return merged
+      })
     })
+    return () => ac.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [built, index, step, shopId, rowOverrides])
 
@@ -232,7 +290,15 @@ export default function ImportWizard() {
   const reject = (row: BuiltRow, productId: string) => {
     const rj: CatalogRejection = { shop_id: shopId, source_key: row.incoming.sourceKey, product_id: productId }
     setRejections((r) => [...r, rj])
-    const idx = buildIndex(products.filter((p) => !p.archived), catalog!.ids, catalog!.dec, [...catalog!.rej, ...rejections, rj], policy)
+    const idx = buildIndex(
+      products.filter((p) => !p.archived),
+      catalog!.ids,
+      catalog!.dec,
+      [...catalog!.rej, ...rejections, rj],
+      policy,
+      catalog!.aliases,
+      catalog!.mfrMappings.length ? catalog!.mfrMappings : manufacturerMappings,
+    )
     const match = matchProduct(idx, shopId, row.incoming)
     setMatches((m) => new Map(m).set(row.rowNumber, { match, choice: defaultChoice(row, match) }))
     toast('ok', 'Rejected. This pairing will not be suggested again.')
@@ -240,6 +306,7 @@ export default function ImportWizard() {
 
   const incomingView = (r: BuiltRow): IncomingView => ({
     title: r.title, code: r.code, brand: r.incoming.brand, manufacturer: r.incoming.manufacturer,
+    country: r.incoming.countryOfOrigin ?? null,
     strength: r.incoming.strengthValue != null ? `${r.incoming.strengthValue}${r.incoming.strengthUnit ?? ''}` : null,
     weight: r.incoming.weightValue != null ? `${r.incoming.weightValue}${r.incoming.weightUnit ?? ''}` : null,
     pack: r.incoming.packSize, barcode: r.incoming.barcode, mfrCode: r.incoming.mfrCode, form: r.incoming.dosageForm,
@@ -267,23 +334,45 @@ export default function ImportWizard() {
     window.scrollTo({ top: 0 })
   }
 
+  // Memoize payload summary calculation so scrolling/pagination never recomputes it
+  const builtCommitPayload = useMemo(
+    () => (step === 3 && built && matches.size > 0 ? buildCommitPayload(built.rows, matches, products, index ?? undefined) : null),
+    [step, built, matches, products, index],
+  )
+  const commitSummary = builtCommitPayload?.summary ?? null
+
   const commit = async () => {
     if (!built || !file || busy) return
-    setBusy(true); setCommitErr(null)
+    setBusy(true)
+    setCommitErr(null)
+    setCommitStage('Preparing validated rows…')
     try {
-      const payload = buildCommitPayload(built.rows, matches, products)
+      const payload = builtCommitPayload ?? buildCommitPayload(built.rows, matches, products, index ?? undefined)
+      setCommitStage(`Saving ${payload.summary.imported} price records…`)
       const { data, error } = await supabase.rpc('commit_import', {
         p_job: { shop_id: shopId, survey_date: surveyDate, survey_notes: notes.trim() || null, filename: file.filename, file_hash: file.hash, file_size: file.size, mapping, options },
-        p_rows: payload.rows, p_new_products: payload.newProducts, p_decisions: [],
+        p_rows: payload.rows,
+        p_new_products: payload.newProducts,
+        p_decisions: payload.decisions,
       })
       if (error) throw new Error(error.message)
       const res = data as { imported: number; skipped: number; errors: number; new_products: number; survey_id: string }
-      if (savePreset) await supabase.from('import_mapping_presets').upsert({ shop_id: shopId, mapping, options }, { onConflict: 'shop_id' })
-      if (rejections.length) await supabase.from('match_rejections').upsert(rejections, { onConflict: 'workspace_id,shop_id,source_key,product_id', ignoreDuplicates: true })
+      setCommitStage('Saving mapping presets…')
+      const postTasks: PromiseLike<unknown>[] = []
+      if (savePreset) postTasks.push(supabase.from('import_mapping_presets').upsert({ shop_id: shopId, mapping, options }, { onConflict: 'shop_id' }))
+      if (rejections.length) postTasks.push(supabase.from('match_rejections').upsert(rejections, { onConflict: 'workspace_id,shop_id,source_key,product_id', ignoreDuplicates: true }))
+      if (postTasks.length) await Promise.all(postTasks)
       setResult(res)
-      await reload()
-      toast('ok', `Imported ${res.imported} price records`)
-    } catch (e) { setCommitErr((e as Error).message) } finally { setBusy(false) }
+      setBusy(false)
+      setCommitStage(null)
+      toast('ok', `Imported ${res.imported} price records — syncing workspace in background`)
+      // Run full workspace reload asynchronously in background without blocking the completion screen
+      void reload()
+    } catch (e) {
+      setCommitErr((e as Error).message)
+      setBusy(false)
+      setCommitStage(null)
+    }
   }
 
   if (result) {
@@ -295,7 +384,7 @@ export default function ImportWizard() {
           </div>
           <div>
             <h1 className="text-lg font-medium text-[var(--text-primary)]">Import complete</h1>
-            <p className="text-sm text-[var(--text-secondary)]">Saved to the shared database. Your partner sees it after refreshing.</p>
+            <p className="text-sm text-[var(--text-secondary)]">Saved to the shared database. Confirmed mappings &amp; aliases will be reused automatically on future imports.</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -306,6 +395,7 @@ export default function ImportWizard() {
         </div>
         <div className="flex flex-wrap gap-2 pt-1">
           <Link to="/compare"><Button>Compare prices</Button></Link>
+          <Link to="/orders"><Button variant="secondary">Create purchase order</Button></Link>
           <Link to="/review"><Button variant="secondary">Review matches</Button></Link>
           <Button variant="secondary" onClick={() => location.assign('/import')}>Import another</Button>
         </div>
@@ -330,7 +420,6 @@ export default function ImportWizard() {
   const mappedRequiredCount = REQUIRED_FIELDS.filter((f) => !!mapping[f.key]).length
   const totalMappedCols = new Set(Object.values(mapping).filter(Boolean)).size
   const unmappedCols = Math.max(0, headers.length - totalMappedCols)
-  const commitSummary = built && matches.size > 0 ? buildCommitPayload(built.rows, matches, products).summary : null
 
   return (
     <div className="space-y-4 pb-16 md:pb-4">
@@ -791,9 +880,9 @@ export default function ImportWizard() {
                   <b className="font-medium text-[var(--text-primary)]">{file?.filename}</b>
                 </p>
               </div>
-              <Button onClick={() => void commit()} disabled={busy || !index || importable.length === 0}>
+              <Button onClick={() => void commit()} disabled={busy || !index || !!matchProgress || importable.length === 0}>
                 <IconCheck size={16} />
-                <span>{busy ? 'Importing…' : `Import ${commitSummary?.imported ?? importable.length} items now`}</span>
+                <span>{busy ? (commitStage ?? 'Importing…') : `Import ${commitSummary?.imported ?? importable.length} items now`}</span>
               </Button>
             </div>
 
@@ -863,8 +952,25 @@ export default function ImportWizard() {
           </div>
 
           {reviewTab === 'matching' ? (
-            !index || (importable.length > 0 && matches.size === 0) ? (
-              <Spinner label="Matching products against shared catalog…" />
+            !index || matchProgress || (importable.length > 0 && matches.size === 0) ? (
+              <Card className="space-y-2.5 !p-4">
+                <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
+                  <span className="font-medium text-[var(--text-primary)]">
+                    {!index
+                      ? 'Loading shared catalog & saved aliases…'
+                      : `Matching products (${matchProgress?.processed ?? 0} / ${matchProgress?.total ?? importable.length})…`}
+                  </span>
+                  <span className="tabular-nums font-semibold text-[var(--color-primary)]">
+                    {matchProgress ? `${matchProgress.pct}%` : '…'}
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-150"
+                    style={{ width: `${matchProgress ? Math.max(4, matchProgress.pct) : 25}%` }}
+                  />
+                </div>
+              </Card>
             ) : (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -876,17 +982,17 @@ export default function ImportWizard() {
                       setMPage(0)
                     }}
                   >
-                    <option value="attention">Needs my attention ({counts.needs_review + counts.conflicting})</option>
+                    <option value="attention">Needs confirmation ({counts.needs_review + counts.conflicting})</option>
                     <option value="all">All importable rows ({importable.length})</option>
                   </Select>
                   <span className="text-xs text-[var(--text-secondary)]">
-                    {counts.exact} exact · {counts.high} high confidence · {counts.unmatched} new products
+                    {counts.exact} exact · {counts.high} strong match · {counts.needs_review + counts.conflicting} possible · {counts.unmatched} new product
                   </span>
                 </div>
 
                 {mRows.length === 0 ? (
                   <Card className="text-sm text-[var(--text-secondary)]">
-                    Nothing needs your attention. All {importable.length} valid rows are matched or ready to be created as new products.
+                    Nothing needs your confirmation. All {importable.length} valid rows are already matched using saved aliases/decisions or ready as new products.
                   </Card>
                 ) : (
                   mRows.slice(mPage * 15, mPage * 15 + 15).map((r) => {
@@ -895,6 +1001,9 @@ export default function ImportWizard() {
                     const sugg = m.match.productId ?? m.match.candidates[0]?.productId ?? null
                     const sel = m.choice.action === 'use' ? m.choice.productId : sugg
                     const existing: Product | undefined = sel ? productMap.get(sel) : undefined
+                    const level = m.match.matchLevel ?? confidenceToMatchLevel(m.match.confidence)
+                    const levelLabel =
+                      m.match.confidence === 'conflicting' ? 'Possible match · Conflict' : MATCH_LEVEL_LABEL[level]
                     return (
                       <Card key={r.rowNumber} className={m.match.confidence === 'conflicting' ? 'border-[var(--color-error-border)]' : ''}>
                         <div className="flex flex-wrap items-center gap-2">
@@ -911,13 +1020,7 @@ export default function ImportWizard() {
                                     : 'slate'
                             }
                           >
-                            {{
-                              exact: 'Exact match',
-                              high: 'High confidence',
-                              needs_review: 'Needs review',
-                              conflicting: 'Conflicting attributes',
-                              unmatched: 'Unmatched → new product',
-                            }[m.match.confidence]}
+                            {levelLabel}
                           </Badge>
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--text-secondary)]">
@@ -1217,9 +1320,9 @@ export default function ImportWizard() {
               <IconArrowRight size={16} />
             </Button>
           ) : (
-            <Button onClick={() => void commit()} disabled={busy || !index || importable.length === 0}>
+            <Button onClick={() => void commit()} disabled={busy || !index || !!matchProgress || importable.length === 0}>
               <IconCheck size={16} />
-              <span>{busy ? 'Importing…' : 'Import now'}</span>
+              <span>{busy ? (commitStage ?? 'Importing…') : 'Import now'}</span>
             </Button>
           )}
         </div>

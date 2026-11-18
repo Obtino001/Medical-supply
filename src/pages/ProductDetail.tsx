@@ -139,7 +139,7 @@ export default function ProductDetail() {
               </button>
             </dd>
           </div>
-          {([['Brand', product.brand], ['Ingredient', product.active_ingredient], ['Dosage form', product.dosage_form], ['Barcode', product.barcode], ['Manufacturer code', product.mfr_code], ['Normalized name', product.normalized_name]] as const).map(([k, v]) => (
+          {([['Brand', product.brand], ['Country of origin', product.country_of_origin], ['Ingredient', product.active_ingredient], ['Dosage form', product.dosage_form], ['Barcode', product.barcode], ['Manufacturer code', product.mfr_code], ['Normalized name', product.normalized_name]] as const).map(([k, v]) => (
             <div key={k}><dt className="text-xs text-[var(--text-secondary)]">{k}</dt><dd className="font-medium text-[var(--text-primary)]">{v || '—'}</dd></div>
           ))}
         </dl>

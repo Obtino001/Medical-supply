@@ -2,7 +2,7 @@
 import { matchHeaderField, suggestMapping, type FieldKey, type ImportOptions, type Mapping } from './columns'
 import { extractCompanyFromTitle, resolveCanonicalCompany } from './companies'
 import type { IncomingProduct } from './matching'
-import { identityKey, normalizeHomoglyphs, normalizeText, parseTitle, sourceKey } from './productParse'
+import { identityKey, normalizeCountryOfOrigin, normalizeHomoglyphs, normalizeText, parseTitle, sourceKey } from './productParse'
 import { calculateEffectiveCost, formatSchemeSummary, parseNumber, parseOfferRateCell, parseSchemeText, type CostResult, type SchemeComponents } from './scheme'
 
 export type RowKind = 'valid' | 'review' | 'invalid' | 'duplicate'
@@ -275,7 +275,7 @@ export function buildRows(
     }
     const idx = {
       title: colIndex('title'), description: colIndex('description'), code: colIndex('code'), barcode: colIndex('barcode'),
-      mfr: colIndex('mfr_code'), brand: colIndex('brand'), manufacturer: colIndex('manufacturer'), strength: colIndex('strength'),
+      mfr: colIndex('mfr_code'), brand: colIndex('brand'), manufacturer: colIndex('manufacturer'), country: colIndex('country'), strength: colIndex('strength'),
       grams: colIndex('grams'), pack: colIndex('pack_size'), price: colIndex('price'), mrp: colIndex('mrp'),
       discount: colIndex('discount'), scheme: colIndex('scheme'), qty: colIndex('quantity'), expiry: colIndex('expiry'),
       avail: colIndex('availability'), notes: colIndex('notes'),
@@ -505,6 +505,8 @@ export function buildRows(
       if (title && !normalizedName) errors.push('Title contains no product name (only sizes / pack)')
       const code = get(idx.code) || null
       const manufacturer = resolveCanonicalCompany(get(idx.manufacturer)) ?? extractCompanyFromTitle(title)?.name ?? null
+      const countryCol = normalizeCountryOfOrigin(get(idx.country))
+      const countryOfOrigin = countryCol ?? pt.countryOfOrigin ?? pd?.countryOfOrigin ?? null
       const incoming: IncomingProduct = {
         title,
         normalizedName,
@@ -513,10 +515,14 @@ export function buildRows(
         mfrCode: get(idx.mfr) || null,
         brand: get(idx.brand) || null,
         manufacturer,
+        countryOfOrigin,
         strengthValue, strengthUnit, weightValue, weightUnit, packSize, dosageForm,
         sourceKey: sourceKey(code, title),
       }
-      const identity = identityKey({ normalizedName, strengthValue, strengthUnit, weightValue, weightUnit, packSize, dosageForm, manufacturer: incoming.manufacturer })
+      const identity = identityKey({
+        normalizedName, strengthValue, strengthUnit, weightValue, weightUnit, packSize, dosageForm,
+        manufacturer: incoming.manufacturer, countryOfOrigin,
+      })
 
       const schemeText =
         price === null && (inlineScheme || hasFallbackScheme)
