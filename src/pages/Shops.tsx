@@ -5,6 +5,7 @@ import { ShopForm } from '../components/ShopForm'
 import { Badge, Button, Card, Empty, Input, PageHeader, Select, fmtDate, useConfirm, useToast } from '../components/ui'
 import { deleteShopWithItems } from '../lib/actions'
 import { useData } from '../lib/data'
+import { matchesSearch } from '../lib/search'
 import type { Shop } from '../lib/types'
 
 export default function Shops() {
@@ -35,7 +36,7 @@ export default function Shops() {
     (s) =>
       (!status || s.status === status) &&
       (!city || s.city === city) &&
-      (!q || [s.name, s.owner_name, s.phone, s.address, s.city].filter(Boolean).join(' ').toLowerCase().includes(q.toLowerCase())),
+      (!q.trim() || matchesSearch([s.name, s.owner_name, s.phone, s.address, s.city], q)),
   )
 
   const handleDelete = async (shop: Shop) => {

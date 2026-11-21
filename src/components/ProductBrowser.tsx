@@ -115,11 +115,17 @@ export function ProductBrowser({
   const [extraPages, setExtraPages] = useState(0)
   const set = useCallback(
     (patch: Partial<View>) => {
-      if ('manufacturer' in patch && urlCompany !== null) {
-        const next = new URLSearchParams(params)
-        next.delete('company')
-        setParams(next, { replace: true })
+      const nextParams = new URLSearchParams(params)
+      let paramsChanged = false
+      if ('q' in patch && urlQ !== null) {
+        nextParams.delete('q')
+        paramsChanged = true
       }
+      if ('manufacturer' in patch && urlCompany !== null) {
+        nextParams.delete('company')
+        paramsChanged = true
+      }
+      if (paramsChanged) setParams(nextParams, { replace: true })
       if (('shop' in patch || 'dosageForm' in patch) && onResetExternal) {
         if ('shop' in patch && externalShop) onResetExternal()
         if ('dosageForm' in patch && externalForm) onResetExternal()
@@ -129,15 +135,32 @@ export function ProductBrowser({
       setExtraPages(0)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [v, setView, params, urlCompany],
+    [v, setView, params, urlCompany, urlQ],
   )
 
   const [qInput, setQInput] = useState(v.q)
+  useEffect(() => {
+    if (urlQ !== null && urlQ !== qInput) setQInput(urlQ)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQ])
+
   const dq = useDebounced(qInput, 180)
   useEffect(() => {
     if (dq !== v.q) set({ q: dq })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dq])
+
+  const clearFiltersKeepSearch = useCallback(() => {
+    if (urlCompany !== null) {
+      const next = new URLSearchParams(params)
+      next.delete('company')
+      setParams(next, { replace: true })
+    }
+    onResetExternal?.()
+    setView({ ...defaultView, q: qInput })
+    setPage(0)
+    setExtraPages(0)
+  }, [defaultView, onResetExternal, params, qInput, setParams, setView, urlCompany])
 
   const resetAllFilters = useCallback(() => {
     if (urlCompany !== null || urlQ !== null) {
@@ -204,6 +227,15 @@ export function ProductBrowser({
     }),
     [rows],
   )
+
+  const queryOnlyMatches = useMemo(() => {
+    if (!v.q.trim()) return 0
+    let count = 0
+    for (const r of rows) {
+      if (matchesQuery(r, v.q, shopMap)) count++
+    }
+    return count
+  }, [rows, v.q, shopMap])
 
   const filtered = useMemo(() => {
     const out = rows.filter((r) => {
@@ -347,6 +379,9 @@ export function ProductBrowser({
               placeholder="Search medicine name, supplier, strength, form, or code…"
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               aria-label="Search products"
               className="min-h-10 sm:min-h-8.5 w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-subtle)] py-1.5 pr-8 pl-9 text-sm text-[var(--text-primary)] transition-colors placeholder:text-[var(--text-secondary)]/75 hover:border-[var(--border-strong)] focus:border-[var(--color-primary)] focus:bg-[var(--bg-input)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
             />
@@ -711,10 +746,21 @@ export function ProductBrowser({
           </Empty>
         ) : (
           <Empty title="No products match these filters">
-            <p>Try clearing or resetting your active search and filter criteria.</p>
-            <div className="mt-3">
+            {v.q.trim() && queryOnlyMatches > 0 ? (
+              <p>
+                Found <b>{queryOnlyMatches}</b> match{queryOnlyMatches === 1 ? '' : 'es'} for “{v.q}” in your catalog, hidden by active filters.
+              </p>
+            ) : (
+              <p>Try clearing or resetting your active search and filter criteria.</p>
+            )}
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {v.q.trim() && queryOnlyMatches > 0 && (
+                <Button small onClick={clearFiltersKeepSearch}>
+                  Show all {queryOnlyMatches} match{queryOnlyMatches === 1 ? '' : 'es'}
+                </Button>
+              )}
               <Button variant="secondary" small onClick={resetAllFilters}>
-                Reset filters
+                Reset all
               </Button>
             </div>
           </Empty>

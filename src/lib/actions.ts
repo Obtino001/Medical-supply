@@ -1,5 +1,5 @@
 // Mutations shared by several pages. All of them write to the shared database; RLS enforces who may do what.
-import { extractCompanyFromTitle, resolveCanonicalCompany, type DuplicateProductGroup } from './companies'
+import { extractCompanyFromTitle, resolveCanonicalCompany, type CompanySuggestion, type DuplicateProductGroup } from './companies'
 import { titlePatternKey } from './matching'
 import { parseTitle, identityKey, normalizeCountryOfOrigin } from './productParse'
 import { calculateEffectiveCost, parseOfferRateCell, type CostResult } from './scheme'
@@ -390,18 +390,44 @@ export async function createManualPriceRecord(
   }
 }
 
+export interface CompanyAssignmentInput {
+  productId: string
+  manufacturer: string | null
+  rawName?: string
+  countryOfOrigin?: string | null
+}
+
+/** Convert company auto-suggestions into DB assignment payloads (also recording reusable title mappings when known). */
+export function buildSuggestionAssignments(suggestions: CompanySuggestion[]): CompanyAssignmentInput[] {
+  return suggestions.map((s) => ({
+    productId: s.productId,
+    manufacturer: s.suggestedManufacturer,
+    rawName: s.suggestedManufacturer ? s.product.name : undefined,
+    countryOfOrigin: s.suggestedManufacturer ? s.product.country_of_origin : undefined,
+  }))
+}
+
 /**
- * Bulk-update the company (`manufacturer`) field on existing catalog products in safe 150-ID chunks.
+ * Bulk-update the company (`manufacturer`) field on existing catalog products in bounded concurrent chunks.
  * Intentionally leaves `identity_key` untouched so partial/unstandardized duplicates never trigger unique-index collisions.
  */
 export async function bulkAssignCompany(
-  assignments: { productId: string; manufacturer: string | null; rawName?: string; countryOfOrigin?: string | null }[],
+  assignments: CompanyAssignmentInput[],
+  options?: { onProgress?: (done: number, total: number) => void },
 ): Promise<number> {
   const byCompany = new Map<string, string[]>()
+  const seenIds = new Set<string>()
   const mappings: { pattern_key: string; raw_name: string; manufacturer: string; country_of_origin: string | null; product_id: string }[] = []
 
+  // Last assignment wins if a productId appears twice
+  const latestByProduct = new Map<string, CompanyAssignmentInput>()
   for (const a of assignments) {
-    if (!a.productId) continue
+    if (a.productId) latestByProduct.set(a.productId, a)
+  }
+
+  for (const a of latestByProduct.values()) {
+    if (seenIds.has(a.productId)) continue
+    seenIds.add(a.productId)
     const key = a.manufacturer === null ? '' : (resolveCanonicalCompany(a.manufacturer) ?? a.manufacturer.trim())
     const arr = byCompany.get(key)
     if (arr) arr.push(a.productId)
@@ -409,34 +435,62 @@ export async function bulkAssignCompany(
     if (key && a.rawName?.trim()) {
       const ctry = normalizeCountryOfOrigin(a.countryOfOrigin) ?? null
       const norm = titlePatternKey(a.rawName, ctry)
-      mappings.push({
-        pattern_key: norm,
-        raw_name: a.rawName.trim(),
-        manufacturer: key,
-        country_of_origin: ctry,
-        product_id: a.productId,
-      })
+      if (norm) {
+        mappings.push({
+          pattern_key: norm,
+          raw_name: a.rawName.trim(),
+          manufacturer: key,
+          country_of_origin: ctry,
+          product_id: a.productId,
+        })
+      }
     }
   }
 
-  let updated = 0
+  const chunks: { mfrValue: string | null; ids: string[] }[] = []
   for (const [key, ids] of byCompany.entries()) {
-    const unique = [...new Set(ids)]
     const mfrValue = key || null
-    for (let i = 0; i < unique.length; i += 150) {
-      const chunk = unique.slice(i, i + 150)
-      must(await supabase.from('products').update({ manufacturer: mfrValue }).in('id', chunk))
-      updated += chunk.length
+    for (let i = 0; i < ids.length; i += 150) {
+      chunks.push({ mfrValue, ids: ids.slice(i, i + 150) })
     }
   }
+
+  const total = seenIds.size
+  options?.onProgress?.(0, total)
+
+  let updated = 0
+  let cursor = 0
+  const workerCount = Math.min(5, Math.max(1, chunks.length))
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (cursor < chunks.length) {
+        const idx = cursor++
+        const { mfrValue, ids } = chunks[idx]
+        must(await supabase.from('products').update({ manufacturer: mfrValue }).in('id', ids))
+        updated += ids.length
+        options?.onProgress?.(Math.min(updated, total), total)
+      }
+    }),
+  )
 
   if (mappings.length > 0) {
     const deduped = [...new Map(mappings.map((m) => [m.pattern_key, m])).values()]
+    const mapChunks: typeof deduped[] = []
     for (let i = 0; i < deduped.length; i += 200) {
-      await supabase
-        .from('manufacturer_mappings')
-        .upsert(deduped.slice(i, i + 200), { onConflict: 'workspace_id,pattern_key' })
+      mapChunks.push(deduped.slice(i, i + 200))
     }
+    let mapCursor = 0
+    const mapWorkers = Math.min(4, Math.max(1, mapChunks.length))
+    await Promise.all(
+      Array.from({ length: mapWorkers }, async () => {
+        while (mapCursor < mapChunks.length) {
+          const idx = mapCursor++
+          await supabase
+            .from('manufacturer_mappings')
+            .upsert(mapChunks[idx], { onConflict: 'workspace_id,pattern_key' })
+        }
+      }),
+    )
   }
 
   return updated

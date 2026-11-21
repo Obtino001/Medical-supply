@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { bulkAssignCompany } from '../lib/actions'
 import { PHARMA_COMPANIES, findKnownCompany, resolveCanonicalCompany } from '../lib/companies'
 import { useData } from '../lib/data'
+import { matchesSearch } from '../lib/search'
 import { IconBuilding, IconCheck, IconSearch } from './icons'
 import { Badge, Button, ErrorBox, Input, Modal, cx, useToast } from './ui'
 
@@ -57,14 +58,9 @@ export function AssignCompanyModal({
       list.push({ name, shortName: name, top50Rank: null, count, aliases: [] })
     }
 
-    const q = search.trim().toLowerCase()
-    if (!q) return list
-    return list.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.shortName.toLowerCase().includes(q) ||
-        (c.top50Rank != null && `#${c.top50Rank}` === q) ||
-        c.aliases.some((a) => a.includes(q)),
+    if (!search.trim()) return list
+    return list.filter((c) =>
+      matchesSearch([c.name, c.shortName, c.top50Rank != null ? `#${c.top50Rank}` : '', ...c.aliases], search),
     )
   }, [products, search])
 

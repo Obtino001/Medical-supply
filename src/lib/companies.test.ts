@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { buildSuggestionAssignments } from './actions'
 import {
   PHARMA_COMPANIES,
   buildCompanySuggestions,
@@ -298,5 +299,26 @@ describe('Pakistan Top 50 Pharmaceutical Companies & auto-categorization', () =>
     // Combined offers from BOTH suppliers S1 and S2 are visible on the single surviving Risek 40mg row
     expect(risek40Row.records.map((r) => r.shop_id).sort()).toEqual(['S1', 'S2'])
     expect(risek40Row.bestShop?.id).toBe('S2')
+  })
+
+  it('builds one-click suggestion assignments keeping manufacturer & origin while omitting rawName for placeholder clears', () => {
+    const pTag = mkProd('AGNAR-TAB. (GETZ)', { country_of_origin: 'Pakistan' })
+    const pMisc = mkProd('RANDOM DROPS', { manufacturer: 'DROPS' })
+    const sugs = buildCompanySuggestions([pTag, pMisc], [])
+    const batch = buildSuggestionAssignments(sugs)
+    const byId = new Map(batch.map((a) => [a.productId, a]))
+
+    expect(byId.get(pTag.id)).toEqual({
+      productId: pTag.id,
+      manufacturer: 'Getz Pharma',
+      rawName: 'AGNAR-TAB. (GETZ)',
+      countryOfOrigin: 'Pakistan',
+    })
+    expect(byId.get(pMisc.id)).toEqual({
+      productId: pMisc.id,
+      manufacturer: null,
+      rawName: undefined,
+      countryOfOrigin: undefined,
+    })
   })
 })

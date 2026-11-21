@@ -14,7 +14,7 @@ import {
   IconStore,
 } from '../components/icons'
 import { Badge, Button, Card, Empty, Input, Modal, PageHeader, Pagination, Select, Stat, cx, rs, useConfirm, useToast } from '../components/ui'
-import { bulkAssignCompany, mergeDuplicateProductGroups } from '../lib/actions'
+import { bulkAssignCompany, buildSuggestionAssignments, mergeDuplicateProductGroups } from '../lib/actions'
 import {
   PHARMA_COMPANIES,
   buildCompanySummaries,
@@ -23,12 +23,14 @@ import {
   findDuplicateProductGroups,
   resolveCanonicalCompany,
   resolveProductDisplayCompany,
+  type CompanySuggestion,
   type CompanySummary,
   type DetectionReason,
 } from '../lib/companies'
 import { useData } from '../lib/data'
 import { download, toCsv, toMatrix, toXlsxBuffer } from '../lib/exporter'
 import { naturalCompare } from '../lib/productParse'
+import { matchesSearch } from '../lib/search'
 import { matchesQuery } from '../lib/tableModel'
 
 type Tab = 'all' | 'top50' | 'categorize'
@@ -123,6 +125,7 @@ export default function Companies() {
   const [showAutoModal, setShowAutoModal] = useState(false)
   const [enabledReasons, setEnabledReasons] = useState<Set<DetectionReason>>(() => new Set(ALL_REASONS))
   const [autoBusy, setAutoBusy] = useState(false)
+  const [applyProgress, setApplyProgress] = useState<{ done: number; total: number } | null>(null)
   const [mergeBusy, setMergeBusy] = useState(false)
 
   // Add custom / assign modal from a company card
@@ -147,17 +150,18 @@ export default function Companies() {
       if (dirFilter === 'empty' && c.productCount > 0) return false
       if (dirFilter === 'multi' && c.multiShopCount === 0) return false
       if (q) {
-        const hay = [
-          c.name,
-          c.shortName,
-          c.top50Rank != null ? `#${c.top50Rank}` : '',
-          ...c.aliases,
-          ...c.shops.map((s) => s.shopName),
-          ...c.sampleProducts.map((p) => p.name),
-        ]
-          .join(' ')
-          .toLowerCase()
-        if (!hay.includes(q)) return false
+        const ok = matchesSearch(
+          [
+            c.name,
+            c.shortName,
+            c.top50Rank != null ? `#${c.top50Rank}` : '',
+            ...c.aliases,
+            ...c.shops.map((s) => s.shopName),
+            ...c.sampleProducts.map((p) => p.name),
+          ],
+          q,
+        )
+        if (!ok) return false
       }
       return true
     })
@@ -245,6 +249,38 @@ export default function Companies() {
     })
   }
 
+  const allWbSelected = workbenchProducts.length > 0 && workbenchProducts.every((p) => wbSelected.has(p.id))
+
+  const toggleWbSelectAll = () => {
+    setWbSelected((prev) => {
+      if (allWbSelected) {
+        const next = new Set(prev)
+        for (const p of workbenchProducts) next.delete(p.id)
+        return next
+      }
+      const next = new Set(prev)
+      for (const p of workbenchProducts) next.add(p.id)
+      return next
+    })
+  }
+
+  const workbenchSuggestions = useMemo(
+    () =>
+      workbenchProducts
+        .map((p) => suggestionByProductId.get(p.id))
+        .filter((s): s is CompanySuggestion => !!s),
+    [workbenchProducts, suggestionByProductId],
+  )
+
+  const wbSelectedSuggestions = useMemo(
+    () =>
+      workbenchProducts
+        .filter((p) => wbSelected.has(p.id))
+        .map((p) => suggestionByProductId.get(p.id))
+        .filter((s): s is CompanySuggestion => !!s),
+    [workbenchProducts, wbSelected, suggestionByProductId],
+  )
+
   // Group auto-suggestions by reason for the review modal
   const reasonGroups = useMemo(() => {
     const counts = new Map<DetectionReason, typeof suggestions>()
@@ -265,50 +301,74 @@ export default function Companies() {
     [suggestions, enabledReasons],
   )
 
-  const runAutoCategorize = async () => {
-    if (selectedAutoSuggestions.length === 0) return
+  const applySuggestionBatch = async (items: CompanySuggestion[], closeModal = false) => {
+    if (items.length === 0 || autoBusy || wbBusy) return
     setAutoBusy(true)
+    setApplyProgress({ done: 0, total: items.length })
     try {
-      const n = await bulkAssignCompany(
-        selectedAutoSuggestions.map((s) => ({ productId: s.productId, manufacturer: s.suggestedManufacturer })),
-      )
+      const n = await bulkAssignCompany(buildSuggestionAssignments(items), {
+        onProgress: (done, total) => setApplyProgress({ done, total }),
+      })
+      const appliedIds = new Set(items.map((it) => it.productId))
+      setWbSelected((prev) => {
+        const next = new Set(prev)
+        for (const id of appliedIds) next.delete(id)
+        return next
+      })
       await reload()
-      setShowAutoModal(false)
-      toast('ok', `Updated company on ${n} product${n === 1 ? '' : 's'}`)
+      if (closeModal) setShowAutoModal(false)
+      toast('ok', `Updated company on ${n.toLocaleString()} product${n === 1 ? '' : 's'}`)
     } catch (e) {
       toast('err', (e as Error).message)
     } finally {
       setAutoBusy(false)
+      setApplyProgress(null)
     }
   }
+
+  const runAutoCategorize = () => applySuggestionBatch(selectedAutoSuggestions, true)
 
   const applyWorkbenchBulk = async (companyValue: string | null) => {
     const ids = [...wbSelected]
     if (ids.length === 0) return
     setWbBusy(true)
+    setApplyProgress({ done: 0, total: ids.length })
     try {
-      const n = await bulkAssignCompany(ids.map((productId) => ({ productId, manufacturer: companyValue })))
+      const byId = new Map(activeProducts.map((p) => [p.id, p]))
+      const n = await bulkAssignCompany(
+        ids.map((productId) => {
+          const p = byId.get(productId)
+          return {
+            productId,
+            manufacturer: companyValue,
+            rawName: companyValue ? p?.name : undefined,
+            countryOfOrigin: companyValue ? p?.country_of_origin : undefined,
+          }
+        }),
+        { onProgress: (done, total) => setApplyProgress({ done, total }) },
+      )
       setWbSelected(new Set())
       await reload()
       toast(
         'ok',
         companyValue
-          ? `Assigned ${n} product${n === 1 ? '' : 's'} to ${companyValue}`
-          : `Cleared company on ${n} product${n === 1 ? '' : 's'}`,
+          ? `Assigned ${n.toLocaleString()} product${n === 1 ? '' : 's'} to ${companyValue}`
+          : `Cleared company on ${n.toLocaleString()} product${n === 1 ? '' : 's'}`,
       )
     } catch (e) {
       toast('err', (e as Error).message)
     } finally {
       setWbBusy(false)
+      setApplyProgress(null)
     }
   }
 
-  const applySingleSuggestion = async (productId: string, manufacturer: string | null) => {
+  const applySingleSuggestion = async (s: CompanySuggestion) => {
     setWbBusy(true)
     try {
-      await bulkAssignCompany([{ productId, manufacturer }])
+      await bulkAssignCompany(buildSuggestionAssignments([s]))
       await reload()
-      toast('ok', manufacturer ? `Assigned to ${manufacturer}` : 'Cleared placeholder')
+      toast('ok', s.suggestedManufacturer ? `Assigned to ${s.suggestedManufacturer}` : 'Cleared placeholder')
     } catch (e) {
       toast('err', (e as Error).message)
     } finally {
@@ -404,10 +464,23 @@ export default function Companies() {
         subtitle="Categorize all medicines by company, track Top 50 Pakistan Pharma coverage, and inspect listed items, offers & discounts."
       >
         {suggestions.length > 0 && (
-          <Button small onClick={() => setShowAutoModal(true)}>
-            <IconSparkles size={15} />
-            <span>Auto-categorize ({suggestions.length})</span>
-          </Button>
+          <>
+            <Button
+              small
+              disabled={autoBusy || wbBusy}
+              onClick={() => void applySuggestionBatch(suggestions)}
+            >
+              <IconSparkles size={15} />
+              <span>
+                {autoBusy && applyProgress
+                  ? `Applying ${applyProgress.done.toLocaleString()}/${applyProgress.total.toLocaleString()}…`
+                  : `Apply all (${suggestions.length})`}
+              </span>
+            </Button>
+            <Button variant="secondary" small disabled={autoBusy || wbBusy} onClick={() => setShowAutoModal(true)}>
+              <span>Review ({suggestions.length})</span>
+            </Button>
+          </>
         )}
         <Button variant="secondary" small onClick={() => exportCompanySummary('xlsx')}>
           <IconDownload size={15} className="text-[var(--color-primary)]" />
@@ -467,9 +540,19 @@ export default function Companies() {
                 Includes supplier Company columns, title tags like (CCL)/(AGP)/(ABBOTT), shorthand standardization (GETZ → Getz Pharma), and catalog brand families.
               </p>
             </div>
-            <Button small className="shrink-0" onClick={() => setShowAutoModal(true)}>
-              <span>Review &amp; apply ({suggestions.length})</span>
-            </Button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button small variant="secondary" disabled={autoBusy || wbBusy} onClick={() => setShowAutoModal(true)}>
+                <span>Review &amp; customize</span>
+              </Button>
+              <Button small disabled={autoBusy || wbBusy} onClick={() => void applySuggestionBatch(suggestions)}>
+                <IconCheck size={14} />
+                <span>
+                  {autoBusy && applyProgress
+                    ? `Applying ${applyProgress.done.toLocaleString()} / ${applyProgress.total.toLocaleString()}…`
+                    : `Apply all (${suggestions.length})`}
+                </span>
+              </Button>
+            </div>
           </div>
         </Card>
       )}
@@ -766,6 +849,15 @@ export default function Companies() {
                   />
                   <span>Select page ({wbPageItems.length})</span>
                 </label>
+                {workbenchProducts.length > wbPageItems.length && (
+                  <button
+                    type="button"
+                    onClick={toggleWbSelectAll}
+                    className="font-medium text-[var(--color-primary)] hover:underline"
+                  >
+                    {allWbSelected ? `Deselect all (${workbenchProducts.length})` : `Select all (${workbenchProducts.length})`}
+                  </button>
+                )}
                 <span className="tabular-nums">
                   · Showing <b className="font-medium text-[var(--text-primary)]">{workbenchProducts.length}</b> matching
                   {wbSelected.size > 0 && ` · ${wbSelected.size} selected`}
@@ -781,7 +873,26 @@ export default function Companies() {
                 )}
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                {(wbSelected.size > 0 ? wbSelectedSuggestions : workbenchSuggestions).length > 0 && (
+                  <Button
+                    small
+                    disabled={autoBusy || wbBusy}
+                    onClick={() =>
+                      void applySuggestionBatch(wbSelected.size > 0 ? wbSelectedSuggestions : workbenchSuggestions)
+                    }
+                    className="shrink-0"
+                  >
+                    <IconSparkles size={14} />
+                    <span>
+                      {(autoBusy || wbBusy) && applyProgress
+                        ? `Applying ${applyProgress.done.toLocaleString()}/${applyProgress.total.toLocaleString()}…`
+                        : wbSelected.size > 0
+                          ? `Apply suggested (${wbSelectedSuggestions.length})`
+                          : `Apply all suggested (${workbenchSuggestions.length})`}
+                    </span>
+                  </Button>
+                )}
                 <Select
                   value={targetCompany}
                   onChange={(e) => {
@@ -789,7 +900,7 @@ export default function Companies() {
                     setCustomTarget('')
                   }}
                   aria-label="Target company"
-                  className="!min-h-9 sm:!w-64 text-xs sm:text-[13px]"
+                  className="!min-h-9 sm:!w-60 text-xs sm:text-[13px]"
                 >
                   {companyDropdownList.map((name) => {
                     const def = PHARMA_COMPANIES.find((c) => c.name === name)
@@ -804,20 +915,21 @@ export default function Companies() {
                   placeholder="Or custom company…"
                   value={customTarget}
                   onChange={(e) => setCustomTarget(e.target.value)}
-                  className="!min-h-9 sm:!w-44 text-xs sm:text-[13px]"
+                  className="!min-h-9 sm:!w-40 text-xs sm:text-[13px]"
                 />
                 <Button
                   small
-                  disabled={wbSelected.size === 0 || wbBusy || !effectiveTarget}
+                  variant="secondary"
+                  disabled={wbSelected.size === 0 || autoBusy || wbBusy || !effectiveTarget}
                   onClick={() => void applyWorkbenchBulk(effectiveTarget)}
                   className="shrink-0"
                 >
                   <span>
-                    {wbBusy
-                      ? 'Saving…'
+                    {wbBusy && applyProgress
+                      ? `Saving ${applyProgress.done.toLocaleString()}/${applyProgress.total.toLocaleString()}…`
                       : wbSelected.size > 0
                         ? `Assign ${wbSelected.size} → ${effectiveTarget}`
-                        : 'Select items to assign'}
+                        : 'Assign selected'}
                   </span>
                 </Button>
               </div>
@@ -837,6 +949,8 @@ export default function Companies() {
                 const sug = suggestionByProductId.get(p.id)
                 const checked = wbSelected.has(p.id)
                 const shopNames = [...new Set(recs.map((r) => shopMap.get(r.shop_id)?.name).filter(Boolean))]
+                const savedRaw = p.manufacturer?.trim() || null
+                const isPendingDbSave = !!sug || !savedRaw || savedRaw !== liveCompany
                 return (
                   <div
                     key={p.id}
@@ -865,12 +979,22 @@ export default function Companies() {
                           {p.dosage_form && <Badge tone="blue">{p.dosage_form}</Badge>}
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-secondary)]">
-                          <span>
-                            Company:{' '}
-                            <b className="font-medium text-[var(--text-primary)]">
-                              {liveCompany ?? (p.manufacturer ? `Raw "${p.manufacturer}"` : 'Uncategorized')}
-                            </b>
-                          </span>
+                          {isPendingDbSave ? (
+                            <>
+                              <span>
+                                Saved:{' '}
+                                <b className="font-medium text-[var(--text-primary)]">
+                                  {savedRaw ? `"${savedRaw}"` : 'Uncategorized'}
+                                </b>
+                              </span>
+                              {sug && <span className="text-[var(--color-primary)]">· {sug.reasonLabel}</span>}
+                            </>
+                          ) : (
+                            <span>
+                              Company:{' '}
+                              <b className="font-medium text-[var(--text-primary)]">{liveCompany}</b>
+                            </span>
+                          )}
                           {shopNames.length > 0 && (
                             <span className="truncate">· Shops: {shopNames.join(', ')}</span>
                           )}
@@ -879,16 +1003,18 @@ export default function Companies() {
                     </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-6 sm:pl-0">
-                      {sug && sug.suggestedManufacturer && (
+                      {sug && (
                         <Button
                           small
                           variant="secondary"
-                          disabled={wbBusy}
-                          onClick={() => void applySingleSuggestion(p.id, sug.suggestedManufacturer)}
+                          disabled={autoBusy || wbBusy}
+                          onClick={() => void applySingleSuggestion(sug)}
                           title={sug.reasonLabel}
                         >
                           <IconSparkles size={13} className="text-[var(--color-primary)]" />
-                          <span>Apply: {sug.suggestedManufacturer}</span>
+                          <span>
+                            {sug.suggestedManufacturer ? `Apply: ${sug.suggestedManufacturer}` : 'Clear placeholder'}
+                          </span>
                         </Button>
                       )}
                       {liveCompany && (
@@ -995,7 +1121,11 @@ export default function Companies() {
                 Cancel
               </Button>
               <Button disabled={autoBusy || selectedAutoSuggestions.length === 0} onClick={() => void runAutoCategorize()}>
-                {autoBusy ? 'Applying…' : `Apply (${selectedAutoSuggestions.length})`}
+                {autoBusy && applyProgress
+                  ? `Applying ${applyProgress.done.toLocaleString()} / ${applyProgress.total.toLocaleString()}…`
+                  : autoBusy
+                    ? 'Applying…'
+                    : `Apply (${selectedAutoSuggestions.length})`}
               </Button>
             </div>
           </div>

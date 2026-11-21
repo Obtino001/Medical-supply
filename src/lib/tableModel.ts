@@ -3,6 +3,7 @@ import { companyProductDedupeKey, primaryProductScore, resolveCanonicalCompany, 
 import { compareOffers, type CompareOptions, type CompareResult, type OfferView } from './compare'
 import { rankOffers, type OfferRanking } from './offerRank'
 import { naturalCompare, numCompare, variantLabel } from './productParse'
+import { buildSearchIndexEntry, expandCompanySearchTerms, matchesSearch, type SearchIndexEntry } from './search'
 import type { PriceRecord, Product, Shop } from './types'
 
 export interface ProductRow {
@@ -30,6 +31,39 @@ export interface ProductRow {
   hasExpiredOffer: boolean
   hasIncompleteOffer: boolean
   searchText: string
+  searchIndex: SearchIndexEntry
+}
+
+function collectProductSearchParts(
+  product: Product,
+  records: PriceRecord[],
+  shops: Map<string, Shop>,
+  company: string | null,
+  variant: string,
+): (string | null | undefined)[] {
+  const parts: (string | null | undefined)[] = [
+    product.name,
+    product.normalized_name,
+    product.brand,
+    product.manufacturer,
+    ...expandCompanySearchTerms(company ?? product.manufacturer),
+    product.country_of_origin,
+    product.active_ingredient,
+    product.dosage_form,
+    product.variant,
+    variant,
+    product.barcode,
+    product.mfr_code,
+    `#${product.product_no}`,
+    String(product.product_no),
+    product.strength_value != null ? `${product.strength_value}${product.strength_unit ?? ''}` : '',
+    product.weight_value != null ? `${product.weight_value}${product.weight_unit ?? ''}` : '',
+    product.pack_size != null ? `${product.pack_size}s` : '',
+  ]
+  for (const r of records) {
+    parts.push(r.original_title, r.original_code, r.scheme_text, shops.get(r.shop_id)?.name)
+  }
+  return parts
 }
 
 export function buildProductRows(products: Product[], current: PriceRecord[], shops: Map<string, Shop>, opt: CompareOptions): ProductRow[] {
@@ -58,28 +92,9 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
       if (latestDate == null || r.observed_on > latestDate) latestDate = r.observed_on
       if (oldestDate == null || r.observed_on < oldestDate) oldestDate = r.observed_on
     }
-    const searchParts: (string | null | undefined)[] = [
-      product.name,
-      product.normalized_name,
-      product.brand,
-      product.manufacturer,
-      company,
-      product.active_ingredient,
-      product.dosage_form,
-      product.variant,
-      variant,
-      product.barcode,
-      product.mfr_code,
-      `#${product.product_no}`,
-      String(product.product_no),
-      product.strength_value != null ? `${product.strength_value}${product.strength_unit ?? ''}` : '',
-      product.weight_value != null ? `${product.weight_value}${product.weight_unit ?? ''}` : '',
-      product.pack_size != null ? `${product.pack_size}s` : '',
-    ]
-    for (const r of records) {
-      searchParts.push(r.original_title, r.original_code, r.scheme_text, shops.get(r.shop_id)?.name)
-    }
-    const searchText = searchParts.filter(Boolean).join(' ').toLowerCase()
+    const searchParts = collectProductSearchParts(product, records, shops, company, variant)
+    const searchIndex = buildSearchIndexEntry(searchParts)
+    const searchText = searchIndex.spaced
 
     return {
       product,
@@ -105,6 +120,7 @@ export function buildProductRows(products: Product[], current: PriceRecord[], sh
       hasExpiredOffer: cmp.hasExpiredOffers,
       hasIncompleteOffer: cmp.hasIncompleteOffers,
       searchText,
+      searchIndex,
     }
   })
 }
@@ -329,27 +345,23 @@ export function titleCase(s: string): string {
 export interface SearchableRow {
   product: Product
   records: PriceRecord[]
+  company?: string | null
+  variant?: string
   searchText?: string
+  searchIndex?: SearchIndexEntry
 }
 
-/** Case-insensitive token search across product fields, dosage form, supplier codes, and shop names. */
+/** Case-insensitive, punctuation/unit/homoglyph-normalized token search across products, companies, aliases, and shops. */
 export function matchesQuery(r: SearchableRow, q: string, shops: Map<string, Shop>): boolean {
-  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean)
-  if (!tokens.length) return true
-  if (r.searchText) {
-    return tokens.every((t) => r.searchText!.includes(t))
-  }
-  const p = r.product
-  const hay = [
-    p.name, p.normalized_name, p.brand, p.manufacturer, p.active_ingredient, p.dosage_form, p.variant,
-    p.barcode, p.mfr_code, `#${p.product_no}`, String(p.product_no),
-    p.strength_value != null ? `${p.strength_value}${p.strength_unit ?? ''}` : '',
-    p.weight_value != null ? `${p.weight_value}${p.weight_unit ?? ''}` : '',
-    p.pack_size != null ? `${p.pack_size}s` : '',
-    ...r.records.flatMap((x) => [x.original_title, x.original_code, x.scheme_text, shops.get(x.shop_id)?.name]),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-  return tokens.every((t) => hay.includes(t))
+  if (!q || !q.trim()) return true
+  if (r.searchIndex) return matchesSearch(r.searchIndex, q)
+  if (r.searchText) return matchesSearch([r.searchText], q)
+  const parts = collectProductSearchParts(
+    r.product,
+    r.records,
+    shops,
+    r.company ?? resolveProductDisplayCompany(r.product, r.records),
+    r.variant ?? variantLabel(r.product),
+  )
+  return matchesSearch(parts, q)
 }

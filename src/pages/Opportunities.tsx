@@ -7,6 +7,7 @@ import { Badge, Button, Card, Empty, PageHeader, Pagination, Select, Stat, cx, f
 import { compareOffers, findOpportunities, type OpportunityReason } from '../lib/compare'
 import { useData } from '../lib/data'
 import { variantLabel } from '../lib/productParse'
+import { matchesSearch } from '../lib/search'
 import { supabase } from '../lib/supabase'
 import type { OpportunityStatus } from '../lib/types'
 
@@ -80,7 +81,7 @@ export default function Opportunities() {
   }, [all, verifiedOnly, hideStatus, opportunityStatus, wishlistMap])
 
   const list = useMemo(() => {
-    const tokens = q.toLowerCase().split(/\s+/).filter(Boolean)
+    const hasQ = q.trim().length > 0
     const out = all.filter((o) => {
       if (verifiedOnly && !o.verified) return false
       if (reason && !o.reasons.includes(reason)) return false
@@ -89,11 +90,32 @@ export default function Opportunities() {
       if (tab === 'wishlist' && !wishlistMap.has(o.product.id)) return false
       if (tab === 'fresh' && !o.best.fresh) return false
       if (tab === 'new_low' && !o.reasons.includes('new_low')) return false
-      if (tokens.length > 0) {
+      if (hasQ) {
         const winShop = shopMap.get(o.best.rec.shop_id)?.name ?? ''
         const nextShop = o.next ? shopMap.get(o.next.rec.shop_id)?.name ?? '' : ''
-        const hay = `${o.product.name} #${o.product.product_no} ${o.product.brand ?? ''} ${o.product.manufacturer ?? ''} ${winShop} ${nextShop}`.toLowerCase()
-        if (!tokens.every((t) => hay.includes(t))) return false
+        const p = o.product
+        const ok = matchesSearch(
+          [
+            p.name,
+            p.normalized_name,
+            `#${p.product_no}`,
+            String(p.product_no),
+            p.brand,
+            p.manufacturer,
+            p.country_of_origin,
+            p.dosage_form,
+            p.barcode,
+            p.mfr_code,
+            p.strength_value != null ? `${p.strength_value}${p.strength_unit ?? ''}` : '',
+            p.weight_value != null ? `${p.weight_value}${p.weight_unit ?? ''}` : '',
+            winShop,
+            nextShop,
+            o.best.rec.original_title,
+            o.next?.rec.original_title,
+          ],
+          q,
+        )
+        if (!ok) return false
       }
       return true
     })

@@ -10,7 +10,9 @@ import { resolveProductDisplayCompany } from '../lib/companies'
 import { compareOffers } from '../lib/compare'
 import { useData } from '../lib/data'
 import { rankOffers } from '../lib/offerRank'
+import { matchesSearch } from '../lib/search'
 import { updateChecked } from '../lib/supabase'
+import { matchesQuery } from '../lib/tableModel'
 import type { PriceRecord } from '../lib/types'
 
 const PER_PAGE = 50
@@ -64,18 +66,17 @@ export default function ShopDetail() {
   }, [current, products, id, settings])
 
   const filteredMine = useMemo(() => {
-    const ql = q.trim().toLowerCase()
+    const trimmed = q.trim()
     return mine
       .filter((r) => {
         if (onlyBest && (!r.product_id || !bestIds.has(r.product_id))) return false
-        if (!ql) return true
+        if (!trimmed) return true
         const prod = r.product_id ? productMap.get(r.product_id) : undefined
-        const comp = prod ? resolveProductDisplayCompany(prod, [r]) : null
-        const hay = `${prod?.name ?? ''} ${r.original_title} ${r.original_code ?? ''} ${comp ?? ''} ${r.scheme_text ?? ''}`.toLowerCase()
-        return hay.includes(ql)
+        if (prod) return matchesQuery({ product: prod, records: [r] }, trimmed, shopMap)
+        return matchesSearch([r.original_title, r.original_code, r.scheme_text, shopMap.get(r.shop_id)?.name], trimmed)
       })
       .sort((a, b) => (productMap.get(a.product_id!)?.name ?? '').localeCompare(productMap.get(b.product_id!)?.name ?? ''))
-  }, [mine, onlyBest, bestIds, q, productMap])
+  }, [mine, onlyBest, bestIds, q, productMap, shopMap])
 
   const pages = Math.max(1, Math.ceil(filteredMine.length / PER_PAGE))
   const safePage = Math.min(page, pages - 1)

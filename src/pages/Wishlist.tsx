@@ -10,6 +10,7 @@ import { compareOffers, findOpportunities, ageInDays, type CompareResult } from 
 import { useData } from '../lib/data'
 import { rankOffers } from '../lib/offerRank'
 import { variantLabel } from '../lib/productParse'
+import { matchesQuery } from '../lib/tableModel'
 import type { PriceRecord, Product, WishlistItem } from '../lib/types'
 
 type SortKey = 'lowest' | 'savings' | 'priority' | 'title' | 'recent' | 'oldest' | 'offers'
@@ -82,10 +83,7 @@ export default function Wishlist() {
   const shown = useMemo(() => {
     const out = entries.filter((e) => {
       const p = e.product
-      if (f.q) {
-        const shopNames = e.records.map((r) => shopMap.get(r.shop_id)?.name ?? '').join(' ')
-        if (!`${p.name} #${p.product_no} ${p.brand ?? ''} ${p.manufacturer ?? ''} ${shopNames}`.toLowerCase().includes(f.q.toLowerCase())) return false
-      }
+      if (f.q && !matchesQuery({ product: p, records: e.records }, f.q, shopMap)) return false
       if (f.priority && e.item.priority !== f.priority) return false
       if (f.brand && p.brand !== f.brand) return false
       if (f.manufacturer && p.manufacturer !== f.manufacturer) return false

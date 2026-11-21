@@ -54,6 +54,7 @@ import {
 } from '../lib/orders'
 import { naturalCompare, variantLabel } from '../lib/productParse'
 import { generatePurchaseOrderPdf, type PurchaseOrderPdfInput } from '../lib/purchaseOrderPdf'
+import { matchesQuery } from '../lib/tableModel'
 import type { PriceRecord, PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus } from '../lib/types'
 
 interface LocalLinePatch {
@@ -265,13 +266,10 @@ export default function Orders() {
   }, [selectedCompany, activeProducts, current])
 
   const filteredCatalog = useMemo(() => {
-    const q = catalogSearch.trim().toLowerCase()
-    if (!q) return companyCatalog
-    return companyCatalog.filter(({ product, records }) => {
-      const shopsStr = records.map((r) => shopMap.get(r.shop_id)?.name ?? '').join(' ')
-      const hay = `${product.name} ${product.brand ?? ''} ${product.dosage_form ?? ''} ${product.country_of_origin ?? ''} #${product.product_no} ${product.barcode ?? ''} ${product.mfr_code ?? ''} ${shopsStr}`.toLowerCase()
-      return hay.includes(q)
-    })
+    if (!catalogSearch.trim()) return companyCatalog
+    return companyCatalog.filter(({ product, records }) =>
+      matchesQuery({ product, records }, catalogSearch, shopMap),
+    )
   }, [companyCatalog, catalogSearch, shopMap])
 
   const orderItemByProductId = useMemo(
